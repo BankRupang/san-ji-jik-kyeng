@@ -1,9 +1,4 @@
-apply plugin: 'org.springframework.boot'
-
 dependencies {
-    implementation project(':common')
     implementation 'org.springframework.cloud:spring-cloud-config-server'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 }
-
-tasks.register("prepareKotlinBuildScriptModel"){}

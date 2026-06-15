@@ -8,8 +8,11 @@ group = 'com.bankrupang'
 version = '0.0.1-SNAPSHOT'
 
 ext {
-    springCloudVersion = '2025.0.0'
+    springCloudVersion = '2025.0.2'
 }
+
+def businessServices = ['user-service', 'auction-service', 'bid-service',
+                        'order-service', 'payment-service', 'notification-service', 'ai-service']
 
 subprojects {
     apply plugin: 'java'
@@ -41,5 +44,23 @@ subprojects {
 
     tasks.named('test') {
         useJUnitPlatform()
+    }
+
+    tasks.register("prepareKotlinBuildScriptModel") {}
+}
+
+configure(subprojects.findAll { it.name != 'common' }) {
+    apply plugin: 'org.springframework.boot'
+
+    dependencies {
+        implementation project(':common')
+    }
+}
+
+configure(subprojects.findAll { businessServices.contains(it.name) }) {
+    dependencies {
+        implementation 'org.springframework.boot:spring-boot-starter-web'
+        implementation 'org.springframework.cloud:spring-cloud-starter-config'
+        implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
     }
 }
