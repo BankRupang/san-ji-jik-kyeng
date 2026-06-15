@@ -1,0 +1,15 @@
+rootProject.name = 'sanji-jk'
+
+include "discovery-server"
+include "gateway-server"
+include "config-server"
+
+include "common"
+
+include "user-service"
+include "auction-service"
+include "bid-service"
+include "order-service"
+include "payment-service"
+include "notification-service"
+include "ai-service"
