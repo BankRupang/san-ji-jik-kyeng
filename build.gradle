@@ -7,6 +7,10 @@ plugins {
 group = 'com.bankrupang'
 version = '0.0.1-SNAPSHOT'
 
+ext {
+    springCloudVersion = '2025.0.0'
+}
+
 subprojects {
     apply plugin: 'java'
     apply plugin: 'io.spring.dependency-management'
@@ -24,6 +28,7 @@ subprojects {
     dependencyManagement {
         imports {
             mavenBom "org.springframework.boot:spring-boot-dependencies:3.5.15"
+            mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
         }
     }
 
