@@ -1,5 +1,5 @@
-spring:
+﻿spring:
   application:
     name: ai-service
   config:
-    import: "configserver:http://localhost:8888"
+    import: "optional:configserver:http://localhost:8888"
