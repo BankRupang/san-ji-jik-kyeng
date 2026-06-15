@@ -1,5 +1,9 @@
+apply plugin: 'java-library'
+
+jar { enabled = true }
+
 dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter'
+    api 'org.springframework.boot:spring-boot-starter'
 }
 
 tasks.register("prepareKotlinBuildScriptModel"){}
