@@ -13,3 +13,11 @@ include "order-service"
 include "payment-service"
 include "notification-service"
 include "ai-service"
+
+project(":user-service").projectDir         = new File(rootDir, "services/user-service")
+project(":auction-service").projectDir      = new File(rootDir, "services/auction-service")
+project(":bid-service").projectDir          = new File(rootDir, "services/bid-service")
+project(":order-service").projectDir        = new File(rootDir, "services/order-service")
+project(":payment-service").projectDir      = new File(rootDir, "services/payment-service")
+project(":notification-service").projectDir = new File(rootDir, "services/notification-service")
+project(":ai-service").projectDir           = new File(rootDir, "services/ai-service")
