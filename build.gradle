@@ -48,6 +48,12 @@ subprojects {
 
     tasks.named('test') {
         useJUnitPlatform()
+        systemProperty 'spring.autoconfigure.exclude',
+            'org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,' +
+            'org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration,' +
+            'org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration,' +
+            'org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration'
+        systemProperty 'spring.cloud.config.enabled', 'false'
     }
 
     tasks.register("prepareKotlinBuildScriptModel") {}
