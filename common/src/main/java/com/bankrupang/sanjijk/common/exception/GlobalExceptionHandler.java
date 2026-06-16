@@ -16,7 +16,7 @@ public class GlobalExceptionHandler {
         log.warn("BaseException: {}", e.getMessage());
         ErrorCode errorCode = e.getErrorCode();
         return ResponseEntity
-                .status(errorCode.getHttpStatus())
+                .status(errorCode.getStatus())
                 .body(ErrorResponse.of(errorCode));
     }
 
@@ -25,18 +25,18 @@ public class GlobalExceptionHandler {
         String message = e.getBindingResult().getFieldErrors().stream()
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .findFirst()
-                .orElse(ErrorCode.INVALID_INPUT.getMessage());
+                .orElse(CommonErrorCode.INVALID_INPUT.getMessage());
         log.warn("ValidationException: {}", message);
         return ResponseEntity
-                .status(ErrorCode.INVALID_INPUT.getHttpStatus())
-                .body(ErrorResponse.of(ErrorCode.INVALID_INPUT.name(), message));
+                .status(CommonErrorCode.INVALID_INPUT.getStatus())
+                .body(ErrorResponse.of(CommonErrorCode.INVALID_INPUT.name(), message));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException(Exception e) {
         log.error("Unexpected error", e);
         return ResponseEntity
-                .status(ErrorCode.INTERNAL_SERVER_ERROR.getHttpStatus())
-                .body(ErrorResponse.of(ErrorCode.INTERNAL_SERVER_ERROR));
+                .status(CommonErrorCode.INTERNAL_SERVER_ERROR.getStatus())
+                .body(ErrorResponse.of(CommonErrorCode.INTERNAL_SERVER_ERROR));
     }
 }
