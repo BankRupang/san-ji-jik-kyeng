@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import lombok.RequiredArgsConstructor;
 
+import com.bankrupang.sanjijk.auction.product.application.service.ProductService;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.request.ProductCreateRequest;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductCreateResponse;
 import com.bankrupang.sanjijk.common.response.ApiResponse;
