@@ -14,6 +14,10 @@ public class ApiResponse<T> {
     private String message;
     private T data;
 
+    public static <T> ApiResponse<T> create(T data) {
+        return new ApiResponse<>(true, "Created", data);
+    }
+
     public static <T> ApiResponse<T> ok(T data) {
         return new ApiResponse<>(true, "success", data);
     }

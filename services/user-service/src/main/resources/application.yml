@@ -1,5 +1,40 @@
 ﻿spring:
   application:
     name: user-service
-  config:
-    import: "optional:configserver:http://localhost:8888"
+
+  # 컨피그 서버 오류로 실행이 안되어 비활성화
+  cloud:
+    config:
+      enabled: false
+
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        show_sql: true
+        format_sql: true
+
+
+  # 로컬 DB 연결
+  datasource:
+    url: jdbc:postgresql://localhost:5432/root
+    username: root
+    password: "password"
+    driver-class-name: org.postgresql.Driver
+
+  # 키클락 링크
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:18080/realms/sanjijk
+          jwk-set-uri: http://localhost:18080/realms/sanjijk/protocol/openid-connect/certs
+
+# 키클락 설정
+keycloak:
+  server-url: ${KEYCLOAK_SERVER_URL}
+  realm: sanjijk
+  client-id: user-service
+  client-secret: ${KEYCLOAK_CLIENT_SECRET}

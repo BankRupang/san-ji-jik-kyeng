@@ -1,0 +1,79 @@
+package com.bankrupang.sanjijk.user.domain.entity;
+
+import com.bankrupang.sanjijk.common.entity.BaseEntity;
+import com.bankrupang.sanjijk.user.domain.UserRole;
+import com.bankrupang.sanjijk.user.domain.UserStatus;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+
+import java.util.UUID;
+
+@Entity
+@Table(name = "p_users")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class User extends BaseEntity {
+
+    @Column(nullable = false, updatable = false, unique = true, length = 20)
+    private String username;
+
+    @Column(nullable = false, length = 20)
+    private String name;
+
+    @Column(nullable = false,updatable = false, unique = true, length = 100)
+    private String email;
+
+    @Column(length = 30)
+    private String phone;
+
+    @Column(nullable = false, unique = true)
+    private String businessNumber;
+
+    @Column(name = "slack_id", nullable = false)
+    private UUID slackId;
+
+    @Column(name = "notification_allow")
+    private boolean notificationAllow;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private UserRole role;
+
+    @Enumerated(EnumType.STRING)
+    private UserStatus status;
+
+    @Builder(access = AccessLevel.PRIVATE)
+    public User(UUID userId, String username, String name, String email, String phone, String businessNumber, UUID slackId, boolean notificationAllow, UserRole role, UserStatus status) {
+        if (userId != null) {
+            this.assignId(userId);
+        }
+        this.username = username;
+        this.name = name;
+        this.email = email;
+        this.phone = phone;
+        this.businessNumber = businessNumber;
+        this.slackId = slackId;
+        this.notificationAllow = notificationAllow;
+        this.role = role;
+        this.status = status;
+    }
+
+    public static User create(UUID keycloakId,String username, String name, String email, String phone, String businessNumber, UUID slackId, boolean notificationAllow, UserRole role) {
+        return User.builder()
+                .userId(keycloakId)
+                .username(username)
+                .name(name)
+                .email(email)
+                .phone(phone)
+                .businessNumber(businessNumber)
+                .slackId(slackId)
+                .notificationAllow(notificationAllow)
+                .role(role)
+                .status(UserStatus.ACTIVE)
+                .build();
+    }
+}
