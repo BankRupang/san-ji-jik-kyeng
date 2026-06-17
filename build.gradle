@@ -71,11 +71,3 @@ configure(subprojects.findAll { businessServices.contains(it.name) }) {
         implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
     }
 }
-
-configure(subprojects.findAll { businessServices.contains(it.name) }) {
-    dependencies {
-        implementation 'org.springframework.boot:spring-boot-starter-web'
-        implementation 'org.springframework.cloud:spring-cloud-starter-config'
-        implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
-    }
-}
