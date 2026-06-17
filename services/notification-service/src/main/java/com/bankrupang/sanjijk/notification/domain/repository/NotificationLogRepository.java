@@ -14,6 +14,6 @@ public interface NotificationLogRepository extends JpaRepository<NotificationLog
 
     Page<NotificationLog> findByUserId(UUID userId, Pageable pageable);
 
-    List<NotificationLog> findByStatusAndSentAtIsNullAndCreatedAtBefore(
-            NotificationStatus status, LocalDateTime before);
+    List<NotificationLog> findByStatusAndNextRetryAtBefore(
+            NotificationStatus status, LocalDateTime now, Pageable pageable);
 }

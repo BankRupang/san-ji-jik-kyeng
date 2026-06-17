@@ -40,6 +40,11 @@ public class NotificationLog extends BaseEntity {
 
     private LocalDateTime sentAt;
 
+    @Column(nullable = false)
+    private int retryCount = 0;
+
+    private LocalDateTime nextRetryAt;
+
     public static NotificationLog create(UUID userId, NotificationType type,
                                          String title, String message,
                                          UUID referenceId, String referenceType) {
@@ -51,15 +56,30 @@ public class NotificationLog extends BaseEntity {
         log.status = NotificationStatus.PENDING;
         log.referenceId = referenceId;
         log.referenceType = referenceType;
+        log.nextRetryAt = LocalDateTime.now().plusMinutes(60);
         return log;
     }
 
     public void markSent() {
         this.status = NotificationStatus.SENT;
         this.sentAt = LocalDateTime.now();
+        this.nextRetryAt = null;
     }
 
     public void markFailed() {
         this.status = NotificationStatus.FAILED;
+        this.nextRetryAt = null;
+    }
+
+    private static final int MAX_RETRY = 5;
+
+    public void scheduleRetry() {
+        this.retryCount++;
+        if (this.retryCount >= MAX_RETRY) {
+            markFailed();
+            return;
+        }
+        long minutes = (long) Math.pow(2, this.retryCount - 1);
+        this.nextRetryAt = LocalDateTime.now().plusMinutes(minutes);
     }
 }
