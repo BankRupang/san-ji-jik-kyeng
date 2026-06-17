@@ -6,7 +6,7 @@ import java.util.UUID;
 import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 
 public record ProductCreateResponse(
-        UUID id,
+        UUID productId,
         UUID sellerId,
         String name,
         String description,
