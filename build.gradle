@@ -61,14 +61,11 @@ subprojects {
 
 configure(subprojects.findAll { it.name != 'common' }) {
     apply plugin: 'org.springframework.boot'
-
-    dependencies {
-        implementation project(':common')
-    }
 }
 
 configure(subprojects.findAll { businessServices.contains(it.name) }) {
     dependencies {
+        implementation project(':common')
         implementation 'org.springframework.boot:spring-boot-starter-web'
         implementation 'org.springframework.cloud:spring-cloud-starter-config'
         implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
