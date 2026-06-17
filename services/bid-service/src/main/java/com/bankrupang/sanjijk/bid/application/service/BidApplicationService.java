@@ -22,7 +22,7 @@ public class BidApplicationService {
         RLock lock = redissonClient.getLock(lockKey);
 
         try {
-            boolean acquired = lock.tryLock(3, 5, TimeUnit.SECONDS);
+            boolean acquired = lock.tryLock(2, 3, TimeUnit.SECONDS);
             if (!acquired) {
                 throw new RuntimeException("입찰 처리 중입니다. 잠시 후 다시 시도해주세요.");
             }
