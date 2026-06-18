@@ -10,6 +10,7 @@ import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -41,7 +42,23 @@ public class BidService {
                 throw new BaseException(BidErrorCode.AUCTION_NOT_FOUND);
             }
 
+            String status = (String) info.get("status");
 
+            if ("READY".equals(status)) {
+                LocalDateTime startAt = LocalDateTime.parse((String) info.get("startAt"));
+                if (LocalDateTime.now().isAfter(startAt)) {
+                    redisTemplate.opsForHash().put(hashKey, "status", "PROGRESS");
+                    status = "PROGRESS";
+                    log.info("경매 상태 PROGRESS 전환 - auctionId: {}", auctionId);
+                }
+            }
+
+            if (!"PROGRESS".equals(status)) {
+                throw new BaseException(BidErrorCode.AUCTION_NOT_IN_PROGRESS);
+            }
+
+            LocalDateTime endAt = LocalDateTime.parse((String) info.get("endAt"));
+            
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("락 획득 중 인터럽트 발생", e);
