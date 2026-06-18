@@ -41,3 +41,5 @@ out/
 .env.local
 .env.*.local
 *.env
+.notes/
+MEMORY.md
