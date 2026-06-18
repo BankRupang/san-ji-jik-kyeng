@@ -5,16 +5,16 @@ import java.util.UUID;
 
 import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 
-public record ProductListResponse (
+public record ProductResponse(
         UUID productId,
         UUID sellerId,
         String name,
         String description,
         String quantity,
         LocalDateTime createdAt
-){
-    public static ProductListResponse from(Product product) {
-        return new ProductListResponse(
+) {
+    public static ProductResponse from(Product product) {
+        return new ProductResponse(
                 product.getId(),
                 product.getSellerId(),
                 product.getName(),

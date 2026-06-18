@@ -20,8 +20,7 @@ import lombok.RequiredArgsConstructor;
 import com.bankrupang.sanjijk.auction.product.application.service.ProductService;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.request.ProductCreateRequest;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductCreateResponse;
-import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductDetailResponse;
-import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductListResponse;
+import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductResponse;
 import com.bankrupang.sanjijk.common.response.ApiResponse;
 import com.bankrupang.sanjijk.common.response.PageResponse;
 
@@ -46,19 +45,19 @@ public class ProductController {
     }
 
     @GetMapping("/{productId}")
-    public ResponseEntity<ApiResponse<ProductDetailResponse>> getProduct(
+    public ResponseEntity<ApiResponse<ProductResponse>> getProduct(
             @PathVariable UUID productId
     ) {
-        ProductDetailResponse response = productService.getProduct(productId);
+        ProductResponse response = productService.getProduct(productId);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<PageResponse<ProductListResponse>>> getProducts(
+    public ResponseEntity<ApiResponse<PageResponse<ProductResponse>>> getProducts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        PageResponse<ProductListResponse> response = productService.getProducts(page, size);
+        PageResponse<ProductResponse> response = productService.getProducts(page, size);
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }

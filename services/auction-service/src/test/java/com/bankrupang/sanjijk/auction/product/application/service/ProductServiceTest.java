@@ -30,8 +30,7 @@ import com.bankrupang.sanjijk.auction.product.exception.ProductErrorCode;
 import com.bankrupang.sanjijk.auction.product.exception.ProductException;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.request.ProductCreateRequest;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductCreateResponse;
-import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductDetailResponse;
-import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductListResponse;
+import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductResponse;
 import com.bankrupang.sanjijk.common.response.PageResponse;
 
 @DisplayName("ProductService 테스트")
@@ -120,7 +119,7 @@ class ProductServiceTest {
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
 
             // when
-            ProductDetailResponse result = productService.getProduct(productId);
+            ProductResponse result = productService.getProduct(productId);
 
             // then
             assertThat(result.productId()).isEqualTo(productId);
@@ -159,7 +158,7 @@ class ProductServiceTest {
                     .willReturn(new PageImpl<>(List.of(firstProduct, secondProduct)));
 
             // when
-            PageResponse<ProductListResponse> result = productService.getProducts(0, 10);
+            PageResponse<ProductResponse> result = productService.getProducts(0, 10);
 
             // then
             assertThat(result.getContent()).hasSize(2);

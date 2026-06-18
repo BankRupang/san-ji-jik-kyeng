@@ -15,8 +15,7 @@ import com.bankrupang.sanjijk.auction.product.exception.ProductErrorCode;
 import com.bankrupang.sanjijk.auction.product.exception.ProductException;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.request.ProductCreateRequest;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductCreateResponse;
-import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductDetailResponse;
-import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductListResponse;
+import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductResponse;
 import com.bankrupang.sanjijk.common.response.PageResponse;
 import com.bankrupang.sanjijk.common.util.PageableUtils;
 
@@ -49,19 +48,19 @@ public class ProductService {
         }
     }
 
-    public ProductDetailResponse getProduct(UUID productId) {
+    public ProductResponse getProduct(UUID productId) {
         Product product = productRepository.findByIdAndDeletedAtIsNull(productId)
                 .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND));
 
-        return ProductDetailResponse.from(product);
+        return ProductResponse.from(product);
     }
 
-    public PageResponse<ProductListResponse> getProducts(int page, int size) {
+    public PageResponse<ProductResponse> getProducts(int page, int size) {
         Pageable pageable = PageableUtils.ofDefault(page, size);
 
-        Page<ProductListResponse> products = productRepository
+        Page<ProductResponse> products = productRepository
                 .findAllByDeletedAtIsNull(pageable)
-                .map(ProductListResponse::from);
+                .map(ProductResponse::from);
 
         return PageResponse.of(products);
     }
