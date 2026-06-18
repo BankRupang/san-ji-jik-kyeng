@@ -21,11 +21,6 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Order extends BaseEntity {
 
-    @Id
-    @GeneratedValue
-    @Column(name = "id", nullable = false, updatable = false)
-    private UUID id;
-
     @Column(name = "order_number", nullable = false, unique = true)
     private String orderNumber;
 
