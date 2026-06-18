@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,8 +20,10 @@ import lombok.RequiredArgsConstructor;
 
 import com.bankrupang.sanjijk.auction.product.application.service.ProductService;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.request.ProductCreateRequest;
+import com.bankrupang.sanjijk.auction.product.presentation.dto.request.ProductUpdateRequest;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductCreateResponse;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductResponse;
+import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductUpdateResponse;
 import com.bankrupang.sanjijk.common.response.ApiResponse;
 import com.bankrupang.sanjijk.common.response.PageResponse;
 
@@ -58,6 +61,18 @@ public class ProductController {
             @RequestParam(defaultValue = "20") int size
     ) {
         PageResponse<ProductResponse> response = productService.getProducts(page, size);
+
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @PatchMapping("/{productId}")
+    public ResponseEntity<ApiResponse<ProductUpdateResponse>> updateProduct(
+            @RequestHeader("X-User-Id") UUID sellerId,
+            @RequestHeader("X-User-Role") String userRole,
+            @PathVariable UUID productId,
+            @Valid @RequestBody ProductUpdateRequest request
+    ) {
+        ProductUpdateResponse response = productService.updateProduct(sellerId, userRole, productId, request);
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
