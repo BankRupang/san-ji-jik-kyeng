@@ -174,6 +174,43 @@ class NotificationEventServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("processAndPublish() — slackId 검증")
+    class SlackIdValidation {
+
+        @Test
+        @DisplayName("slackId가 null이면 저장 및 이벤트 발행 안 함")
+        void nullSlackId() {
+            // given
+            AuctionWonEvent event = createAuctionWonEvent();
+            given(userNotificationCacheService.getNotificationEnabled(any()))
+                    .willReturn(new UserNotificationResponse(UUID.randomUUID(), null, true));
+
+            // when
+            notificationEventService.handleAuctionWon(event);
+
+            // then
+            then(notificationLogRepository).shouldHaveNoInteractions();
+            then(eventPublisher).shouldHaveNoInteractions();
+        }
+
+        @Test
+        @DisplayName("slackId가 빈 문자열이면 저장 및 이벤트 발행 안 함")
+        void blankSlackId() {
+            // given
+            AuctionWonEvent event = createAuctionWonEvent();
+            given(userNotificationCacheService.getNotificationEnabled(any()))
+                    .willReturn(new UserNotificationResponse(UUID.randomUUID(), "", true));
+
+            // when
+            notificationEventService.handleAuctionWon(event);
+
+            // then
+            then(notificationLogRepository).shouldHaveNoInteractions();
+            then(eventPublisher).shouldHaveNoInteractions();
+        }
+    }
+
     private AuctionWonEvent createAuctionWonEvent() {
         AuctionWonEvent event = new AuctionWonEvent();
         ReflectionTestUtils.setField(event, "auctionId", UUID.randomUUID());

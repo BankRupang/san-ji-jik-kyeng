@@ -132,6 +132,11 @@ public class NotificationEventService {
             return;
         }
 
+        if (response.getSlackId() == null || response.getSlackId().isBlank()) {
+            log.warn("slackId 없음, 알림 스킵 userId={}", userId);
+            return;
+        }
+
         NotificationLog notificationLog = NotificationLog.create(
                 userId, type, title, message, referenceId, resolveReferenceType(type), response.getSlackId());
         notificationLogRepository.save(notificationLog);
