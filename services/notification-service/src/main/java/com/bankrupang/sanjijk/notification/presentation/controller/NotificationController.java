@@ -43,10 +43,10 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.ok(notificationService.getNotification(userId, notificationId)));
     }
 
-    @Operation(summary = "전체 알림 목록 조회 (어드민)", description = "모든 알림을 조회합니다. ADMIN 또는 MASTER 권한 필요.")
+    @Operation(summary = "전체 알림 목록 조회 (어드민)", description = "모든 알림을 조회합니다. MANAGER 또는 MASTER 권한 필요.")
     @GetMapping("/admin/notifications")
     public ResponseEntity<ApiResponse<PageResponse<NotificationResponseDto>>> getAllNotifications(
-            @Parameter(description = "사용자 역할 (gateway에서 주입) - ADMIN 또는 MASTER") @RequestHeader("X-User-Role") String userRole,
+            @Parameter(description = "사용자 역할 (gateway에서 주입) - MANAGER 또는 MASTER") @RequestHeader("X-User-Role") String userRole,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         validateAdminRole(userRole);
@@ -55,7 +55,7 @@ public class NotificationController {
     }
 
     private void validateAdminRole(String role) {
-        if (!"ADMIN".equals(role) && !"MASTER".equals(role)) {
+        if (!"MANAGER".equals(role) && !"MASTER".equals(role)) {
             throw new BaseException(NotificationErrorCode.NOTIFICATION_ACCESS_DENIED);
         }
     }
