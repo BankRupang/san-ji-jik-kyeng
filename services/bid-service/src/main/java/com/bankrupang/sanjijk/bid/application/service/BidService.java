@@ -58,6 +58,10 @@ public class BidService {
             }
 
             LocalDateTime endAt = LocalDateTime.parse((String) info.get("endAt"));
+
+            if (LocalDateTime.now().isAfter(endAt)) {
+                throw new BaseException(BidErrorCode.AUCTION_ENDED);
+            }
             
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
