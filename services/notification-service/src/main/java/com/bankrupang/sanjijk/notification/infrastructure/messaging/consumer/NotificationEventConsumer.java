@@ -29,13 +29,37 @@ public class NotificationEventConsumer {
                 .collect(Collectors.toMap(NotificationEventHandler::getEventType, h -> h));
     }
 
-    @KafkaListener(topics = "notification-events.DLT", containerFactory = "notificationDltContainerFactory")
-    public void consumeDlt(String payload) {
-        log.error("DLT 수신 - 재시도 소진, 운영자 확인 필요: {}", payload);
+    @KafkaListener(topics = "auction-events.DLT", containerFactory = "notificationDltContainerFactory")
+    public void consumeAuctionDlt(String payload) {
+        log.error("DLT 수신 (auction-events) - 재시도 소진, 운영자 확인 필요: {}", payload);
     }
 
-    @KafkaListener(topics = "notification-events", containerFactory = "notificationContainerFactory")
-    public void consume(String payload) {
+    @KafkaListener(topics = "bid-events.DLT", containerFactory = "notificationDltContainerFactory")
+    public void consumeBidDlt(String payload) {
+        log.error("DLT 수신 (bid-events) - 재시도 소진, 운영자 확인 필요: {}", payload);
+    }
+
+    @KafkaListener(topics = "payment-events.DLT", containerFactory = "notificationDltContainerFactory")
+    public void consumePaymentDlt(String payload) {
+        log.error("DLT 수신 (payment-events) - 재시도 소진, 운영자 확인 필요: {}", payload);
+    }
+
+    @KafkaListener(topics = "auction-events", containerFactory = "notificationContainerFactory")
+    public void consumeAuctionEvents(String payload) {
+        dispatch(payload);
+    }
+
+    @KafkaListener(topics = "bid-events", containerFactory = "notificationContainerFactory")
+    public void consumeBidEvents(String payload) {
+        dispatch(payload);
+    }
+
+    @KafkaListener(topics = "payment-events", containerFactory = "notificationContainerFactory")
+    public void consumePaymentEvents(String payload) {
+        dispatch(payload);
+    }
+
+    private void dispatch(String payload) {
         try {
             JsonNode node = objectMapper.readTree(payload);
             String type = node.path("type").asText("");
