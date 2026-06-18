@@ -77,6 +77,16 @@ public class ProductService {
         return ProductUpdateResponse.from(product);
     }
 
+    @Transactional
+    public void deleteProduct(UUID sellerId, String userRole, UUID productId) {
+        validateSellerRole(userRole);
+
+        Product product = getExistingProduct(productId);
+        validateProductOwner(product, sellerId);
+
+        product.softDelete(sellerId);
+    }
+
     private void validateSellerRole(String userRole) {
         if (!"SELLER".equalsIgnoreCase(userRole)) {
             throw new ProductException(ProductErrorCode.PRODUCT_FORBIDDEN);
