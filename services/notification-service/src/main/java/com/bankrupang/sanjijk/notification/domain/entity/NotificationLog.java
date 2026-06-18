@@ -56,7 +56,7 @@ public class NotificationLog extends BaseEntity {
         log.status = NotificationStatus.PENDING;
         log.referenceId = referenceId;
         log.referenceType = referenceType;
-        log.nextRetryAt = LocalDateTime.now().plusMinutes(60);
+        log.nextRetryAt = LocalDateTime.now();
         return log;
     }
 
