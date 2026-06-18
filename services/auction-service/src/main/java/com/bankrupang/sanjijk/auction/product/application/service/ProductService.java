@@ -14,8 +14,10 @@ import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepositor
 import com.bankrupang.sanjijk.auction.product.exception.ProductErrorCode;
 import com.bankrupang.sanjijk.auction.product.exception.ProductException;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.request.ProductCreateRequest;
+import com.bankrupang.sanjijk.auction.product.presentation.dto.request.ProductUpdateRequest;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductCreateResponse;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductResponse;
+import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductUpdateResponse;
 import com.bankrupang.sanjijk.common.response.PageResponse;
 import com.bankrupang.sanjijk.common.util.PageableUtils;
 
@@ -42,15 +44,8 @@ public class ProductService {
         return ProductCreateResponse.from(savedProduct);
     }
 
-    private void validateSellerRole(String userRole) {
-        if (!"SELLER".equalsIgnoreCase(userRole)) {
-            throw new ProductException(ProductErrorCode.PRODUCT_FORBIDDEN);
-        }
-    }
-
     public ProductResponse getProduct(UUID productId) {
-        Product product = productRepository.findByIdAndDeletedAtIsNull(productId)
-                .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND));
+        Product product = getExistingProduct(productId);
 
         return ProductResponse.from(product);
     }
@@ -63,6 +58,39 @@ public class ProductService {
                 .map(ProductResponse::from);
 
         return PageResponse.of(products);
+    }
+
+    @Transactional
+    public ProductUpdateResponse updateProduct(UUID sellerId, String userRole, UUID productId, ProductUpdateRequest request) {
+        validateSellerRole(userRole);
+
+        Product product = getExistingProduct(productId);
+        validateProductOwner(product, sellerId);
+
+        product.update(
+                request.name(),
+                request.description(),
+                request.quantity()
+        );
+
+        return ProductUpdateResponse.from(product);
+    }
+
+    private void validateSellerRole(String userRole) {
+        if (!"SELLER".equalsIgnoreCase(userRole)) {
+            throw new ProductException(ProductErrorCode.PRODUCT_FORBIDDEN);
+        }
+    }
+
+    private Product getExistingProduct(UUID productId) {
+        return productRepository.findByIdAndDeletedAtIsNull(productId)
+                .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND));
+    }
+
+    private void validateProductOwner(Product product, UUID sellerId) {
+        if (!product.getSellerId().equals(sellerId)) {
+            throw new ProductException(ProductErrorCode.PRODUCT_FORBIDDEN);
+        }
     }
 
 }
