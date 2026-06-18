@@ -43,9 +43,15 @@ public class Product extends BaseEntity {
     }
 
     public void update(String name, String description, String quantity) {
-        this.name = name;
-        this.description = description;
-        this.quantity = quantity;
+        if (name != null) {
+            this.name = name;
+        }
+        if (description != null) {
+            this.description = description;
+        }
+        if (quantity != null) {
+            this.quantity = quantity;
+        }
     }
 
 }

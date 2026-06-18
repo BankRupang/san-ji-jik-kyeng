@@ -63,6 +63,7 @@ public class ProductService {
     @Transactional
     public ProductUpdateResponse updateProduct(UUID sellerId, String userRole, UUID productId, ProductUpdateRequest request) {
         validateSellerRole(userRole);
+        validateUpdateRequest(request);
 
         Product product = getExistingProduct(productId);
         validateProductOwner(product, sellerId);
@@ -85,6 +86,22 @@ public class ProductService {
     private Product getExistingProduct(UUID productId) {
         return productRepository.findByIdAndDeletedAtIsNull(productId)
                 .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND));
+    }
+
+    private void validateUpdateRequest(ProductUpdateRequest request) {
+        if (request.name() == null && request.description() == null && request.quantity() == null) {
+            throw new ProductException(ProductErrorCode.INVALID_PRODUCT_REQUEST);
+        }
+
+        validateNotBlankIfPresent(request.name());
+        validateNotBlankIfPresent(request.description());
+        validateNotBlankIfPresent(request.quantity());
+    }
+
+    private void validateNotBlankIfPresent(String value) {
+        if (value != null && value.isBlank()) {
+            throw new ProductException(ProductErrorCode.INVALID_PRODUCT_REQUEST);
+        }
     }
 
     private void validateProductOwner(Product product, UUID sellerId) {
