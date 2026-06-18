@@ -1,0 +1,215 @@
+package com.bankrupang.sanjijk.order.domain.entity;
+
+import com.bankrupang.sanjijk.common.entity.BaseEntity;
+import com.bankrupang.sanjijk.order.domain.enums.OrderStatus;
+import com.bankrupang.sanjijk.order.domain.enums.OrderType;
+import com.bankrupang.sanjijk.order.domain.exception.InvalidOrderStatusException;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Entity
+@Table(name = "p_orders")
+@SQLRestriction("deleted_at IS NULL")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class Order extends BaseEntity {
+
+    @Id
+    @GeneratedValue
+    @Column(name = "id", nullable = false, updatable = false)
+    private UUID id;
+
+    @Column(name = "order_number", nullable = false, unique = true)
+    private String orderNumber;
+
+    @Column(name = "user_id", nullable = false, updatable = false)
+    private UUID userId;
+
+    @Column(name = "user_name", nullable = false, length = 10)
+    private String userName;
+
+    @Column(name = "slack_id", nullable = false, length = 30)
+    private String slackId;
+
+    @Column(name = "auction_id", nullable = false, updatable = false)
+    private UUID auctionId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "order_type", nullable = false, updatable = false)
+    private OrderType orderType;
+
+    @Column(name = "amount", nullable = false)
+    private Long amount;
+
+    @Column(name = "request_memo", length = 200)
+    private String requestMemo;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private OrderStatus status;
+
+    @Column(name = "payment_due_at")
+    private LocalDateTime paymentDueAt;
+
+    @Column(name = "penalty_due_at")
+    private LocalDateTime penaltyDueAt;
+
+    @Builder(access = AccessLevel.PRIVATE)
+    private Order(
+            String orderNumber,
+            UUID userId,
+            String userName,
+            String slackId,
+            UUID auctionId,
+            OrderType orderType,
+            Long amount,
+            String requestMemo,
+            LocalDateTime paymentDueAt
+    ) {
+        this.orderNumber = orderNumber;
+        this.userId = userId;
+        this.userName = userName;
+        this.slackId = slackId;
+        this.auctionId = auctionId;
+        this.orderType = orderType;
+        this.amount = amount;
+        this.requestMemo = requestMemo;
+        this.status = OrderStatus.PENDING;
+        this.paymentDueAt = paymentDueAt;
+    }
+
+    // 예치금 주문
+    public static Order createDepositOrder(
+            UUID userId,
+            String userName,
+            String slackId,
+            UUID auctionId,
+            Long amount
+    ) {
+        return Order.builder()
+                .orderNumber(generateOrderNumber())
+                .userId(userId)
+                .userName(userName)
+                .slackId(slackId)
+                .auctionId(auctionId)
+                .orderType(OrderType.DEPOSIT)
+                .amount(amount)
+                .build();
+    }
+
+    // 낙찰 주문
+    public static Order createWinningOrder(
+            UUID userId,
+            String userName,
+            String slackId,
+            UUID auctionId,
+            Long amount,
+            String requestMemo
+    ) {
+        return Order.builder()
+                .orderNumber(generateOrderNumber())
+                .userId(userId)
+                .userName(userName)
+                .slackId(slackId)
+                .auctionId(auctionId)
+                .orderType(OrderType.WINNING)
+                .amount(amount)
+                .requestMemo(requestMemo)
+                .paymentDueAt(LocalDateTime.now().plusMinutes(15))
+                .build();
+    }
+
+    // 토스에 전달할 주문 번호 -> 결제 서비스로
+    private static String generateOrderNumber() {
+        return "ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
+
+    // ──────────────────────────────────────────
+    // 상태 전이 메서드
+    // ──────────────────────────────────────────
+
+    // DEPOSIT: PENDING → PAYMENT_SUCCESS
+// WINNING: PENDING → PAYMENT_SUCCESS
+    public void markPaymentSuccess() {
+        if (this.status != OrderStatus.PENDING) {
+            throw new InvalidOrderStatusException();
+        }
+        this.status = OrderStatus.PAYMENT_SUCCESS;
+    }
+
+    // WINNING: PAYMENT_SUCCESS → COMPLETED
+    public void markCompleted() {
+        if (this.status != OrderStatus.PAYMENT_SUCCESS) {
+            throw new InvalidOrderStatusException();
+        }
+        this.status = OrderStatus.COMPLETED;
+    }
+
+    // DEPOSIT: PAYMENT_SUCCESS → REFUNDED (경매 유찰 시)
+    public void markRefunded() {
+        if (this.status != OrderStatus.PAYMENT_SUCCESS) {
+            throw new InvalidOrderStatusException();
+        }
+        this.status = OrderStatus.REFUNDED;
+    }
+
+    // DEPOSIT: PAYMENT_SUCCESS → FORFEITED (낙찰자 결제 실패 시)
+    public void markForfeited() {
+        if (this.status != OrderStatus.PAYMENT_SUCCESS) {
+            throw new InvalidOrderStatusException();
+        }
+        this.status = OrderStatus.FORFEITED;
+    }
+
+    // WINNING: PENDING → PAYMENT_FAILED
+    public void markPaymentFailed() {
+        if (this.status != OrderStatus.PENDING) {
+            throw new InvalidOrderStatusException();
+        }
+        this.status = OrderStatus.PAYMENT_FAILED;
+        this.penaltyDueAt = LocalDateTime.now().plusMinutes(15);
+    }
+
+    // WINNING: PAYMENT_FAILED → PENALTY_PENDING
+    public void markPenaltyPending() {
+        if (this.status != OrderStatus.PAYMENT_FAILED) {
+            throw new InvalidOrderStatusException();
+        }
+        this.status = OrderStatus.PENALTY_PENDING;
+    }
+
+    // WINNING: PENALTY_PENDING → COMPLETED (재결제 성공)
+    public void markPenaltyCompleted() {
+        if (this.status != OrderStatus.PENALTY_PENDING) {
+            throw new InvalidOrderStatusException();
+        }
+        this.status = OrderStatus.COMPLETED;
+    }
+
+    // WINNING: PENALTY_PENDING → EXPIRED (15분 초과)
+    public void markExpired() {
+        if (this.status != OrderStatus.PENALTY_PENDING) {
+            throw new InvalidOrderStatusException();
+        }
+        this.status = OrderStatus.EXPIRED;
+    }
+
+    // ──────────────────────────────────────────
+    // 내부 유효성 검사
+    // ──────────────────────────────────────────
+    private void validateStatus(OrderStatus required) {
+        if (this.status != required) {
+            throw new IllegalStateException(
+                    "주문 상태 전이 불가: " + this.status + " → " + required
+            );
+        }
+    }
+
+}
