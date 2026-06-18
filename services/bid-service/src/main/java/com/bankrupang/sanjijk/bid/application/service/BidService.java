@@ -1,6 +1,8 @@
 package com.bankrupang.sanjijk.bid.application.service;
 
+import com.bankrupang.sanjijk.bid.domain.exception.BidErrorCode;
 import com.bankrupang.sanjijk.bid.presentation.dto.BidRequestDto;
+import com.bankrupang.sanjijk.common.exception.BaseException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -8,8 +10,6 @@ import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -33,6 +33,13 @@ public class BidService {
             }
 
             log.info("분산 락 획득 - auctionId: {}, userId: {}", auctionId, userId);
+
+            String hashKey = "auction:" + auctionId + ":info";
+            Map<Object, Object> info = redisTemplate.opsForHash().entries(hashKey);
+
+            if (info.isEmpty()) {
+                throw new BaseException(BidErrorCode.AUCTION_NOT_FOUND);
+            }
 
 
         } catch (InterruptedException e) {
