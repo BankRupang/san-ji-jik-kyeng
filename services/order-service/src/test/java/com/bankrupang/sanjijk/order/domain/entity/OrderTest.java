@@ -15,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class OrderTest {
 
     private final UUID userId = UUID.randomUUID();
+    private final UUID sellerId = UUID.randomUUID();
     private final UUID auctionId = UUID.randomUUID();
 
     // ──────────────────────────────────────────
@@ -28,7 +29,7 @@ class OrderTest {
 
         @BeforeEach
         void setUp() {
-            order = Order.createDepositOrder(userId, "김지민", "U123456", auctionId, 50000L);
+            order = Order.createDepositOrder(userId, "김지민", "U123456", auctionId, "참외 10박스", 50000L);
         }
 
         @Test
@@ -88,7 +89,7 @@ class OrderTest {
 
         @BeforeEach
         void setUp() {
-            order = Order.createWinningOrder(userId, "김지민", "U123456", auctionId, 500000L, "문 앞에 놔주세요");
+            order = Order.createWinningOrder(userId, sellerId , "김지민", "U123456", auctionId, "참외 10박스",500000L, "문 앞에 놔주세요");
         }
 
         @Test

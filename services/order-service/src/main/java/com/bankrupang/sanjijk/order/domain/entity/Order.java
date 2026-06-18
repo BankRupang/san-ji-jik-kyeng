@@ -27,6 +27,9 @@ public class Order extends BaseEntity {
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
 
+    @Column(name = "seller_id", updatable = false)
+    private UUID sellerId;
+
     @Column(name = "user_name", nullable = false, length = 10)
     private String userName;
 
@@ -35,6 +38,9 @@ public class Order extends BaseEntity {
 
     @Column(name = "auction_id", nullable = false, updatable = false)
     private UUID auctionId;
+
+    @Column(name = "auction_title", nullable = false, length = 30)
+    private String auctionTitle;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "order_type", nullable = false, updatable = false)
@@ -60,9 +66,11 @@ public class Order extends BaseEntity {
     private Order(
             String orderNumber,
             UUID userId,
+            UUID sellerId,
             String userName,
             String slackId,
             UUID auctionId,
+            String auctionTitle,
             OrderType orderType,
             Long amount,
             String requestMemo,
@@ -70,9 +78,11 @@ public class Order extends BaseEntity {
     ) {
         this.orderNumber = orderNumber;
         this.userId = userId;
+        this.sellerId = sellerId;
         this.userName = userName;
         this.slackId = slackId;
         this.auctionId = auctionId;
+        this.auctionTitle = auctionTitle;
         this.orderType = orderType;
         this.amount = amount;
         this.requestMemo = requestMemo;
@@ -86,6 +96,7 @@ public class Order extends BaseEntity {
             String userName,
             String slackId,
             UUID auctionId,
+            String auctionTitle,
             Long amount
     ) {
         return Order.builder()
@@ -94,6 +105,7 @@ public class Order extends BaseEntity {
                 .userName(userName)
                 .slackId(slackId)
                 .auctionId(auctionId)
+                .auctionTitle(auctionTitle)
                 .orderType(OrderType.DEPOSIT)
                 .amount(amount)
                 .build();
@@ -102,18 +114,22 @@ public class Order extends BaseEntity {
     // 낙찰 주문
     public static Order createWinningOrder(
             UUID userId,
+            UUID sellerId,
             String userName,
             String slackId,
             UUID auctionId,
+            String auctionTitle,
             Long amount,
             String requestMemo
     ) {
         return Order.builder()
                 .orderNumber(generateOrderNumber())
                 .userId(userId)
+                .sellerId(sellerId)
                 .userName(userName)
                 .slackId(slackId)
                 .auctionId(auctionId)
+                .auctionTitle(auctionTitle)
                 .orderType(OrderType.WINNING)
                 .amount(amount)
                 .requestMemo(requestMemo)
