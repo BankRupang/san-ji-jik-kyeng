@@ -62,7 +62,13 @@ public class BidService {
             if (LocalDateTime.now().isAfter(endAt)) {
                 throw new BaseException(BidErrorCode.AUCTION_ENDED);
             }
-            
+
+            Long currentPrice = Long.parseLong((String) info.get("currentPrice"));
+
+            if (!request.getClientSeenPrice().equals(currentPrice)) {
+                throw new BaseException(BidErrorCode.BID_PRICE_OUTDATED);
+            }
+
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("락 획득 중 인터럽트 발생", e);
