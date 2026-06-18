@@ -29,10 +29,11 @@ public class ProductController {
     @PostMapping
     public ResponseEntity<ApiResponse<ProductCreateResponse>> createProduct (
             @RequestHeader("X-User-Id") UUID sellerId,
+            @RequestHeader("X-User-Role") String userRole,
             @Valid @RequestBody ProductCreateRequest request
     ) {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(ApiResponse.ok("상품이 생성되었습니다.", productService.createProduct(sellerId, request)));
+                .body(ApiResponse.ok("상품이 생성되었습니다.", productService.createProduct(sellerId, userRole, request)));
     }
 }
