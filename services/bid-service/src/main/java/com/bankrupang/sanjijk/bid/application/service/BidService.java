@@ -69,6 +69,15 @@ public class BidService {
                 throw new BaseException(BidErrorCode.BID_PRICE_OUTDATED);
             }
 
+            String highestBidderId = (String) info.get("highestBidderId");
+
+            // 2.5 최고 입찰자 본인 여부 확인 (중복 입찰 방지)
+            if (userId.toString().equals(highestBidderId)) {
+                throw new BaseException(BidErrorCode.ALREADY_HIGHEST_BIDDER);
+            }
+
+            // TODO: 2.6 보증금 결제 완료 여부 확인 (payment-service 협의 필요)
+
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("락 획득 중 인터럽트 발생", e);
