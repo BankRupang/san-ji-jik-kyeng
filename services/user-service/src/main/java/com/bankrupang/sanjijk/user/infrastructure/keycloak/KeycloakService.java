@@ -1,10 +1,15 @@
 package com.bankrupang.sanjijk.user.infrastructure.keycloak;
 
+import com.bankrupang.sanjijk.user.domain.UserRole;
+import com.bankrupang.sanjijk.user.domain.exception.UserKeycloakCreationFailedException;
 import jakarta.ws.rs.core.Response;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.keycloak.admin.client.Keycloak;
+import org.keycloak.admin.client.resource.UserResource;
 import org.keycloak.admin.client.resource.UsersResource;
 import org.keycloak.representations.idm.CredentialRepresentation;
+import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -12,6 +17,7 @@ import org.springframework.stereotype.Service;
 import java.util.Collections;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class KeycloakService {
@@ -21,35 +27,43 @@ public class KeycloakService {
     @Value("${keycloak.realm}")
     private String realm;
 
-    public UUID createUser(String username, String email, String password) {
-        // 1. Keycloak 규격에 맞는 유저 객체 생성
+    public UUID createUser(String username, String email, String password, UserRole role) {
         UserRepresentation user = new UserRepresentation();
         user.setUsername(username);
         user.setEmail(email);
-        user.setEnabled(true); // 💡 아까 수동으로 켰던 Enabled 설정을 코드로 자동화!
+        user.setEnabled(true);
 
-        // 2. 비밀번호 세팅
         CredentialRepresentation credential = new CredentialRepresentation();
         credential.setType(CredentialRepresentation.PASSWORD);
         credential.setValue(password);
-        credential.setTemporary(false); // 💡 아까 삽질 유발했던 Temporary도 false로 깔끔하게 처리!
+        credential.setTemporary(false);
         user.setCredentials(Collections.singletonList(credential));
 
-        // 3. Keycloak 서버의 Users API 호출
         UsersResource usersResource = keycloak.realm(realm).users();
         Response response = usersResource.create(user);
 
         if (response.getStatus() == 201) {
-            // 성공하면 Keycloak 생성 URL에서 생성된 유저의 고유 UUID를 파싱해서 반환합니다.
             String path = response.getLocation().getPath();
             String keycloakUserId = path.substring(path.lastIndexOf("/") + 1);
+            assignRoleToUser(keycloakUserId, role.name());
             return UUID.fromString(keycloakUserId);
         } else {
-            throw new RuntimeException("Keycloak 회원가입 실패 상태코드: " + response.getStatus());
+            log.error("Keycloak 유저 생성 실패. status={}, username={}", response.getStatus(), username);
+            throw new UserKeycloakCreationFailedException();
         }
     }
 
+    private void assignRoleToUser(String userId, String roleName) {
+        RoleRepresentation roleToAssign = keycloak.realm(realm)
+                .roles()
+                .get(roleName)
+                .toRepresentation();
+
+        UserResource userResource = keycloak.realm(realm).users().get(userId);
+        userResource.roles().realmLevel().add(Collections.singletonList(roleToAssign));
+    }
+
     public void deleteUser(UUID keycloakUserId) {
-            keycloak.realm(realm).users().get(keycloakUserId.toString()).remove();
+        keycloak.realm(realm).users().get(keycloakUserId.toString()).remove();
     }
 }

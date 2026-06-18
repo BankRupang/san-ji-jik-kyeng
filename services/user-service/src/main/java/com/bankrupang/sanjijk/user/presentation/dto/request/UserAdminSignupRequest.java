@@ -5,7 +5,7 @@ import jakarta.validation.constraints.*;
 
 import java.util.UUID;
 
-public record UserSignupRequest(
+public record UserAdminSignupRequest(
         @NotBlank
         @Pattern(regexp = "^[a-z0-9]{4,12}$", message = "username은 4~12자 소문자와 숫자만 가능합니다")
         String username,
@@ -26,24 +26,23 @@ public record UserSignupRequest(
                 message = "password는 8~15자, 대소문자, 숫자, 특수문자를 포함해야 합니다")
         String password,
 
-        @NotBlank
-        @Pattern(regexp = "^\\d{3}-\\d{2}-\\d{5}$", message = "사업자등록번호 형식이 올바르지 않습니다. (예: 123-45-67890)")
-        String businessNumber,
-
         @NotNull
         UUID slackId,
 
         boolean notificationAllow,
 
         @NotNull
-        UserRole role
+        UserRole role,
+
+        @NotBlank
+        String adminKey
 ) {
-    public UserSignupRequest {
+    public UserAdminSignupRequest {
         username = cleanString(username);
         name = cleanString(name);
         email = cleanString(email);
         phone = cleanString(phone);
-        businessNumber = cleanString(businessNumber);
+        adminKey = cleanString(adminKey);
     }
 
     private static String cleanString(String input) {

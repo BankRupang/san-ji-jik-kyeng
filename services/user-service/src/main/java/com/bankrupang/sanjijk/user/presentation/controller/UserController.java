@@ -2,6 +2,7 @@ package com.bankrupang.sanjijk.user.presentation.controller;
 
 import com.bankrupang.sanjijk.common.response.ApiResponse;
 import com.bankrupang.sanjijk.user.application.service.UserService;
+import com.bankrupang.sanjijk.user.presentation.dto.request.UserAdminSignupRequest;
 import com.bankrupang.sanjijk.user.presentation.dto.request.UserSignupRequest;
 import com.bankrupang.sanjijk.user.presentation.dto.response.UserResponse;
 import jakarta.validation.Valid;
@@ -18,9 +19,19 @@ public class UserController {
 
     private final UserService userService;
 
+    // 일반 유저 가입 (BUYER / SELLER)
     @PostMapping("/api/v1/auth/signup")
-    public ResponseEntity<ApiResponse<UserResponse>> signup (
+    public ResponseEntity<ApiResponse<UserResponse>> signup(
             @RequestBody @Valid UserSignupRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.create(userService.signup(request)));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.create(userService.signup(request)));
+    }
+
+    // 관리자 가입 (MANAGER / MASTER)
+    @PostMapping("/api/v1/auth/admin/signup")
+    public ResponseEntity<ApiResponse<UserResponse>> adminSignup(
+            @RequestBody @Valid UserAdminSignupRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.create(userService.adminSignup(request)));
     }
 }

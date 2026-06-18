@@ -23,7 +23,7 @@ public class KeycloakConfig {
 
     @Bean
     public Keycloak keycloakAdminClient() {
-        // 💡 Service account roles 설정을 켰기 때문에 Client Credentials 방식으로 상시 인증 연동
+        // Service account roles 설정을 켰기 때문에 Client Credentials 방식으로 상시 인증 연동
         return KeycloakBuilder.builder()
                 .serverUrl(serverUrl)
                 .realm(realm)

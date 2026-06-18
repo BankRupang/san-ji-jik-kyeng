@@ -8,7 +8,6 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
 
 import java.util.UUID;
 
@@ -24,13 +23,14 @@ public class User extends BaseEntity {
     @Column(nullable = false, length = 20)
     private String name;
 
-    @Column(nullable = false,updatable = false, unique = true, length = 100)
+    @Column(nullable = false, updatable = false, unique = true, length = 100)
     private String email;
 
     @Column(length = 30)
     private String phone;
 
-    @Column(nullable = false, unique = true)
+    // 관리자(MANAGER, MASTER)는 사업자번호가 없을 수 있음
+    @Column(unique = true)
     private String businessNumber;
 
     @Column(name = "slack_id", nullable = false)
@@ -47,7 +47,9 @@ public class User extends BaseEntity {
     private UserStatus status;
 
     @Builder(access = AccessLevel.PRIVATE)
-    public User(UUID userId, String username, String name, String email, String phone, String businessNumber, UUID slackId, boolean notificationAllow, UserRole role, UserStatus status) {
+    public User(UUID userId, String username, String name, String email, String phone,
+                String businessNumber, UUID slackId, boolean notificationAllow,
+                UserRole role, UserStatus status) {
         if (userId != null) {
             this.assignId(userId);
         }
@@ -62,7 +64,9 @@ public class User extends BaseEntity {
         this.status = status;
     }
 
-    public static User create(UUID keycloakId,String username, String name, String email, String phone, String businessNumber, UUID slackId, boolean notificationAllow, UserRole role) {
+    public static User create(UUID keycloakId, String username, String name, String email,
+                              String phone, String businessNumber, UUID slackId,
+                              boolean notificationAllow, UserRole role) {
         return User.builder()
                 .userId(keycloakId)
                 .username(username)
