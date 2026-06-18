@@ -2,7 +2,7 @@
   application:
     name: gateway-server
   config:
-    import: "configserver:http://localhost:8888"
+    import: "configserver:"
   cloud:
     config:
       fail-fast: true

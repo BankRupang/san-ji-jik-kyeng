@@ -2,13 +2,10 @@ name: sanji-dev
 
 # 모든 Spring 서비스가 공통으로 사용하는 설정
 # depends_on은 서비스마다 의존성이 달라서 여기에 넣지 않음
+# environment도 서비스마다 다른 항목이 있어 각 서비스에 명시
 x-spring-common: &spring-common
   restart: unless-stopped
   networks: [sanji]
-  environment:
-    SPRING_PROFILES_ACTIVE: dev
-    SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
-    EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
 
 services:
   # ================================================================
@@ -110,12 +107,17 @@ services:
       config-server: { condition: service_healthy }
 
   # 로컬 진입점. prod에서는 ALB 뒤에서 ECS Fargate로 실행됨
+  # SPRING_CLOUD_CONFIG_URI로 application.yml의 localhost:8888 오버라이드
   gateway-server:
     <<: *spring-common
     build:
       context: .
       dockerfile: ./gateway-server/Dockerfile
     ports: ["8000:8000"]
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
     depends_on:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
@@ -124,6 +126,7 @@ services:
   # 비즈니스 서비스
   # config-server의 config/*.yml이 localhost를 사용하므로
   # environment 블록에서 컨테이너 이름으로 오버라이드
+  # YAML 앵커 머지는 environment 키를 통째로 덮어쓰므로 공통 변수도 명시
   # ================================================================
 
   user-service:
@@ -133,9 +136,19 @@ services:
       dockerfile: ./services/user-service/Dockerfile
     ports: ["19091:19091"]
     environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=user_schema
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      # application.yml의 localhost를 컨테이너 환경에 맞게 오버라이드
+      KEYCLOAK_SERVER_URL: ${KEYCLOAK_SERVER_URL}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUERURI: ${KEYCLOAK_SERVER_URL}/realms/${KEYCLOAK_REALM}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI: ${KEYCLOAK_SERVER_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs
+      MANAGER_KEY: ${MANAGER_KEY}
+      MASTER_KEY: ${MASTER_KEY}
     depends_on:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
@@ -149,6 +162,9 @@ services:
       dockerfile: ./services/auction-service/Dockerfile
     ports: ["19092:19092"]
     environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=auction_schema
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
@@ -169,6 +185,9 @@ services:
       dockerfile: ./services/bid-service/Dockerfile
     ports: ["19093:19093"]
     environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=bid_schema
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
@@ -188,6 +207,9 @@ services:
       dockerfile: ./services/order-service/Dockerfile
     ports: ["19094:19094"]
     environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=order_schema
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
@@ -205,6 +227,9 @@ services:
       dockerfile: ./services/payment-service/Dockerfile
     ports: ["19095:19095"]
     environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=payment_schema
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
@@ -222,6 +247,9 @@ services:
       dockerfile: ./services/notification-service/Dockerfile
     ports: ["19096:19096"]
     environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=notification_schema
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
@@ -239,6 +267,9 @@ services:
       dockerfile: ./services/ai-service/Dockerfile
     ports: ["19097:19097"]
     environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=ai_schema
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
