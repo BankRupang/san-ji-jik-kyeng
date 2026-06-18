@@ -17,6 +17,8 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class NotificationLog extends BaseEntity {
 
+    private static final int MAX_RETRY = 5;
+
     @Column(nullable = false)
     private UUID userId;
 
@@ -38,6 +40,9 @@ public class NotificationLog extends BaseEntity {
 
     private String referenceType;
 
+    @Column(nullable = false)
+    private String slackId;
+
     private LocalDateTime sentAt;
 
     @Column(nullable = false)
@@ -47,7 +52,8 @@ public class NotificationLog extends BaseEntity {
 
     public static NotificationLog create(UUID userId, NotificationType type,
                                          String title, String message,
-                                         UUID referenceId, String referenceType) {
+                                         UUID referenceId, String referenceType,
+                                         String slackId) {
         NotificationLog log = new NotificationLog();
         log.userId = userId;
         log.type = type;
@@ -56,7 +62,8 @@ public class NotificationLog extends BaseEntity {
         log.status = NotificationStatus.PENDING;
         log.referenceId = referenceId;
         log.referenceType = referenceType;
-        log.nextRetryAt = LocalDateTime.now();
+        log.slackId = slackId;
+        log.nextRetryAt = null;
         return log;
     }
 
@@ -71,14 +78,12 @@ public class NotificationLog extends BaseEntity {
         this.nextRetryAt = null;
     }
 
-    private static final int MAX_RETRY = 5;
-
     public void scheduleRetry() {
-        this.retryCount++;
         if (this.retryCount >= MAX_RETRY) {
             markFailed();
             return;
         }
+        this.retryCount++;
         long minutes = (long) Math.pow(2, this.retryCount - 1);
         this.nextRetryAt = LocalDateTime.now().plusMinutes(minutes);
     }
