@@ -1,8 +1,8 @@
 package com.bankrupang.sanjijk.bid.application.service;
 
 import com.bankrupang.sanjijk.bid.domain.exception.BidErrorCode;
+import com.bankrupang.sanjijk.bid.domain.exception.BidException;
 import com.bankrupang.sanjijk.bid.presentation.dto.BidRequestDto;
-import com.bankrupang.sanjijk.common.exception.BaseException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -39,7 +39,7 @@ public class BidService {
             Map<Object, Object> info = redisTemplate.opsForHash().entries(hashKey);
 
             if (info.isEmpty()) {
-                throw new BaseException(BidErrorCode.AUCTION_NOT_FOUND);
+                throw new BidException(BidErrorCode.AUCTION_NOT_FOUND);
             }
 
             String status = (String) info.get("status");
@@ -54,26 +54,26 @@ public class BidService {
             }
 
             if (!"PROGRESS".equals(status)) {
-                throw new BaseException(BidErrorCode.AUCTION_NOT_IN_PROGRESS);
+                throw new BidException(BidErrorCode.AUCTION_NOT_IN_PROGRESS);
             }
 
             LocalDateTime endAt = LocalDateTime.parse((String) info.get("endAt"));
 
             if (LocalDateTime.now().isAfter(endAt)) {
-                throw new BaseException(BidErrorCode.AUCTION_ENDED);
+                throw new BidException(BidErrorCode.AUCTION_ENDED);
             }
 
             Long currentPrice = Long.parseLong((String) info.get("currentPrice"));
 
             if (!request.getClientSeenPrice().equals(currentPrice)) {
-                throw new BaseException(BidErrorCode.BID_PRICE_OUTDATED);
+                throw new BidException(BidErrorCode.BID_PRICE_OUTDATED);
             }
 
             String highestBidderId = (String) info.get("highestBidderId");
 
             // 2.5 최고 입찰자 본인 여부 확인 (중복 입찰 방지)
             if (userId.toString().equals(highestBidderId)) {
-                throw new BaseException(BidErrorCode.ALREADY_HIGHEST_BIDDER);
+                throw new BidException(BidErrorCode.ALREADY_HIGHEST_BIDDER);
             }
 
             // TODO: 2.6 보증금 결제 완료 여부 확인 (payment-service 협의 필요)
