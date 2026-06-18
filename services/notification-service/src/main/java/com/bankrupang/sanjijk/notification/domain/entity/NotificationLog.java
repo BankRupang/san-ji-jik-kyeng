@@ -1,14 +1,12 @@
 package com.bankrupang.sanjijk.notification.domain.entity;
 
+import com.bankrupang.sanjijk.common.entity.BaseEntity;
 import com.bankrupang.sanjijk.notification.domain.enums.NotificationStatus;
 import com.bankrupang.sanjijk.notification.domain.enums.NotificationType;
-import com.fasterxml.uuid.Generators;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -17,11 +15,7 @@ import java.util.UUID;
 @Table(name = "notification_log")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@EntityListeners(AuditingEntityListener.class)
-public class NotificationLog {
-
-    @Id
-    private UUID id;
+public class NotificationLog extends BaseEntity {
 
     @Column(nullable = false)
     private UUID userId;
@@ -44,18 +38,12 @@ public class NotificationLog {
 
     private String referenceType;
 
-    @CreatedDate
-    @Column(updatable = false)
-    private LocalDateTime createdAt;
-
     private LocalDateTime sentAt;
 
-    @PrePersist
-    public void prePersist() {
-        if (id == null) {
-            id = Generators.timeBasedEpochGenerator().generate();
-        }
-    }
+    @Column(nullable = false)
+    private int retryCount = 0;
+
+    private LocalDateTime nextRetryAt;
 
     public static NotificationLog create(UUID userId, NotificationType type,
                                          String title, String message,
@@ -68,15 +56,30 @@ public class NotificationLog {
         log.status = NotificationStatus.PENDING;
         log.referenceId = referenceId;
         log.referenceType = referenceType;
+        log.nextRetryAt = LocalDateTime.now().plusMinutes(60);
         return log;
     }
 
     public void markSent() {
         this.status = NotificationStatus.SENT;
         this.sentAt = LocalDateTime.now();
+        this.nextRetryAt = null;
     }
 
     public void markFailed() {
         this.status = NotificationStatus.FAILED;
+        this.nextRetryAt = null;
+    }
+
+    private static final int MAX_RETRY = 5;
+
+    public void scheduleRetry() {
+        this.retryCount++;
+        if (this.retryCount >= MAX_RETRY) {
+            markFailed();
+            return;
+        }
+        long minutes = (long) Math.pow(2, this.retryCount - 1);
+        this.nextRetryAt = LocalDateTime.now().plusMinutes(minutes);
     }
 }
