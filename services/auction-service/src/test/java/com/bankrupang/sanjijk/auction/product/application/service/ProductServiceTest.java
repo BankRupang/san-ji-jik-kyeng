@@ -29,8 +29,10 @@ import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepositor
 import com.bankrupang.sanjijk.auction.product.exception.ProductErrorCode;
 import com.bankrupang.sanjijk.auction.product.exception.ProductException;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.request.ProductCreateRequest;
+import com.bankrupang.sanjijk.auction.product.presentation.dto.request.ProductUpdateRequest;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductCreateResponse;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductResponse;
+import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductUpdateResponse;
 import com.bankrupang.sanjijk.common.response.PageResponse;
 
 @DisplayName("ProductService 테스트")
@@ -81,6 +83,39 @@ class ProductServiceTest {
             assertThat(result.description()).isEqualTo(request.description());
             assertThat(result.quantity()).isEqualTo(request.quantity());
             assertThat(result.createdAt()).isEqualTo(createdAt);
+            verify(productRepository).save(any(Product.class));
+        }
+
+        @Test
+        @DisplayName("성공 - 마스터가 상품을 등록한다")
+        void success_master() {
+            // given
+            UUID masterId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            LocalDateTime createdAt = LocalDateTime.now();
+            ProductCreateRequest request = new ProductCreateRequest(
+                    "사과",
+                    "신선한 사과입니다.",
+                    "10"
+            );
+
+            Product savedProduct = Product.create(
+                    masterId,
+                    request.name(),
+                    request.description(),
+                    request.quantity()
+            );
+            ReflectionTestUtils.setField(savedProduct, "id", productId);
+            ReflectionTestUtils.setField(savedProduct, "createdAt", createdAt);
+
+            given(productRepository.save(any(Product.class))).willReturn(savedProduct);
+
+            // when
+            ProductCreateResponse result = productService.createProduct(masterId, "MASTER", request);
+
+            // then
+            assertThat(result.productId()).isEqualTo(productId);
+            assertThat(result.sellerId()).isEqualTo(masterId);
             verify(productRepository).save(any(Product.class));
         }
 
@@ -176,6 +211,62 @@ class ProductServiceTest {
             assertThat(pageable.getPageNumber()).isZero();
             assertThat(pageable.getPageSize()).isEqualTo(10);
             assertThat(pageable.getSort().getOrderFor("createdAt").isDescending()).isTrue();
+        }
+    }
+
+    @Nested
+    @DisplayName("updateProduct()")
+    class UpdateProduct {
+
+        @Test
+        @DisplayName("성공 - 마스터가 다른 판매자의 상품을 수정한다")
+        void success_master() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID masterId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            Product product = createProduct(sellerId, productId, LocalDateTime.now());
+            ProductUpdateRequest request = new ProductUpdateRequest(
+                    "수정된 사과",
+                    null,
+                    null
+            );
+
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+
+            // when
+            ProductUpdateResponse result = productService.updateProduct(masterId, "MASTER", productId, request);
+
+            // then
+            assertThat(result.productId()).isEqualTo(productId);
+            assertThat(result.sellerId()).isEqualTo(sellerId);
+            assertThat(result.name()).isEqualTo("수정된 사과");
+            assertThat(result.description()).isEqualTo("신선한 사과입니다.");
+            assertThat(result.quantity()).isEqualTo("10");
+        }
+    }
+
+    @Nested
+    @DisplayName("deleteProduct()")
+    class DeleteProduct {
+
+        @Test
+        @DisplayName("성공 - 마스터가 다른 판매자의 상품을 삭제한다")
+        void success_master() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID masterId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            Product product = createProduct(sellerId, productId, LocalDateTime.now());
+
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+
+            // when
+            productService.deleteProduct(masterId, "MASTER", productId);
+
+            // then
+            assertThat(product.isDeleted()).isTrue();
+            assertThat(product.getDeletedBy()).isEqualTo(masterId);
         }
     }
 

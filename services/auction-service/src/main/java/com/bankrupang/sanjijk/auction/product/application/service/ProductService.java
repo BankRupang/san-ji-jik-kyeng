@@ -30,7 +30,7 @@ public class ProductService {
 
     @Transactional
     public ProductCreateResponse createProduct(UUID sellerId, String userRole, ProductCreateRequest request) {
-        validateSellerRole(userRole);
+        validateSellerOrMasterRole(userRole);
 
         Product product = Product.create(
                 sellerId,
@@ -62,11 +62,11 @@ public class ProductService {
 
     @Transactional
     public ProductUpdateResponse updateProduct(UUID sellerId, String userRole, UUID productId, ProductUpdateRequest request) {
-        validateSellerRole(userRole);
+        validateSellerOrMasterRole(userRole);
         validateUpdateRequest(request);
 
         Product product = getExistingProduct(productId);
-        validateProductOwner(product, sellerId);
+        validateProductOwnerOrMaster(product, sellerId, userRole);
 
         product.update(
                 request.name(),
@@ -79,16 +79,16 @@ public class ProductService {
 
     @Transactional
     public void deleteProduct(UUID sellerId, String userRole, UUID productId) {
-        validateSellerRole(userRole);
+        validateSellerOrMasterRole(userRole);
 
         Product product = getExistingProduct(productId);
-        validateProductOwner(product, sellerId);
+        validateProductOwnerOrMaster(product, sellerId, userRole);
 
         product.softDelete(sellerId);
     }
 
-    private void validateSellerRole(String userRole) {
-        if (!"SELLER".equalsIgnoreCase(userRole)) {
+    private void validateSellerOrMasterRole(String userRole) {
+        if (!"SELLER".equalsIgnoreCase(userRole) && !"MASTER".equalsIgnoreCase(userRole)) {
             throw new ProductException(ProductErrorCode.PRODUCT_FORBIDDEN);
         }
     }
@@ -114,7 +114,11 @@ public class ProductService {
         }
     }
 
-    private void validateProductOwner(Product product, UUID sellerId) {
+    private void validateProductOwnerOrMaster(Product product, UUID sellerId, String userRole) {
+        if ("MASTER".equalsIgnoreCase(userRole)) {
+            return;
+        }
+
         if (!product.getSellerId().equals(sellerId)) {
             throw new ProductException(ProductErrorCode.PRODUCT_FORBIDDEN);
         }
