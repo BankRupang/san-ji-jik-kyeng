@@ -12,9 +12,6 @@ import com.bankrupang.sanjijk.common.exception.BaseException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
-import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -133,24 +130,10 @@ public class ChatService {
                 ? "관련 문서 없음"
                 : String.join("\n\n---\n\n", documents);
 
-        InMemoryChatMemoryRepository memoryRepository = new InMemoryChatMemoryRepository();
-        MessageWindowChatMemory memory = MessageWindowChatMemory.builder()
-                .chatMemoryRepository(memoryRepository)
-                .maxMessages(20)
-                .build();
-
-        String conversationId = UUID.randomUUID().toString();
-        List<Message> pastMessages = toAiMessages(history);
-        if (!pastMessages.isEmpty()) {
-            memory.add(conversationId, pastMessages);
-        }
-
         try {
             String content = chatClient.prompt()
                     .system(ChatClientConfig.BASE_SYSTEM_PROMPT + "\n\n[참고 문서]\n" + context)
-                    .advisors(MessageChatMemoryAdvisor.builder(memory)
-                            .conversationId(conversationId)
-                            .build())
+                    .messages(toAiMessages(history))
                     .user(userMessage)
                     .call()
                     .content();
