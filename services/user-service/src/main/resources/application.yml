@@ -27,8 +27,8 @@
 # 키클락 설정
 keycloak:
   server-url: ${KEYCLOAK_SERVER_URL}
-  realm: ${KEYCLOAK_REALM}
-  client-id: ${KEYCLOAK_CLIENT_ID}
+  realm: sanjijk
+  client-id: user-service
   client-secret: ${KEYCLOAK_CLIENT_SECRET}
 
 eureka:
