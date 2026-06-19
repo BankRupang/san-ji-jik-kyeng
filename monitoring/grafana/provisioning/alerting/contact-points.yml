@@ -1,0 +1,27 @@
+apiVersion: 1
+contactPoints:
+  - orgId: 1
+    name: slack-critical
+    receivers:
+      - uid: sanji-slack-critical
+        type: slack
+        settings:
+          url: ${SLACK_WEBHOOK_URL}
+          recipient: "#grafana"
+          title: "[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+          text: "{{ range .Alerts }}{{ .Annotations.description }}\n{{ end }}"
+          username: Grafana Alert
+        disableResolveMessage: false
+
+  - orgId: 1
+    name: slack-warn
+    receivers:
+      - uid: sanji-slack-warn
+        type: slack
+        settings:
+          url: ${SLACK_WEBHOOK_URL}
+          recipient: "#grafana"
+          title: "[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+          text: "{{ range .Alerts }}{{ .Annotations.summary }}\n{{ end }}"
+          username: Grafana Alert
+        disableResolveMessage: false
