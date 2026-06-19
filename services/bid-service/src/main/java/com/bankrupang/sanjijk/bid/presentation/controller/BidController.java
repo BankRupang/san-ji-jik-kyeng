@@ -1,6 +1,6 @@
 package com.bankrupang.sanjijk.bid.presentation.controller;
 
-import com.bankrupang.sanjijk.bid.application.service.BidApplicationService;
+import com.bankrupang.sanjijk.bid.application.service.BidService;
 import com.bankrupang.sanjijk.bid.presentation.dto.BidRequestDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +17,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class BidController {
 
-    private final BidApplicationService bidApplicationService;
+    private final BidService bidService;
 
     @MessageMapping("/auction/{auctionId}/bid")
     public void bid(
@@ -26,6 +26,6 @@ public class BidController {
             @Payload BidRequestDto request
     ) {
         //log.info("입찰 요청 - auctionId: {}, userId: {}, bidPrice: {}", auctionId, userId, request.getBidPrice());
-        bidApplicationService.bid(auctionId, userId, request);
+        bidService.bid(auctionId, userId, request);
     }
 }
