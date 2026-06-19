@@ -151,66 +151,50 @@ public class Order extends BaseEntity {
     // DEPOSIT: PENDING → PAYMENT_SUCCESS
 // WINNING: PENDING → PAYMENT_SUCCESS
     public void markPaymentSuccess() {
-        if (this.status != OrderStatus.PENDING) {
-            throw new InvalidOrderStatusException();
-        }
+        validateStatus(OrderStatus.PENDING);
         this.status = OrderStatus.PAYMENT_SUCCESS;
     }
 
     // WINNING: PAYMENT_SUCCESS → COMPLETED
     public void markCompleted() {
-        if (this.status != OrderStatus.PAYMENT_SUCCESS) {
-            throw new InvalidOrderStatusException();
-        }
+        validateStatus(OrderStatus.PAYMENT_SUCCESS);
         this.status = OrderStatus.COMPLETED;
     }
 
     // DEPOSIT: PAYMENT_SUCCESS → REFUNDED (경매 유찰 시)
     public void markRefunded() {
-        if (this.status != OrderStatus.PAYMENT_SUCCESS) {
-            throw new InvalidOrderStatusException();
-        }
+        validateStatus(OrderStatus.PAYMENT_SUCCESS);
         this.status = OrderStatus.REFUNDED;
     }
 
     // DEPOSIT: PAYMENT_SUCCESS → FORFEITED (낙찰자 결제 실패 시)
     public void markForfeited() {
-        if (this.status != OrderStatus.PAYMENT_SUCCESS) {
-            throw new InvalidOrderStatusException();
-        }
+        validateStatus(OrderStatus.PAYMENT_SUCCESS);
         this.status = OrderStatus.FORFEITED;
     }
 
     // WINNING: PENDING → PAYMENT_FAILED
     public void markPaymentFailed() {
-        if (this.status != OrderStatus.PENDING) {
-            throw new InvalidOrderStatusException();
-        }
+        validateStatus(OrderStatus.PENDING);
         this.status = OrderStatus.PAYMENT_FAILED;
         this.penaltyDueAt = LocalDateTime.now().plusMinutes(15);
     }
 
     // WINNING: PAYMENT_FAILED → PENALTY_PENDING
     public void markPenaltyPending() {
-        if (this.status != OrderStatus.PAYMENT_FAILED) {
-            throw new InvalidOrderStatusException();
-        }
+        validateStatus(OrderStatus.PAYMENT_FAILED);
         this.status = OrderStatus.PENALTY_PENDING;
     }
 
     // WINNING: PENALTY_PENDING → COMPLETED (재결제 성공)
     public void markPenaltyCompleted() {
-        if (this.status != OrderStatus.PENALTY_PENDING) {
-            throw new InvalidOrderStatusException();
-        }
+        validateStatus(OrderStatus.PENALTY_PENDING);
         this.status = OrderStatus.COMPLETED;
     }
 
     // WINNING: PENALTY_PENDING → EXPIRED (15분 초과)
     public void markExpired() {
-        if (this.status != OrderStatus.PENALTY_PENDING) {
-            throw new InvalidOrderStatusException();
-        }
+        validateStatus(OrderStatus.PENALTY_PENDING);
         this.status = OrderStatus.EXPIRED;
     }
 
@@ -219,9 +203,7 @@ public class Order extends BaseEntity {
     // ──────────────────────────────────────────
     private void validateStatus(OrderStatus required) {
         if (this.status != required) {
-            throw new IllegalStateException(
-                    "주문 상태 전이 불가: " + this.status + " → " + required
-            );
+            throw new InvalidOrderStatusException();
         }
     }
 
