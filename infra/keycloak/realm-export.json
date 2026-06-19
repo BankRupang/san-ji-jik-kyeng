@@ -27,12 +27,23 @@
       "enabled": true,
       "publicClient": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "replace-this-secret",
+      "secret": "dev-secret-sanjijk-1234",
       "serviceAccountsEnabled": true,
       "authorizationServicesEnabled": false,
       "standardFlowEnabled": false,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": true
+    }
+  ],
+
+  "requiredActions": [
+    {
+      "alias": "VERIFY_PROFILE",
+      "name": "Verify Profile",
+      "providerId": "VERIFY_PROFILE",
+      "enabled": false,
+      "defaultAction": false,
+      "priority": 90
     }
   ],
 

@@ -10,7 +10,7 @@
 
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
     properties:
       hibernate:
         show_sql: true
@@ -23,14 +23,6 @@
     username: ${POSTGRES_USERNAME}
     password: ${POSTGRES_PASSWORD}
     driver-class-name: org.postgresql.Driver
-
-  # 키클락 링크
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER_URI}
-          jwk-set-uri: ${KEYCLOAK_ISSUER_URI}/protocol/openid-connect/certs
 
 # 키클락 설정
 keycloak:
@@ -49,3 +41,6 @@ eureka:
 admin :
   manager-key : ${MANAGER_KEY}
   master-key : ${MASTER_KEY}
+
+server:
+  port: 19091
