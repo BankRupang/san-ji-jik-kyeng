@@ -11,6 +11,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -44,15 +45,6 @@ public class BidService {
 
             String status = (String) info.get("status");
 
-            if ("READY".equals(status)) {
-                LocalDateTime startAt = LocalDateTime.parse((String) info.get("startAt"));
-                if (LocalDateTime.now().isAfter(startAt)) {
-                    redisTemplate.opsForHash().put(hashKey, "status", "PROGRESS");
-                    status = "PROGRESS";
-                    log.info("경매 상태 PROGRESS 전환 - auctionId: {}", auctionId);
-                }
-            }
-
             if (!"PROGRESS".equals(status)) {
                 throw new BidException(BidErrorCode.AUCTION_NOT_IN_PROGRESS);
             }
@@ -71,12 +63,20 @@ public class BidService {
 
             String highestBidderId = (String) info.get("highestBidderId");
 
-            // 2.5 최고 입찰자 본인 여부 확인 (중복 입찰 방지)
             if (userId.toString().equals(highestBidderId)) {
                 throw new BidException(BidErrorCode.ALREADY_HIGHEST_BIDDER);
             }
 
-            // TODO: 2.6 보증금 결제 완료 여부 확인 (payment-service 협의 필요)
+
+            //Boolean hasPaid = redisTemplate.hasKey("auction:" + auctionId + ":deposit:" + userId);
+
+            if (Duration.between(LocalDateTime.now(), endAt).getSeconds() <= 30) {
+                LocalDateTime newEndAt = endAt.plusMinutes(1);
+                long newTtl = Duration.between(LocalDateTime.now(), newEndAt).getSeconds();
+                redisTemplate.opsForHash().put(hashKey, "endAt", newEndAt.toString());
+                redisTemplate.expire(hashKey, Duration.ofSeconds(newTtl));
+                log.info("안티스나이핑 발동 - auctionId: {}, newEndAt: {}", auctionId, newEndAt);
+            }
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
