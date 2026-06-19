@@ -23,35 +23,35 @@ import com.bankrupang.sanjijk.common.entity.BaseEntity;
 public class Auction extends BaseEntity {
 
     @Column(name = "product_id", nullable = false)
-    UUID productId;
+    private UUID productId;
 
     @Column(name = "seller_id", nullable = false)
-    UUID sellerId;
+    private UUID sellerId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    AuctionStatus status;
+    private AuctionStatus status;
 
     @Column(name = "start_price", nullable = false)
-    Integer startPrice;
+    private Integer startPrice;
 
     @Column(name = "winner_id")
-    UUID winnerId;
+    private UUID winnerId;
 
     @Column(name = "final_price")
-    Integer finalPrice;
+    private Integer finalPrice;
 
     @Column(name = "bid_unit", nullable = false)
-    Integer bidUnit;
+    private Integer bidUnit;
 
     @Column(name = "extension_count", nullable = false)
-    Integer extensionCount;
+    private Integer extensionCount;
 
     @Column(name = "start_at", nullable = false)
-    LocalDateTime startAt;
+    private LocalDateTime startAt;
 
     @Column(name = "end_at", nullable = false)
-    LocalDateTime endAt;
+    private LocalDateTime endAt;
 
     public static Auction create(
             UUID productId,
