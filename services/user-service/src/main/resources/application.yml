@@ -1,4 +1,4 @@
-﻿server:
+server:
   port: 19091
 
 spring:
@@ -22,18 +22,10 @@ spring:
 
   # 로컬 DB 연결
   datasource:
-    url: jdbc:postgresql://localhost:5432/${POSTGRES_DB}
-    username: ${POSTGRES_USER}
+    url: ${POSTGRES_DB_URL}
+    username: ${POSTGRES_USERNAME}
     password: ${POSTGRES_PASSWORD}
     driver-class-name: org.postgresql.Driver
-
-  # 키클락 링크
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: http://localhost:18080/realms/sanjijk
-          jwk-set-uri: http://localhost:18080/realms/sanjijk/protocol/openid-connect/certs
 
 # 키클락 설정
 keycloak:
