@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "notification_log")
+@Table(name = "p_notification_logs")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class NotificationLog extends BaseEntity {
