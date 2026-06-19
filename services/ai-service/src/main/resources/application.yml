@@ -7,7 +7,7 @@ spring:
   config:
     import: "optional:configserver:"
   datasource:
-    url: jdbc:postgresql://localhost:5432/ai_db
+    url: jdbc:postgresql://localhost:5432/postgres?currentSchema=ai_schema
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
@@ -17,6 +17,7 @@ spring:
       ddl-auto: create
     properties:
       hibernate:
+        default_schema: ai_schema
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
     show-sql: true
@@ -27,16 +28,17 @@ spring:
       base-url: https://generativelanguage.googleapis.com/v1beta/openai
       chat:
         options:
-          model: gemini-1.5-flash
+          model: gemini-2.5-flash
       embedding:
         options:
-          model: text-embedding-004
+          model: gemini-embedding-2
     vectorstore:
       pgvector:
         initialize-schema: true
         index-type: HNSW
         distance-type: COSINE_DISTANCE
         dimensions: 768
+        schema-name: ai_schema
 
 eureka:
   client:
