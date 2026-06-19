@@ -8,21 +8,21 @@ import jakarta.validation.constraints.Positive;
 
 public record AuctionCreateRequest(
 
-        @NotNull
+        @NotNull(message = "상품 ID는 필수입니다.")
         UUID productId,
 
-        @NotNull
-        @Positive
+        @NotNull(message = "시작가는 필수입니다.")
+        @Positive(message = "시작가는 1 이상이어야 합니다.")
         Integer startPrice,
 
-        @NotNull
-        @Positive
+        @NotNull(message = "입찰 단위는 필수입니다.")
+        @Positive(message = "입찰 단위는 1 이상이어야 합니다.")
         Integer bidUnit,
 
-        @NotNull
+        @NotNull(message = "경매 시작 시각은 필수입니다.")
         LocalDateTime startAt,
 
-        @NotNull
+        @NotNull(message = "경매 종료 시각은 필수입니다.")
         LocalDateTime endAt
 ) {
 
