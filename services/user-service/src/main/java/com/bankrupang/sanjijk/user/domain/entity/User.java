@@ -3,6 +3,8 @@ package com.bankrupang.sanjijk.user.domain.entity;
 import com.bankrupang.sanjijk.common.entity.BaseEntity;
 import com.bankrupang.sanjijk.user.domain.UserRole;
 import com.bankrupang.sanjijk.user.domain.UserStatus;
+import com.bankrupang.sanjijk.user.domain.exception.UserDeletedException;
+import com.bankrupang.sanjijk.user.domain.exception.UserSuspendedException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -79,5 +81,14 @@ public class User extends BaseEntity {
                 .role(role)
                 .status(UserStatus.ACTIVE)
                 .build();
+    }
+
+    public void validateStatusForLogin() {
+        if (status == UserStatus.SUSPENDED) {
+            throw new UserSuspendedException();
+        }
+        if (status == UserStatus.DELETED) {
+            throw new UserDeletedException();
+        }
     }
 }
