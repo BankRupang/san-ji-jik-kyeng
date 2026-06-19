@@ -15,6 +15,7 @@ import com.bankrupang.sanjijk.auction.auction.exception.AuctionErrorCode;
 import com.bankrupang.sanjijk.auction.auction.exception.AuctionException;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCreateRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCreateResponse;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionDetailResponse;
 import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepository;
 import com.bankrupang.sanjijk.auction.product.exception.ProductErrorCode;
@@ -50,6 +51,13 @@ public class AuctionService {
         return AuctionCreateResponse.from(savedAuction);
     }
 
+    public AuctionDetailResponse getAuction(UUID auctionId) {
+        Auction auction = getExistingAuction(auctionId);
+        Product product = getExistingProduct(auction.getProductId());
+
+        return AuctionDetailResponse.of(auction, product);
+    }
+
     private Product getExistingProduct(UUID productId) {
         return productRepository.findByIdAndDeletedAtIsNull(productId)
                 .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND));
@@ -80,6 +88,11 @@ public class AuctionService {
                 .getAuthorities()
                 .stream()
                 .anyMatch(authority -> authority.getAuthority().equals(role));
+    }
+
+    private Auction getExistingAuction(UUID auctionId) {
+        return auctionRepository.findByIdAndDeletedAtIsNull(auctionId)
+                .orElseThrow(() -> new AuctionException(AuctionErrorCode.AUCTION_NOT_FOUND));
     }
 
 }
