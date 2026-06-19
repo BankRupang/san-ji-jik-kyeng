@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,11 +30,9 @@ public class ProductService {
     private final ProductRepository productRepository;
 
     @Transactional
-    public ProductCreateResponse createProduct(UUID sellerId, String userRole, ProductCreateRequest request) {
-        validateSellerOrMasterRole(userRole);
-
+    public ProductCreateResponse createProduct(UUID userId, ProductCreateRequest request) {
         Product product = Product.create(
-                sellerId,
+                userId,
                 request.name(),
                 request.description(),
                 request.quantity()
@@ -61,12 +60,11 @@ public class ProductService {
     }
 
     @Transactional
-    public ProductUpdateResponse updateProduct(UUID sellerId, String userRole, UUID productId, ProductUpdateRequest request) {
-        validateSellerOrMasterRole(userRole);
+    public ProductUpdateResponse updateProduct(UUID userId, UUID productId, ProductUpdateRequest request) {
         validateUpdateRequest(request);
 
         Product product = getExistingProduct(productId);
-        validateProductOwnerOrMaster(product, sellerId, userRole);
+        validateProductOwnerOrMaster(product, userId);
 
         product.update(
                 request.name(),
@@ -78,19 +76,11 @@ public class ProductService {
     }
 
     @Transactional
-    public void deleteProduct(UUID sellerId, String userRole, UUID productId) {
-        validateSellerOrMasterRole(userRole);
-
+    public void deleteProduct(UUID userId, UUID productId) {
         Product product = getExistingProduct(productId);
-        validateProductOwnerOrMaster(product, sellerId, userRole);
+        validateProductOwnerOrMaster(product, userId);
 
-        product.softDelete(sellerId);
-    }
-
-    private void validateSellerOrMasterRole(String userRole) {
-        if (!"SELLER".equalsIgnoreCase(userRole) && !"MASTER".equalsIgnoreCase(userRole)) {
-            throw new ProductException(ProductErrorCode.PRODUCT_FORBIDDEN);
-        }
+        product.softDelete(userId);
     }
 
     private Product getExistingProduct(UUID productId) {
@@ -114,14 +104,25 @@ public class ProductService {
         }
     }
 
-    private void validateProductOwnerOrMaster(Product product, UUID sellerId, String userRole) {
-        if ("MASTER".equalsIgnoreCase(userRole)) {
+    private void validateProductOwnerOrMaster(Product product, UUID userId) {
+        if (hasRole("ROLE_MASTER")) {
             return;
         }
 
-        if (!product.getSellerId().equals(sellerId)) {
+        if (!product.getSellerId().equals(userId)) {
             throw new ProductException(ProductErrorCode.PRODUCT_FORBIDDEN);
         }
+    }
+
+    private boolean hasRole(String role) {
+        if (SecurityContextHolder.getContext().getAuthentication() == null) {
+            return false;
+        }
+
+        return SecurityContextHolder.getContext().getAuthentication()
+                .getAuthorities()
+                .stream()
+                .anyMatch(authority -> authority.getAuthority().equals(role));
     }
 
 }
