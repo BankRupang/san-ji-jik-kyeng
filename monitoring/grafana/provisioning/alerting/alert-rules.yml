@@ -105,7 +105,7 @@ groups:
                     type: last
                     params: []
               refId: B
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         for: 5m
         labels:
@@ -153,7 +153,7 @@ groups:
                     type: last
                     params: []
               refId: B
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         for: 5m
         labels:
@@ -201,7 +201,7 @@ groups:
                     type: last
                     params: []
               refId: B
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         for: 5m
         labels:
@@ -305,7 +305,7 @@ groups:
                     type: last
                     params: []
               refId: B
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         for: 5m
         labels:
@@ -361,7 +361,7 @@ groups:
                     type: last
                     params: []
               refId: B
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         for: 5m
         labels:
