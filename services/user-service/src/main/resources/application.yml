@@ -1,4 +1,7 @@
-﻿spring:
+﻿server:
+  port: 19091
+
+spring:
   application:
     name: user-service
 
@@ -49,3 +52,12 @@ eureka:
 admin :
   manager-key : ${MANAGER_KEY}
   master-key : ${MASTER_KEY}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  endpoint:
+    health:
+      show-details: always
