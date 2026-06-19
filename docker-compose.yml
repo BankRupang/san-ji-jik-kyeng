@@ -1,0 +1,288 @@
+name: sanji-dev
+
+# 모든 Spring 서비스가 공통으로 사용하는 설정
+# depends_on은 서비스마다 의존성이 달라서 여기에 넣지 않음
+# environment도 서비스마다 다른 항목이 있어 각 서비스에 명시
+x-spring-common: &spring-common
+  restart: unless-stopped
+  networks: [sanji]
+
+services:
+  # ================================================================
+  # 인프라 의존성
+  # ================================================================
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports: ["5432:5432"]
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+    networks: [sanji]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    volumes:
+      - redis-data:/data
+    networks: [sanji]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # KRaft 모드(Zookeeper 없음) 단일 브로커
+  # prod에서는 EC2 위에서 별도 docker-compose.kafka.yml로 실행
+  kafka:
+    image: apache/kafka:3.7.0
+    ports: ["9092:9092"]
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks: [sanji]
+
+  # prod에서는 ECS Fargate로 실행. 로컬에서만 컨테이너로 띄움
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    command: ["start-dev", "--http-port=18080"]
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      KC_DB_USERNAME: ${POSTGRES_USER}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KC_DB_SCHEMA: keycloak_schema
+    ports: ["18080:18080"]
+    networks: [sanji]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  # ================================================================
+  # 플랫폼 서비스
+  # ================================================================
+
+  # classpath:/config/ 에서 각 서비스 설정 파일을 읽어 제공
+  # healthcheck 통과 후에 다른 서비스들이 기동됨
+  config-server:
+    build:
+      context: .
+      dockerfile: ./config-server/Dockerfile
+    ports: ["8888:8888"]
+    networks: [sanji]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8888/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # standalone 모드로 동작 (자기 자신을 register하지 않음)
+  discovery-server:
+    build:
+      context: .
+      dockerfile: ./discovery-server/Dockerfile
+    ports: ["8761:8761"]
+    networks: [sanji]
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+    depends_on:
+      config-server: { condition: service_healthy }
+
+  # 로컬 진입점. prod에서는 ALB 뒤에서 ECS Fargate로 실행됨
+  # SPRING_CLOUD_CONFIG_URI로 application.yml의 localhost:8888 오버라이드
+  gateway-server:
+    <<: *spring-common
+    build:
+      context: .
+      dockerfile: ./gateway-server/Dockerfile
+    ports: ["8000:8000"]
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+    depends_on:
+      config-server: { condition: service_healthy }
+      discovery-server: { condition: service_started }
+
+  # ================================================================
+  # 비즈니스 서비스
+  # config-server의 config/*.yml이 localhost를 사용하므로
+  # environment 블록에서 컨테이너 이름으로 오버라이드
+  # YAML 앵커 머지는 environment 키를 통째로 덮어쓰므로 공통 변수도 명시
+  # ================================================================
+
+  user-service:
+    <<: *spring-common
+    build:
+      context: .
+      dockerfile: ./services/user-service/Dockerfile
+    ports: ["19091:19091"]
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=user_schema
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      # application.yml의 localhost를 컨테이너 환경에 맞게 오버라이드
+      KEYCLOAK_SERVER_URL: ${KEYCLOAK_SERVER_URL}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUERURI: ${KEYCLOAK_SERVER_URL}/realms/${KEYCLOAK_REALM}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI: ${KEYCLOAK_SERVER_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs
+      MANAGER_KEY: ${MANAGER_KEY}
+      MASTER_KEY: ${MASTER_KEY}
+    depends_on:
+      config-server: { condition: service_healthy }
+      discovery-server: { condition: service_started }
+      postgres: { condition: service_healthy }
+      keycloak: { condition: service_started }
+
+  auction-service:
+    <<: *spring-common
+    build:
+      context: .
+      dockerfile: ./services/auction-service/Dockerfile
+    ports: ["19092:19092"]
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=auction_schema
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      config-server: { condition: service_healthy }
+      discovery-server: { condition: service_started }
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_started }
+
+  # prod에서는 Auto Scaling(2~6 태스크). 로컬은 단일 컨테이너
+  bid-service:
+    <<: *spring-common
+    build:
+      context: .
+      dockerfile: ./services/bid-service/Dockerfile
+    ports: ["19093:19093"]
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=bid_schema
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      config-server: { condition: service_healthy }
+      discovery-server: { condition: service_started }
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_started }
+
+  order-service:
+    <<: *spring-common
+    build:
+      context: .
+      dockerfile: ./services/order-service/Dockerfile
+    ports: ["19094:19094"]
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=order_schema
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      config-server: { condition: service_healthy }
+      discovery-server: { condition: service_started }
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_started }
+
+  payment-service:
+    <<: *spring-common
+    build:
+      context: .
+      dockerfile: ./services/payment-service/Dockerfile
+    ports: ["19095:19095"]
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=payment_schema
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      config-server: { condition: service_healthy }
+      discovery-server: { condition: service_started }
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_started }
+
+  notification-service:
+    <<: *spring-common
+    build:
+      context: .
+      dockerfile: ./services/notification-service/Dockerfile
+    ports: ["19096:19096"]
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=notification_schema
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      config-server: { condition: service_healthy }
+      discovery-server: { condition: service_started }
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_started }
+
+  ai-service:
+    <<: *spring-common
+    build:
+      context: .
+      dockerfile: ./services/ai-service/Dockerfile
+    ports: ["19097:19097"]
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=ai_schema
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      config-server: { condition: service_healthy }
+      discovery-server: { condition: service_started }
+      postgres: { condition: service_healthy }
+
+volumes:
+  pg-data:
+  redis-data:
+  kafka-data:
+
+networks:
+  sanji:
+    driver: bridge

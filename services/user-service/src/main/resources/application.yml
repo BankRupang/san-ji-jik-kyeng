@@ -19,9 +19,9 @@
 
   # 로컬 DB 연결
   datasource:
-    url: jdbc:postgresql://localhost:5432/root
-    username: root
-    password: ${DB_PASSWORD}
+    url: jdbc:postgresql://localhost:5432/${POSTGRES_DB}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   # 키클락 링크
@@ -38,6 +38,13 @@ keycloak:
   realm: sanjijk
   client-id: user-service
   client-secret: ${KEYCLOAK_CLIENT_SECRET}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
 
 admin :
   manager-key : ${MANAGER_KEY}
