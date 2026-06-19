@@ -29,8 +29,10 @@ import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepositor
 import com.bankrupang.sanjijk.auction.product.exception.ProductErrorCode;
 import com.bankrupang.sanjijk.auction.product.exception.ProductException;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.request.ProductCreateRequest;
+import com.bankrupang.sanjijk.auction.product.presentation.dto.request.ProductUpdateRequest;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductCreateResponse;
 import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductResponse;
+import com.bankrupang.sanjijk.auction.product.presentation.dto.response.ProductUpdateResponse;
 import com.bankrupang.sanjijk.common.response.PageResponse;
 
 @DisplayName("ProductService 테스트")
@@ -81,6 +83,39 @@ class ProductServiceTest {
             assertThat(result.description()).isEqualTo(request.description());
             assertThat(result.quantity()).isEqualTo(request.quantity());
             assertThat(result.createdAt()).isEqualTo(createdAt);
+            verify(productRepository).save(any(Product.class));
+        }
+
+        @Test
+        @DisplayName("성공 - 마스터가 상품을 등록한다")
+        void success_master() {
+            // given
+            UUID masterId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            LocalDateTime createdAt = LocalDateTime.now();
+            ProductCreateRequest request = new ProductCreateRequest(
+                    "사과",
+                    "신선한 사과입니다.",
+                    "10"
+            );
+
+            Product savedProduct = Product.create(
+                    masterId,
+                    request.name(),
+                    request.description(),
+                    request.quantity()
+            );
+            ReflectionTestUtils.setField(savedProduct, "id", productId);
+            ReflectionTestUtils.setField(savedProduct, "createdAt", createdAt);
+
+            given(productRepository.save(any(Product.class))).willReturn(savedProduct);
+
+            // when
+            ProductCreateResponse result = productService.createProduct(masterId, "MASTER", request);
+
+            // then
+            assertThat(result.productId()).isEqualTo(productId);
+            assertThat(result.sellerId()).isEqualTo(masterId);
             verify(productRepository).save(any(Product.class));
         }
 
@@ -176,6 +211,253 @@ class ProductServiceTest {
             assertThat(pageable.getPageNumber()).isZero();
             assertThat(pageable.getPageSize()).isEqualTo(10);
             assertThat(pageable.getSort().getOrderFor("createdAt").isDescending()).isTrue();
+        }
+    }
+
+    @Nested
+    @DisplayName("updateProduct()")
+    class UpdateProduct {
+
+        @Test
+        @DisplayName("성공 - 판매자가 본인 상품을 부분 수정한다")
+        void success_seller() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            Product product = createProduct(sellerId, productId, LocalDateTime.now());
+            ProductUpdateRequest request = new ProductUpdateRequest(
+                    "수정된 사과",
+                    null,
+                    "20"
+            );
+
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+
+            // when
+            ProductUpdateResponse result = productService.updateProduct(sellerId, "SELLER", productId, request);
+
+            // then
+            assertThat(result.productId()).isEqualTo(productId);
+            assertThat(result.sellerId()).isEqualTo(sellerId);
+            assertThat(result.name()).isEqualTo("수정된 사과");
+            assertThat(result.description()).isEqualTo("신선한 사과입니다.");
+            assertThat(result.quantity()).isEqualTo("20");
+        }
+
+        @Test
+        @DisplayName("성공 - 마스터가 다른 판매자의 상품을 수정한다")
+        void success_master() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID masterId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            Product product = createProduct(sellerId, productId, LocalDateTime.now());
+            ProductUpdateRequest request = new ProductUpdateRequest(
+                    "수정된 사과",
+                    null,
+                    null
+            );
+
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+
+            // when
+            ProductUpdateResponse result = productService.updateProduct(masterId, "MASTER", productId, request);
+
+            // then
+            assertThat(result.productId()).isEqualTo(productId);
+            assertThat(result.sellerId()).isEqualTo(sellerId);
+            assertThat(result.name()).isEqualTo("수정된 사과");
+            assertThat(result.description()).isEqualTo("신선한 사과입니다.");
+            assertThat(result.quantity()).isEqualTo("10");
+        }
+
+        @Test
+        @DisplayName("실패 - 판매자 또는 마스터가 아니면 상품을 수정할 수 없다")
+        void fail_forbidden_role() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            ProductUpdateRequest request = new ProductUpdateRequest(
+                    "수정된 사과",
+                    null,
+                    null
+            );
+
+            // when & then
+            assertThatThrownBy(() -> productService.updateProduct(userId, "BUYER", productId, request))
+                    .isInstanceOf(ProductException.class)
+                    .hasMessage(ProductErrorCode.PRODUCT_FORBIDDEN.getMessage());
+            verify(productRepository, never()).findByIdAndDeletedAtIsNull(any(UUID.class));
+        }
+
+        @Test
+        @DisplayName("실패 - 상품이 존재하지 않으면 수정할 수 없다")
+        void fail_product_not_found() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            ProductUpdateRequest request = new ProductUpdateRequest(
+                    "수정된 사과",
+                    null,
+                    null
+            );
+
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> productService.updateProduct(sellerId, "SELLER", productId, request))
+                    .isInstanceOf(ProductException.class)
+                    .hasMessage(ProductErrorCode.PRODUCT_NOT_FOUND.getMessage());
+        }
+
+        @Test
+        @DisplayName("실패 - 판매자가 다른 판매자의 상품을 수정할 수 없다")
+        void fail_not_product_owner() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID otherSellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            Product product = createProduct(sellerId, productId, LocalDateTime.now());
+            ProductUpdateRequest request = new ProductUpdateRequest(
+                    "수정된 사과",
+                    null,
+                    null
+            );
+
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+
+            // when & then
+            assertThatThrownBy(() -> productService.updateProduct(otherSellerId, "SELLER", productId, request))
+                    .isInstanceOf(ProductException.class)
+                    .hasMessage(ProductErrorCode.PRODUCT_FORBIDDEN.getMessage());
+            assertThat(product.getName()).isEqualTo("사과");
+        }
+
+        @Test
+        @DisplayName("실패 - 수정할 값이 하나도 없으면 수정할 수 없다")
+        void fail_empty_update_request() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            ProductUpdateRequest request = new ProductUpdateRequest(
+                    null,
+                    null,
+                    null
+            );
+
+            // when & then
+            assertThatThrownBy(() -> productService.updateProduct(sellerId, "SELLER", productId, request))
+                    .isInstanceOf(ProductException.class)
+                    .hasMessage(ProductErrorCode.INVALID_PRODUCT_REQUEST.getMessage());
+            verify(productRepository, never()).findByIdAndDeletedAtIsNull(any(UUID.class));
+        }
+
+        @Test
+        @DisplayName("실패 - 수정 값이 공백이면 수정할 수 없다")
+        void fail_blank_update_request() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            ProductUpdateRequest request = new ProductUpdateRequest(
+                    " ",
+                    null,
+                    null
+            );
+
+            // when & then
+            assertThatThrownBy(() -> productService.updateProduct(sellerId, "SELLER", productId, request))
+                    .isInstanceOf(ProductException.class)
+                    .hasMessage(ProductErrorCode.INVALID_PRODUCT_REQUEST.getMessage());
+            verify(productRepository, never()).findByIdAndDeletedAtIsNull(any(UUID.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("deleteProduct()")
+    class DeleteProduct {
+
+        @Test
+        @DisplayName("성공 - 판매자가 본인 상품을 삭제한다")
+        void success_seller() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            Product product = createProduct(sellerId, productId, LocalDateTime.now());
+
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+
+            // when
+            productService.deleteProduct(sellerId, "SELLER", productId);
+
+            // then
+            assertThat(product.isDeleted()).isTrue();
+            assertThat(product.getDeletedBy()).isEqualTo(sellerId);
+        }
+
+        @Test
+        @DisplayName("성공 - 마스터가 다른 판매자의 상품을 삭제한다")
+        void success_master() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID masterId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            Product product = createProduct(sellerId, productId, LocalDateTime.now());
+
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+
+            // when
+            productService.deleteProduct(masterId, "MASTER", productId);
+
+            // then
+            assertThat(product.isDeleted()).isTrue();
+            assertThat(product.getDeletedBy()).isEqualTo(masterId);
+        }
+
+        @Test
+        @DisplayName("실패 - 판매자 또는 마스터가 아니면 상품을 삭제할 수 없다")
+        void fail_forbidden_role() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+
+            // when & then
+            assertThatThrownBy(() -> productService.deleteProduct(userId, "BUYER", productId))
+                    .isInstanceOf(ProductException.class)
+                    .hasMessage(ProductErrorCode.PRODUCT_FORBIDDEN.getMessage());
+            verify(productRepository, never()).findByIdAndDeletedAtIsNull(any(UUID.class));
+        }
+
+        @Test
+        @DisplayName("실패 - 상품이 존재하지 않으면 삭제할 수 없다")
+        void fail_product_not_found() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> productService.deleteProduct(sellerId, "SELLER", productId))
+                    .isInstanceOf(ProductException.class)
+                    .hasMessage(ProductErrorCode.PRODUCT_NOT_FOUND.getMessage());
+        }
+
+        @Test
+        @DisplayName("실패 - 판매자가 다른 판매자의 상품을 삭제할 수 없다")
+        void fail_not_product_owner() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID otherSellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            Product product = createProduct(sellerId, productId, LocalDateTime.now());
+
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+
+            // when & then
+            assertThatThrownBy(() -> productService.deleteProduct(otherSellerId, "SELLER", productId))
+                    .isInstanceOf(ProductException.class)
+                    .hasMessage(ProductErrorCode.PRODUCT_FORBIDDEN.getMessage());
+            assertThat(product.isDeleted()).isFalse();
         }
     }
 

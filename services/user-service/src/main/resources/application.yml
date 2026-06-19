@@ -19,18 +19,10 @@
 
   # 로컬 DB 연결
   datasource:
-    url: jdbc:postgresql://localhost:5432/root
-    username: root
-    password: ${DB_PASSWORD}
+    url: ${POSTGRES_DB_URL}
+    username: ${POSTGRES_USERNAME}
+    password: ${POSTGRES_PASSWORD}
     driver-class-name: org.postgresql.Driver
-
-  # 키클락 링크
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: http://localhost:18080/realms/sanjijk
-          jwk-set-uri: http://localhost:18080/realms/sanjijk/protocol/openid-connect/certs
 
 # 키클락 설정
 keycloak:
@@ -39,6 +31,16 @@ keycloak:
   client-id: user-service
   client-secret: ${KEYCLOAK_CLIENT_SECRET}
 
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
 admin :
   manager-key : ${MANAGER_KEY}
   master-key : ${MASTER_KEY}
+
+server:
+  port: 19091

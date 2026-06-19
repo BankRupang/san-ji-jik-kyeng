@@ -1,12 +1,16 @@
 package com.bankrupang.sanjijk.user.application.service;
 
 import com.bankrupang.sanjijk.user.domain.UserRole;
-import com.bankrupang.sanjijk.user.domain.exception.*;
-import com.bankrupang.sanjijk.user.infrastructure.keycloak.KeycloakService;
+import com.bankrupang.sanjijk.user.domain.UserStatus;
 import com.bankrupang.sanjijk.user.domain.entity.User;
+import com.bankrupang.sanjijk.user.domain.exception.*;
 import com.bankrupang.sanjijk.user.domain.repository.UserRepository;
+import com.bankrupang.sanjijk.user.infrastructure.keycloak.KeycloakService;
+import com.bankrupang.sanjijk.user.presentation.dto.response.KeycloakTokenResponse;
 import com.bankrupang.sanjijk.user.presentation.dto.request.UserAdminSignupRequest;
+import com.bankrupang.sanjijk.user.presentation.dto.request.UserLoginRequest;
 import com.bankrupang.sanjijk.user.presentation.dto.request.UserSignupRequest;
+import com.bankrupang.sanjijk.user.presentation.dto.response.UserLoginResponse;
 import com.bankrupang.sanjijk.user.presentation.dto.response.UserResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +34,6 @@ public class UserService {
     @Value("${admin.master-key}")
     private String masterKey;
 
-    // 일반 회원가입 (BUYER / SELLER)
     @Transactional
     public UserResponse signup(UserSignupRequest request) {
         validateUserRole(request.role());
@@ -63,7 +66,6 @@ public class UserService {
         }
     }
 
-    // 관리자 회원가입 (MANAGER / MASTER)
     @Transactional
     public UserResponse adminSignup(UserAdminSignupRequest request) {
         validateAdminRole(request.role());
@@ -95,6 +97,23 @@ public class UserService {
             throw new UserKeycloakCreationFailedException();
         }
     }
+
+    @Transactional
+    public UserLoginResponse login(UserLoginRequest request) {
+        // 1. DB에서 유저 상태 확인 (정지/탈퇴 여부)
+        User user = userRepository.findByUsername(request.username())
+                .orElseThrow(UserNotFoundException::new);
+
+        user.validateStatusForLogin();
+
+        // 2. Keycloak에 로그인 요청 → 토큰 받기
+        KeycloakTokenResponse token = keycloakService.login(request.username(), request.password());
+
+        // 3. UserLoginResponse로 변환해서 반환
+        return new UserLoginResponse(token.accessToken(), token.refreshToken());
+
+    }
+
 
     // 일반 가입 롤 검증 — BUYER, SELLER만 허용
     private void validateUserRole(UserRole role) {
