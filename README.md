@@ -1,5 +1,15 @@
 # 산지직경
 
+## 접속 주소
+
+| 서비스 | 주소 | 계정 |
+| --- | --- | --- |
+| Kafka-UI | http://localhost:8080 | - |
+| Prometheus | http://localhost:9090| - |
+| Grafana | http://localhost:3000 | admin / admin |
+
+---
+
 ## Docker 실행 방법 (Dev)
 
 ### 사전 준비
