@@ -13,6 +13,4 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
     Page<ChatSession> findByUserIdAndDeletedAtIsNull(UUID userId, Pageable pageable);
 
     Optional<ChatSession> findByIdAndDeletedAtIsNull(UUID id);
-
-    boolean existsByIdAndUserId(UUID id, UUID userId);
 }

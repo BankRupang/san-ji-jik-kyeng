@@ -10,6 +10,7 @@ import com.bankrupang.sanjijk.ai.exception.AiErrorCode;
 import com.bankrupang.sanjijk.ai.infrastructure.ai.HybridSearchService;
 import com.bankrupang.sanjijk.common.exception.BaseException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
@@ -27,6 +28,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ChatService {
@@ -121,6 +123,7 @@ public class ChatService {
                     .content();
             return (reformulated != null && !reformulated.isBlank()) ? reformulated : userMessage;
         } catch (Exception e) {
+            log.warn("쿼리 재작성 실패, 원본 쿼리 사용 - error: {}", e.getMessage());
             return userMessage;
         }
     }

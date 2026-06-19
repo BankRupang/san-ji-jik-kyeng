@@ -23,8 +23,6 @@ public class ChatClientConfig {
 
     @Bean
     public ChatClient chatClient(ChatClient.Builder builder) {
-        return builder
-                .defaultSystem(BASE_SYSTEM_PROMPT)
-                .build();
+        return builder.build();
     }
 }
