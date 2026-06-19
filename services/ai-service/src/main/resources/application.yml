@@ -32,6 +32,7 @@ spring:
       embedding:
         options:
           model: gemini-embedding-2
+          dimensions: 768
     vectorstore:
       pgvector:
         initialize-schema: true
