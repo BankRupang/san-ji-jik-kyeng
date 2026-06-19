@@ -1,0 +1,56 @@
+# 모니터링 EC2 배포용 (Prometheus + Loki + Grafana)
+# SSM Run Command로 실행: docker compose -f docker-compose.monitoring.yml pull && up -d
+# 사전 준비: envsubst로 prometheus.prod.yml.template의 IP 치환 후 실행
+#   KAFKA_PRIVATE_IP=$(aws ssm get-parameter --name /sanji/kafka/private-ip --query Parameter.Value --output text)
+#   envsubst < monitoring/prometheus/prometheus.prod.yml.template > monitoring/prometheus/prometheus.prod.yml
+
+name: sanji-monitoring
+
+services:
+  # ECS Fargate 앱(ecs_sd_configs 동적 탐색) + Kafka EC2(정적 타깃) 메트릭 수집
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus/prometheus.prod.yml:/etc/prometheus/prometheus.yml
+      - prom-data:/prometheus
+    ports: ["9090:9090"]
+
+  # ECS Fargate 앱의 Loki appender가 로그를 push
+  loki:
+    image: grafana/loki:latest
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/local-config.yaml
+      - loki-data:/loki
+    ports: ["3100:3100"]
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    environment:
+      # EC2 Instance Role로 CloudWatch datasource 인증 (RDS, ElastiCache, ALB 지표)
+      GF_AWS_default_REGION: ap-northeast-2
+      # SSM Parameter Store /sanji/monitoring/grafana-admin-password 에서 주입
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana-data:/var/lib/grafana
+    ports: ["3000:3000"]
+    depends_on: [prometheus, loki]
+
+  # Kafka EC2 브로커 상태 확인용 UI
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    restart: unless-stopped
+    environment:
+      KAFKA_CLUSTERS_0_NAME: prod
+      # SSM Run Command 스크립트에서 .env로 주입
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${KAFKA_PRIVATE_IP}:9092
+    ports: ["8080:8080"]
+
+volumes:
+  prom-data:
+  loki-data:
+  grafana-data:

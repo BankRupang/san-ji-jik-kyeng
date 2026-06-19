@@ -41,5 +41,8 @@ out/
 .env.local
 .env.*.local
 *.env
+.env.prod*
+
+### ETC ###
 .notes/
 MEMORY.md
