@@ -37,11 +37,11 @@ public class ProductController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<ProductCreateResponse>> createProduct (
-            @RequestHeader("X-User-Id") UUID sellerId,
+            @RequestHeader("X-User-Id") UUID userId,
             @RequestHeader("X-User-Role") String userRole,
             @Valid @RequestBody ProductCreateRequest request
     ) {
-        ProductCreateResponse response = productService.createProduct(sellerId, userRole, request);
+        ProductCreateResponse response = productService.createProduct(userId, userRole, request);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -68,23 +68,23 @@ public class ProductController {
 
     @PatchMapping("/{productId}")
     public ResponseEntity<ApiResponse<ProductUpdateResponse>> updateProduct(
-            @RequestHeader("X-User-Id") UUID sellerId,
+            @RequestHeader("X-User-Id") UUID userId,
             @RequestHeader("X-User-Role") String userRole,
             @PathVariable UUID productId,
             @Valid @RequestBody ProductUpdateRequest request
     ) {
-        ProductUpdateResponse response = productService.updateProduct(sellerId, userRole, productId, request);
+        ProductUpdateResponse response = productService.updateProduct(userId, userRole, productId, request);
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @DeleteMapping("/{productId}")
     public ResponseEntity<ApiResponse<Void>> deleteProduct(
-            @RequestHeader("X-User-Id") UUID sellerId,
+            @RequestHeader("X-User-Id") UUID userId,
             @RequestHeader("X-User-Role") String userRole,
             @PathVariable UUID productId
     ) {
-        productService.deleteProduct(sellerId, userRole, productId);
+        productService.deleteProduct(userId, userRole, productId);
 
         return ResponseEntity.ok(ApiResponse.ok("상품이 삭제되었습니다.", null));
     }

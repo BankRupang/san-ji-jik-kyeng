@@ -29,11 +29,11 @@ public class ProductService {
     private final ProductRepository productRepository;
 
     @Transactional
-    public ProductCreateResponse createProduct(UUID sellerId, String userRole, ProductCreateRequest request) {
+    public ProductCreateResponse createProduct(UUID userId, String userRole, ProductCreateRequest request) {
         validateSellerOrMasterRole(userRole);
 
         Product product = Product.create(
-                sellerId,
+                userId,
                 request.name(),
                 request.description(),
                 request.quantity()
@@ -61,12 +61,12 @@ public class ProductService {
     }
 
     @Transactional
-    public ProductUpdateResponse updateProduct(UUID sellerId, String userRole, UUID productId, ProductUpdateRequest request) {
+    public ProductUpdateResponse updateProduct(UUID userId, String userRole, UUID productId, ProductUpdateRequest request) {
         validateSellerOrMasterRole(userRole);
         validateUpdateRequest(request);
 
         Product product = getExistingProduct(productId);
-        validateProductOwnerOrMaster(product, sellerId, userRole);
+        validateProductOwnerOrMaster(product, userId, userRole);
 
         product.update(
                 request.name(),
@@ -78,13 +78,13 @@ public class ProductService {
     }
 
     @Transactional
-    public void deleteProduct(UUID sellerId, String userRole, UUID productId) {
+    public void deleteProduct(UUID userId, String userRole, UUID productId) {
         validateSellerOrMasterRole(userRole);
 
         Product product = getExistingProduct(productId);
-        validateProductOwnerOrMaster(product, sellerId, userRole);
+        validateProductOwnerOrMaster(product, userId, userRole);
 
-        product.softDelete(sellerId);
+        product.softDelete(userId);
     }
 
     private void validateSellerOrMasterRole(String userRole) {
@@ -114,12 +114,12 @@ public class ProductService {
         }
     }
 
-    private void validateProductOwnerOrMaster(Product product, UUID sellerId, String userRole) {
+    private void validateProductOwnerOrMaster(Product product, UUID userId, String userRole) {
         if ("MASTER".equalsIgnoreCase(userRole)) {
             return;
         }
 
-        if (!product.getSellerId().equals(sellerId)) {
+        if (!product.getSellerId().equals(userId)) {
             throw new ProductException(ProductErrorCode.PRODUCT_FORBIDDEN);
         }
     }

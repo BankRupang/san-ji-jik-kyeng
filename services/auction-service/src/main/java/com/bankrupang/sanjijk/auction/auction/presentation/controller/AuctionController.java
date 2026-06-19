@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import lombok.RequiredArgsConstructor;
 
+import com.bankrupang.sanjijk.auction.auction.application.service.AuctionService;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCreateRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCreateResponse;
 import com.bankrupang.sanjijk.common.response.ApiResponse;
@@ -27,11 +28,11 @@ public class AuctionController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<AuctionCreateResponse>> createAuction(
-            @RequestHeader("X-User-Id") UUID sellerId,
+            @RequestHeader("X-User-Id") UUID userId,
             @RequestHeader("X-User-Role") String userRole,
             @Valid @RequestBody AuctionCreateRequest request
     ) {
-        AuctionCreateResponse response = auctionService.createAuction(sellerId, userRole, request);
+        AuctionCreateResponse response = auctionService.createAuction(userId, userRole, request);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
