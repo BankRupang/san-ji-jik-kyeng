@@ -17,3 +17,8 @@ scrape_configs:
           - "payment-service:19095"
           - "notification-service:19096"
           - "ai-service:19097"
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: "([^:]+):.*"
+        target_label: application
+        replacement: "$1"
