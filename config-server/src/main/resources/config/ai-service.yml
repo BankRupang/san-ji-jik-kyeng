@@ -20,16 +20,17 @@ spring:
       base-url: https://generativelanguage.googleapis.com/v1beta/openai
       chat:
         options:
-          model: gemini-1.5-flash
+          model: gemini-2.5-flash
       embedding:
         options:
-          model: text-embedding-004
+          model: gemini-embedding-2
     vectorstore:
       pgvector:
         initialize-schema: true
         index-type: HNSW
         distance-type: COSINE_DISTANCE
         dimensions: 768
+        schema-name: ai_schema
 
 ai:
   chat:
