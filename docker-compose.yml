@@ -90,6 +90,8 @@ services:
       dockerfile: ./config-server/Dockerfile
     ports: ["8888:8888"]
     networks: [sanji]
+    environment:
+      LOKI_URL: http://loki:3100
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8888/actuator/health || exit 1"]
       interval: 10s
@@ -105,6 +107,9 @@ services:
     networks: [sanji]
     environment:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      LOKI_URL: http://loki:3100
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus"
+      MANAGEMENT_ENDPOINT_PROMETHEUS_ACCESS: unrestricted
     depends_on:
       config-server: { condition: service_healthy }
 
@@ -120,6 +125,7 @@ services:
       SPRING_PROFILES_ACTIVE: dev
       SPRING_CLOUD_CONFIG_URI: http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      LOKI_URL: http://loki:3100
     depends_on:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
@@ -151,6 +157,7 @@ services:
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI: ${KEYCLOAK_SERVER_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs
       MANAGER_KEY: ${MANAGER_KEY}
       MASTER_KEY: ${MASTER_KEY}
+      LOKI_URL: http://loki:3100
     depends_on:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
@@ -172,6 +179,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092
+      LOKI_URL: http://loki:3100
     depends_on:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
@@ -195,6 +203,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092
+      LOKI_URL: http://loki:3100
     depends_on:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
@@ -216,6 +225,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092
+      LOKI_URL: http://loki:3100
     depends_on:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
@@ -236,6 +246,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092
+      LOKI_URL: http://loki:3100
     depends_on:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
@@ -256,6 +267,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092
+      LOKI_URL: http://loki:3100
     depends_on:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
@@ -275,15 +287,58 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=ai_schema
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      LOKI_URL: http://loki:3100
     depends_on:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
       postgres: { condition: service_healthy }
 
+  # ================================================================
+  # 모니터링
+  # ================================================================
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./monitoring/prometheus/prometheus.local.yml:/etc/prometheus/prometheus.yml
+    ports: ["9090:9090"]
+    networks: [sanji]
+
+  loki:
+    image: grafana/loki:latest
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/local-config.yaml
+      - loki-data:/loki
+    ports: ["3100:3100"]
+    networks: [sanji]
+
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana-data:/var/lib/grafana
+    ports: ["3000:3000"]
+    networks: [sanji]
+    depends_on: [prometheus, loki]
+    environment:
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports: ["8080:8080"]
+    networks: [sanji]
+    depends_on: [kafka]
+
 volumes:
   pg-data:
   redis-data:
   kafka-data:
+  loki-data:
+  grafana-data:
 
 networks:
   sanji:
