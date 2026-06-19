@@ -15,7 +15,9 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "p_orders")
+@Table(name = "p_orders", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"user_id", "auction_id", "order_type"})
+})
 @SQLRestriction("deleted_at IS NULL")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -222,5 +224,8 @@ public class Order extends BaseEntity {
             );
         }
     }
+
+    @Version
+    private Long version;
 
 }
