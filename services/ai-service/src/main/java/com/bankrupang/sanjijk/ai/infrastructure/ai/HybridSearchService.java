@@ -55,7 +55,8 @@ public class HybridSearchService {
 
     public List<String> search(String query) {
         try {
-            float[] embedding = embeddingModel.embed(query);
+            String prefixedQuery = "task: question answering | query: " + query;
+            float[] embedding = embeddingModel.embed(prefixedQuery);
             String vectorStr = toVectorString(embedding);
             int searchLimit = topK * 2;
 

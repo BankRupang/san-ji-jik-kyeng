@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "chat_sessions")
+@Table(name = "p_chat_sessions")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ChatSession extends BaseEntity {
