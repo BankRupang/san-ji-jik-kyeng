@@ -5,9 +5,12 @@ import org.springframework.http.HttpStatus;
 public class RemoteServiceException extends BaseException {
 
     public RemoteServiceException(int httpStatus, String code, String message) {
-        super(new RemoteErrorCode(
-                HttpStatus.resolve(httpStatus) != null ? HttpStatus.resolve(httpStatus) : HttpStatus.INTERNAL_SERVER_ERROR,
-                code, message));
+        super(new RemoteErrorCode(resolveStatus(httpStatus), code, message));
+    }
+
+    private static HttpStatus resolveStatus(int httpStatus) {
+        HttpStatus status = HttpStatus.resolve(httpStatus);
+        return status != null ? status : HttpStatus.INTERNAL_SERVER_ERROR;
     }
 
     private record RemoteErrorCode(
