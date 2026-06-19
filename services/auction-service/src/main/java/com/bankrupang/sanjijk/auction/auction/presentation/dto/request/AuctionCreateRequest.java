@@ -20,10 +20,8 @@ public record AuctionCreateRequest(
         Integer bidUnit,
 
         @NotNull(message = "경매 시작 시각은 필수입니다.")
-        LocalDateTime startAt,
+        LocalDateTime startAt
 
-        @NotNull(message = "경매 종료 시각은 필수입니다.")
-        LocalDateTime endAt
 ) {
 
 }
