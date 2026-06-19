@@ -57,7 +57,7 @@ public class AuctionController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<PageResponse<AuctionListResponse>>> getAuctons(
+    public ResponseEntity<ApiResponse<PageResponse<AuctionListResponse>>> getAuctions(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) AuctionStatus status

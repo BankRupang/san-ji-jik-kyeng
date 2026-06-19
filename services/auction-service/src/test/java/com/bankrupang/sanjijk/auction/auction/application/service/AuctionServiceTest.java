@@ -21,6 +21,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -33,10 +35,13 @@ import com.bankrupang.sanjijk.auction.auction.exception.AuctionErrorCode;
 import com.bankrupang.sanjijk.auction.auction.exception.AuctionException;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCreateRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCreateResponse;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionDetailResponse;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionListResponse;
 import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepository;
 import com.bankrupang.sanjijk.auction.product.exception.ProductErrorCode;
 import com.bankrupang.sanjijk.auction.product.exception.ProductException;
+import com.bankrupang.sanjijk.common.response.PageResponse;
 
 @DisplayName("AuctionService 테스트")
 @ExtendWith(MockitoExtension.class)
@@ -191,6 +196,147 @@ class AuctionServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("getAuction()")
+    class GetAuction {
+
+        @Test
+        @DisplayName("성공 - 경매를 단건 조회한다")
+        void success() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Product product = createProduct(sellerId, productId);
+            Auction auction = createAuction(sellerId, productId, auctionId);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+
+            // when
+            AuctionDetailResponse result = auctionService.getAuction(auctionId);
+
+            // then
+            assertThat(result.auctionId()).isEqualTo(auctionId);
+            assertThat(result.product().productId()).isEqualTo(productId);
+            assertThat(result.product().name()).isEqualTo(product.getName());
+            assertThat(result.product().description()).isEqualTo(product.getDescription());
+            assertThat(result.product().quantity()).isEqualTo(product.getQuantity());
+            assertThat(result.sellerId()).isEqualTo(sellerId);
+            assertThat(result.status()).isEqualTo(AuctionStatus.READY);
+            assertThat(result.bidUnit()).isEqualTo(1000);
+            assertThat(result.startPrice()).isEqualTo(10000);
+            assertThat(result.startAt()).isEqualTo(auction.getStartAt());
+            assertThat(result.endAt()).isEqualTo(auction.getEndAt());
+        }
+
+        @Test
+        @DisplayName("실패 - 경매가 존재하지 않는다")
+        void fail_auction_not_found() {
+            // given
+            UUID auctionId = UUID.randomUUID();
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> auctionService.getAuction(auctionId))
+                    .isInstanceOf(AuctionException.class)
+                    .hasMessage(AuctionErrorCode.AUCTION_NOT_FOUND.getMessage());
+        }
+
+        @Test
+        @DisplayName("실패 - 경매 상품이 존재하지 않는다")
+        void fail_product_not_found() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> auctionService.getAuction(auctionId))
+                    .isInstanceOf(ProductException.class)
+                    .hasMessage(ProductErrorCode.PRODUCT_NOT_FOUND.getMessage());
+        }
+    }
+
+    @Nested
+    @DisplayName("getAuctions()")
+    class GetAuctions {
+
+        @Test
+        @DisplayName("성공 - 경매 목록을 최신 등록순으로 조회한다")
+        void success() {
+            // given
+            UUID firstSellerId = UUID.randomUUID();
+            UUID firstProductId = UUID.randomUUID();
+            UUID firstAuctionId = UUID.randomUUID();
+            UUID secondSellerId = UUID.randomUUID();
+            UUID secondProductId = UUID.randomUUID();
+            UUID secondAuctionId = UUID.randomUUID();
+            Auction firstAuction = createAuction(firstSellerId, firstProductId, firstAuctionId);
+            Auction secondAuction = createAuction(secondSellerId, secondProductId, secondAuctionId);
+            Product firstProduct = createProduct(firstSellerId, firstProductId);
+            Product secondProduct = createProduct(secondSellerId, secondProductId);
+
+            given(auctionRepository.findAllByDeletedAtIsNull(any(Pageable.class)))
+                    .willReturn(new PageImpl<>(List.of(firstAuction, secondAuction)));
+            given(productRepository.findByIdAndDeletedAtIsNull(firstProductId)).willReturn(Optional.of(firstProduct));
+            given(productRepository.findByIdAndDeletedAtIsNull(secondProductId)).willReturn(Optional.of(secondProduct));
+
+            // when
+            PageResponse<AuctionListResponse> result = auctionService.getAuctions(0, 10, null);
+
+            // then
+            assertThat(result.getContent()).hasSize(2);
+            assertThat(result.getContent().get(0).auctionId()).isEqualTo(firstAuctionId);
+            assertThat(result.getContent().get(0).productName()).isEqualTo(firstProduct.getName());
+            assertThat(result.getContent().get(1).auctionId()).isEqualTo(secondAuctionId);
+            assertThat(result.getContent().get(1).productName()).isEqualTo(secondProduct.getName());
+            assertThat(result.getPage()).isZero();
+            assertThat(result.getSize()).isEqualTo(2);
+            assertThat(result.getTotalElements()).isEqualTo(2);
+            assertThat(result.getTotalPages()).isEqualTo(1);
+            assertThat(result.getSort()).isEqualTo("createdAt,DESC");
+
+            ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+            verify(auctionRepository).findAllByDeletedAtIsNull(pageableCaptor.capture());
+            Pageable pageable = pageableCaptor.getValue();
+            assertThat(pageable.getPageNumber()).isZero();
+            assertThat(pageable.getPageSize()).isEqualTo(10);
+            assertThat(pageable.getSort().getOrderFor("createdAt").isDescending()).isTrue();
+            verify(auctionRepository, never()).findAllByStatusAndDeletedAtIsNull(any(AuctionStatus.class), any(Pageable.class));
+        }
+
+        @Test
+        @DisplayName("성공 - 상태별 경매 목록을 조회한다")
+        void success_filter_status() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            Product product = createProduct(sellerId, productId);
+
+            given(auctionRepository.findAllByStatusAndDeletedAtIsNull(any(AuctionStatus.class), any(Pageable.class)))
+                    .willReturn(new PageImpl<>(List.of(auction)));
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+
+            // when
+            PageResponse<AuctionListResponse> result = auctionService.getAuctions(0, 10, AuctionStatus.READY);
+
+            // then
+            assertThat(result.getContent()).hasSize(1);
+            assertThat(result.getContent().get(0).auctionId()).isEqualTo(auctionId);
+            assertThat(result.getContent().get(0).status()).isEqualTo(AuctionStatus.READY);
+            assertThat(result.getContent().get(0).productName()).isEqualTo(product.getName());
+            verify(auctionRepository).findAllByStatusAndDeletedAtIsNull(any(AuctionStatus.class), any(Pageable.class));
+            verify(auctionRepository, never()).findAllByDeletedAtIsNull(any(Pageable.class));
+        }
+    }
+
     private AuctionCreateRequest createRequest(UUID productId, LocalDateTime startAt) {
         return new AuctionCreateRequest(
                 productId,
@@ -209,6 +355,20 @@ class AuctionServiceTest {
         );
         ReflectionTestUtils.setField(product, "id", productId);
         return product;
+    }
+
+    private Auction createAuction(UUID sellerId, UUID productId, UUID auctionId) {
+        LocalDateTime startAt = LocalDateTime.now().plusDays(1);
+        Auction auction = Auction.create(
+                productId,
+                sellerId,
+                10000,
+                1000,
+                startAt,
+                startAt.plusHours(1)
+        );
+        ReflectionTestUtils.setField(auction, "id", auctionId);
+        return auction;
     }
 
     private void setAuthentication(String role) {
