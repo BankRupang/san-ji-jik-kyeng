@@ -1,1 +1,2 @@
 com.bankrupang.sanjijk.common.config.CommonAutoConfiguration
+com.bankrupang.sanjijk.common.config.CommonFeignAutoConfiguration
