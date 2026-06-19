@@ -78,6 +78,11 @@ public class BidService {
                 log.info("안티스나이핑 발동 - auctionId: {}, newEndAt: {}", auctionId, newEndAt);
             }
 
+            // 4. Redis 현재가 갱신
+            redisTemplate.opsForHash().put(hashKey, "currentPrice", String.valueOf(request.getBidPrice()));
+            redisTemplate.opsForHash().put(hashKey, "highestBidderId", userId.toString());
+            log.info("현재가 갱신 - auctionId: {}, newPrice: {}, highestBidder: {}", auctionId, request.getBidPrice(), userId);
+
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("락 획득 중 인터럽트 발생", e);
