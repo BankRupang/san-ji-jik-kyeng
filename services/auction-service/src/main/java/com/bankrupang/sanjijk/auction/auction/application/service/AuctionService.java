@@ -3,6 +3,8 @@ package com.bankrupang.sanjijk.auction.auction.application.service;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,15 +13,19 @@ import lombok.RequiredArgsConstructor;
 
 import com.bankrupang.sanjijk.auction.auction.domain.entity.Auction;
 import com.bankrupang.sanjijk.auction.auction.domain.repository.AuctionRepository;
+import com.bankrupang.sanjijk.auction.auction.domain.type.AuctionStatus;
 import com.bankrupang.sanjijk.auction.auction.exception.AuctionErrorCode;
 import com.bankrupang.sanjijk.auction.auction.exception.AuctionException;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCreateRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCreateResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionDetailResponse;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionListResponse;
 import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepository;
 import com.bankrupang.sanjijk.auction.product.exception.ProductErrorCode;
 import com.bankrupang.sanjijk.auction.product.exception.ProductException;
+import com.bankrupang.sanjijk.common.response.PageResponse;
+import com.bankrupang.sanjijk.common.util.PageableUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -58,6 +64,19 @@ public class AuctionService {
         return AuctionDetailResponse.of(auction, product);
     }
 
+    public PageResponse<AuctionListResponse> getAuctions(int page, int size, AuctionStatus status) {
+        Pageable pageable = PageableUtils.ofDefault(page, size);
+
+        Page<Auction> auctions = findAuctions(pageable, status);
+
+        Page<AuctionListResponse> response = auctions.map(auction -> {
+            Product product = getExistingProduct(auction.getProductId());
+            return AuctionListResponse.of(auction, product);
+        });
+
+        return PageResponse.of(response);
+    }
+
     private Product getExistingProduct(UUID productId) {
         return productRepository.findByIdAndDeletedAtIsNull(productId)
                 .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND));
@@ -93,6 +112,14 @@ public class AuctionService {
     private Auction getExistingAuction(UUID auctionId) {
         return auctionRepository.findByIdAndDeletedAtIsNull(auctionId)
                 .orElseThrow(() -> new AuctionException(AuctionErrorCode.AUCTION_NOT_FOUND));
+    }
+
+    private Page<Auction> findAuctions(Pageable pageable, AuctionStatus status) {
+        if (status == null) {
+            return auctionRepository.findAllByDeletedAtIsNull(pageable);
+        }
+
+        return auctionRepository.findAllByStatusAndDeletedAtIsNull(status, pageable);
     }
 
 }
