@@ -1,5 +1,52 @@
-﻿spring:
+server:
+  port: 19097
+
+spring:
   application:
     name: ai-service
   config:
-    import: "optional:configserver:http://localhost:8888"
+    import: "optional:configserver:"
+  datasource:
+    url: jdbc:postgresql://localhost:5432/postgres?currentSchema=ai_schema
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create
+    properties:
+      hibernate:
+        default_schema: ai_schema
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: true
+
+  ai:
+    openai:
+      api-key: ${GEMINI_API_KEY}
+      base-url: https://generativelanguage.googleapis.com/v1beta/openai
+      chat:
+        options:
+          model: gemini-2.5-flash
+      embedding:
+        options:
+          model: gemini-embedding-2
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 768
+        schema-name: ai_schema
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+ai:
+  chat:
+    session-expire-hours: 24
+    similarity-threshold: 0.7
+    top-k: 3
