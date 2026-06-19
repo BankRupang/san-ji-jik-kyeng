@@ -1,0 +1,97 @@
+{
+  "realm": "sanjijk",
+  "displayName": "산지직경",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "verifyEmail": false,
+  "accessTokenLifespan": 86400,
+  "refreshTokenMaxReuse": 0,
+
+  "roles": {
+    "realm": [
+      { "name": "BUYER",   "description": "구매자" },
+      { "name": "SELLER",  "description": "판매자" },
+      { "name": "MANAGER", "description": "중간 관리자" },
+      { "name": "MASTER",  "description": "마스터 관리자" }
+    ]
+  },
+
+  "clients": [
+    {
+      "clientId": "user-service",
+      "name": "User Service",
+      "description": "회원가입/로그인 및 Admin API 호출 클라이언트",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "replace-this-secret",
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true
+    }
+  ],
+
+  "users": [
+    {
+      "username": "service-account-user-service",
+      "serviceAccountClientId": "user-service",
+      "enabled": true,
+      "clientRoles": {
+        "realm-management": ["manage-users"]
+      }
+    },
+    {
+      "username": "testbuyer",
+      "email": "buyer@test.com",
+      "firstName": "구매자",
+      "lastName": "테스터",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        { "type": "password", "value": "Test1234!", "temporary": false }
+      ],
+      "realmRoles": ["BUYER"]
+    },
+    {
+      "username": "testseller",
+      "email": "seller@test.com",
+      "firstName": "판매자",
+      "lastName": "테스터",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        { "type": "password", "value": "Test1234!", "temporary": false }
+      ],
+      "realmRoles": ["SELLER"]
+    },
+    {
+      "username": "testmanager",
+      "email": "manager@test.com",
+      "firstName": "매니저",
+      "lastName": "관리자",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        { "type": "password", "value": "Test1234!", "temporary": false }
+      ],
+      "realmRoles": ["MANAGER"]
+    },
+    {
+      "username": "testmaster",
+      "email": "master@test.com",
+      "firstName": "마스터",
+      "lastName": "관리자",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        { "type": "password", "value": "Test1234!", "temporary": false }
+      ],
+      "realmRoles": ["MASTER"]
+    }
+  ]
+}

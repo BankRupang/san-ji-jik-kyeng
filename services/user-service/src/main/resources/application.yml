@@ -10,7 +10,7 @@
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create
     properties:
       hibernate:
         show_sql: true
@@ -19,9 +19,9 @@
 
   # 로컬 DB 연결
   datasource:
-    url: jdbc:postgresql://localhost:5432/root
-    username: root
-    password: ${DB_PASSWORD}
+    url: ${POSTGRES_DB_URL}
+    username: ${POSTGRES_USERNAME}
+    password: ${POSTGRES_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   # 키클락 링크
@@ -29,14 +29,14 @@
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:18080/realms/sanjijk
-          jwk-set-uri: http://localhost:18080/realms/sanjijk/protocol/openid-connect/certs
+          issuer-uri: ${KEYCLOAK_ISSUER_URI}
+          jwk-set-uri: ${KEYCLOAK_ISSUER_URI}/protocol/openid-connect/certs
 
 # 키클락 설정
 keycloak:
   server-url: ${KEYCLOAK_SERVER_URL}
-  realm: sanjijk
-  client-id: user-service
+  realm: ${KEYCLOAK_REALM}
+  client-id: ${KEYCLOAK_CLIENT_ID}
   client-secret: ${KEYCLOAK_CLIENT_SECRET}
 
 admin :
