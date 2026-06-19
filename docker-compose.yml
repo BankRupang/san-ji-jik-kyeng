@@ -319,6 +319,8 @@ services:
     ports: ["3000:3000"]
     networks: [sanji]
     depends_on: [prometheus, loki]
+    environment:
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
