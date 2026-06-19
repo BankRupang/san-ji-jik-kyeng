@@ -3,6 +3,7 @@ package com.bankrupang.sanjijk.auction.auction.application.service;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,11 +29,9 @@ public class AuctionService {
     private final ProductRepository productRepository;
 
     @Transactional
-    public AuctionCreateResponse createAuction(UUID userId, String userRole, AuctionCreateRequest request) {
-        validateSellerOrMasterRole(userRole);
-
+    public AuctionCreateResponse createAuction(UUID userId, AuctionCreateRequest request) {
         Product product = getExistingProduct(request.productId());
-        validateProductOwnerOrMaster(product, userId, userRole);
+        validateProductOwnerOrMaster(product, userId);
         validateStartAt(request.startAt());
 
         LocalDateTime endAt = request.startAt().plusHours(1);
@@ -51,19 +50,13 @@ public class AuctionService {
         return AuctionCreateResponse.from(savedAuction);
     }
 
-    private void validateSellerOrMasterRole(String userRole) {
-        if (!"SELLER".equalsIgnoreCase(userRole) && !"MASTER".equalsIgnoreCase(userRole)) {
-            throw new AuctionException(AuctionErrorCode.AUCTION_FORBIDDEN);
-        }
-    }
-
     private Product getExistingProduct(UUID productId) {
         return productRepository.findByIdAndDeletedAtIsNull(productId)
                 .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND));
     }
 
-    private void validateProductOwnerOrMaster(Product product, UUID userId, String userRole) {
-        if ("MASTER".equalsIgnoreCase(userRole)) {
+    private void validateProductOwnerOrMaster(Product product, UUID userId) {
+        if (hasRole("ROLE_MASTER")) {
             return;
         }
 
@@ -76,6 +69,17 @@ public class AuctionService {
         if (!startAt.isAfter(LocalDateTime.now())) {
             throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_PERIOD);
         }
+    }
+
+    private boolean hasRole(String role) {
+        if (SecurityContextHolder.getContext().getAuthentication() == null) {
+            return false;
+        }
+
+        return SecurityContextHolder.getContext().getAuthentication()
+                .getAuthorities()
+                .stream()
+                .anyMatch(authority -> authority.getAuthority().equals(role));
     }
 
 }

@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -36,12 +37,12 @@ public class ProductController {
     private final ProductService productService;
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('SELLER', 'MASTER')")
     public ResponseEntity<ApiResponse<ProductCreateResponse>> createProduct (
             @RequestHeader("X-User-Id") UUID userId,
-            @RequestHeader("X-User-Role") String userRole,
             @Valid @RequestBody ProductCreateRequest request
     ) {
-        ProductCreateResponse response = productService.createProduct(userId, userRole, request);
+        ProductCreateResponse response = productService.createProduct(userId, request);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -67,24 +68,24 @@ public class ProductController {
     }
 
     @PatchMapping("/{productId}")
+    @PreAuthorize("hasAnyRole('SELLER', 'MASTER')")
     public ResponseEntity<ApiResponse<ProductUpdateResponse>> updateProduct(
             @RequestHeader("X-User-Id") UUID userId,
-            @RequestHeader("X-User-Role") String userRole,
             @PathVariable UUID productId,
             @Valid @RequestBody ProductUpdateRequest request
     ) {
-        ProductUpdateResponse response = productService.updateProduct(userId, userRole, productId, request);
+        ProductUpdateResponse response = productService.updateProduct(userId, productId, request);
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @DeleteMapping("/{productId}")
+    @PreAuthorize("hasAnyRole('SELLER', 'MASTER')")
     public ResponseEntity<ApiResponse<Void>> deleteProduct(
             @RequestHeader("X-User-Id") UUID userId,
-            @RequestHeader("X-User-Role") String userRole,
             @PathVariable UUID productId
     ) {
-        productService.deleteProduct(userId, userRole, productId);
+        productService.deleteProduct(userId, productId);
 
         return ResponseEntity.ok(ApiResponse.ok("상품이 삭제되었습니다.", null));
     }

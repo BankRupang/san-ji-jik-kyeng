@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -27,12 +28,12 @@ public class AuctionController {
     private final AuctionService auctionService;
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('SELLER', 'MASTER')")
     public ResponseEntity<ApiResponse<AuctionCreateResponse>> createAuction(
             @RequestHeader("X-User-Id") UUID userId,
-            @RequestHeader("X-User-Role") String userRole,
             @Valid @RequestBody AuctionCreateRequest request
     ) {
-        AuctionCreateResponse response = auctionService.createAuction(userId, userRole, request);
+        AuctionCreateResponse response = auctionService.createAuction(userId, request);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
