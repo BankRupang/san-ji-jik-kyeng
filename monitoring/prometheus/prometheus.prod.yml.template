@@ -10,7 +10,7 @@ scrape_configs:
       - region: ap-northeast-2
     relabel_configs:
       - source_labels: [__meta_ecs_task_definition_family]
-        target_label: service
+        target_label: application
       - source_labels: [__meta_ecs_container_name]
         action: keep
         regex: ".*(service|server)"
