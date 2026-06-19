@@ -29,7 +29,7 @@ class OrderTest {
 
         @BeforeEach
         void setUp() {
-            order = Order.createDepositOrder(userId, "김지민", "U123456", auctionId, "참외 10박스", 50000L);
+            order = Order.createDepositOrder(userId, "김지민", "U123456", auctionId, "참외 10박스", 50000);
         }
 
         @Test
@@ -89,7 +89,7 @@ class OrderTest {
 
         @BeforeEach
         void setUp() {
-            order = Order.createWinningOrder(userId, sellerId , "김지민", "U123456", auctionId, "참외 10박스",500000L, "문 앞에 놔주세요");
+            order = Order.createWinningOrder(userId, sellerId , "김지민", "U123456", auctionId, "참외 10박스",500000, "문 앞에 놔주세요");
         }
 
         @Test

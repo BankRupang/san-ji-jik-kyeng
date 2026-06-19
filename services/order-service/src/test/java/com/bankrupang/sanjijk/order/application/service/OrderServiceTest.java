@@ -51,7 +51,7 @@ class OrderServiceTest {
             request = new OrderDepositCreateRequest(
                     UUID.randomUUID(),
                     "싱싱한 광어",
-                    10000L,
+                    10000,
                     "사람",
                     "UI123456"
             );
@@ -73,7 +73,7 @@ class OrderServiceTest {
             assertThat(response.status()).isEqualTo(OrderStatus.PENDING);
             assertThat(response.userId()).isEqualTo(userId);
             assertThat(response.auctionId()).isEqualTo(request.auctionId());
-            assertThat(response.amount()).isEqualTo(10000L);
+            assertThat(response.amount()).isEqualTo(10000);
 
             verify(orderRepository).save(any(Order.class));
             verify(orderEventPublisher).publishDepositCreated(any(Order.class));

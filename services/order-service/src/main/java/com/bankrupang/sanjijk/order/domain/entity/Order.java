@@ -49,7 +49,7 @@ public class Order extends BaseEntity {
     private OrderType orderType;
 
     @Column(name = "amount", nullable = false)
-    private Long amount;
+    private int amount;
 
     @Column(name = "request_memo", length = 200)
     private String requestMemo;
@@ -74,7 +74,7 @@ public class Order extends BaseEntity {
             UUID auctionId,
             String auctionTitle,
             OrderType orderType,
-            Long amount,
+            int amount,
             String requestMemo,
             LocalDateTime paymentDueAt
     ) {
@@ -99,7 +99,7 @@ public class Order extends BaseEntity {
             String slackId,
             UUID auctionId,
             String auctionTitle,
-            Long amount
+            int amount
     ) {
         return Order.builder()
                 .orderNumber(generateOrderNumber())
@@ -121,7 +121,7 @@ public class Order extends BaseEntity {
             String slackId,
             UUID auctionId,
             String auctionTitle,
-            Long amount,
+            int amount,
             String requestMemo
     ) {
         return Order.builder()

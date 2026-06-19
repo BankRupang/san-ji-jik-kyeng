@@ -15,7 +15,7 @@ public record OrderResponse(
         UUID auctionId,
         String auctionTitle,
         OrderType orderType,
-        Long amount,
+        int amount,
         OrderStatus status,
         LocalDateTime createdAt
 ) {
