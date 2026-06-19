@@ -42,4 +42,16 @@ public class Product extends BaseEntity {
         return product;
     }
 
+    public void update(String name, String description, String quantity) {
+        if (name != null) {
+            this.name = name;
+        }
+        if (description != null) {
+            this.description = description;
+        }
+        if (quantity != null) {
+            this.quantity = quantity;
+        }
+    }
+
 }
