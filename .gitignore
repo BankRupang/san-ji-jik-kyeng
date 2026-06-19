@@ -40,9 +40,12 @@ out/
 .env
 .env.local
 .env.*.local
+.env.*.prod
 *.env
-.env.prod*
 
 ### ETC ###
 .notes/
 MEMORY.md
+
+### Generated at deploy time ###
+monitoring/prometheus/prometheus.prod.yml
