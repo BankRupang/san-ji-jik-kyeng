@@ -41,5 +41,6 @@ out/
 .env.local
 .env.*.local
 *.env
+.terraform/
 .notes/
 MEMORY.md
