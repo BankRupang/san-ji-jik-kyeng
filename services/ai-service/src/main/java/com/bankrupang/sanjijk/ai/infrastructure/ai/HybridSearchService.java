@@ -29,7 +29,7 @@ public class HybridSearchService {
             WITH vector_results AS (
                 SELECT id, content,
                        ROW_NUMBER() OVER (ORDER BY embedding <=> CAST(? AS vector)) AS rank
-                FROM vector_store
+                FROM ai_schema.vector_store
                 WHERE 1 - (embedding <=> CAST(? AS vector)) >= ?
                 LIMIT ?
             ),
@@ -38,7 +38,7 @@ public class HybridSearchService {
                        ROW_NUMBER() OVER (
                            ORDER BY ts_rank(to_tsvector('simple', content), plainto_tsquery('simple', ?)) DESC
                        ) AS rank
-                FROM vector_store
+                FROM ai_schema.vector_store
                 WHERE to_tsvector('simple', content) @@ plainto_tsquery('simple', ?)
                 LIMIT ?
             ),
@@ -60,10 +60,13 @@ public class HybridSearchService {
             String vectorStr = toVectorString(embedding);
             int searchLimit = topK * 2;
 
-            return jdbcTemplate.queryForList(HYBRID_SEARCH_SQL, String.class,
+            List<String> results = jdbcTemplate.queryForList(HYBRID_SEARCH_SQL, String.class,
                     vectorStr, vectorStr, similarityThreshold, searchLimit,
                     query, query, searchLimit,
                     topK);
+
+            log.info("하이브리드 검색 결과 - query: {}, threshold: {}, 결과 수: {}", query, similarityThreshold, results.size());
+            return results;
         } catch (Exception e) {
             log.warn("하이브리드 검색 실패 - query: {}, error: {}", query, e.getMessage());
             return Collections.emptyList();

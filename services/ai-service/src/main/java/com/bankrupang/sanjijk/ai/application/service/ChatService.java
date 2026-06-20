@@ -20,6 +20,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.UUID;
@@ -34,6 +35,7 @@ public class ChatService {
     private final ChatSessionRepository sessionRepository;
     private final ChatMessageRepository messageRepository;
     private final HybridSearchService hybridSearchService;
+    private final TransactionTemplate transactionTemplate;
 
     @Value("${ai.chat.session-expire-hours}")
     private int sessionExpireHours;
@@ -43,7 +45,6 @@ public class ChatService {
         return sessionRepository.save(ChatSession.create(userId, sessionExpireHours));
     }
 
-    @Transactional
     public String chat(UUID sessionId, UUID userId, String userMessage) {
         validateSession(sessionId, userId);
 
@@ -58,8 +59,11 @@ public class ChatService {
         // 4단계: Context Condensing + 응답 생성 (시스템 프롬프트에 가드레일 포함)
         String response = generateResponse(userMessage, history, documents);
 
-        messageRepository.save(ChatMessage.of(sessionId, ChatRole.USER, userMessage));
-        messageRepository.save(ChatMessage.of(sessionId, ChatRole.ASSISTANT, response));
+        transactionTemplate.execute(status -> {
+            messageRepository.save(ChatMessage.of(sessionId, ChatRole.USER, userMessage));
+            messageRepository.save(ChatMessage.of(sessionId, ChatRole.ASSISTANT, response));
+            return null;
+        });
 
         return response;
     }
@@ -96,6 +100,8 @@ public class ChatService {
             throw new BaseException(AiErrorCode.CHAT_SESSION_ACCESS_DENIED);
         }
         if (session.isExpired()) {
+            session.expire();
+            sessionRepository.save(session);
             throw new BaseException(AiErrorCode.CHAT_SESSION_EXPIRED);
         }
     }
