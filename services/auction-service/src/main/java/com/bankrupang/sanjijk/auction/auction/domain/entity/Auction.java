@@ -155,7 +155,7 @@ public class Auction extends BaseEntity {
     }
 
     private void validateWinningResult(UUID winnerId, Integer finalPrice) {
-        if (winnerId == null || finalPrice == null || finalPrice <= 0) {
+        if (winnerId == null || finalPrice == null || finalPrice <= 0 || finalPrice < startPrice) {
             throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_RESULT);
         }
     }

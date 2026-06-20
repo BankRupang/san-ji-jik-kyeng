@@ -119,6 +119,23 @@ class AuctionTest {
         }
 
         @Test
+        @DisplayName("성공 - 최종 낙찰가가 시작가와 같으면 낙찰 처리한다")
+        void success_same_as_start_price() {
+            // given
+            Auction auction = createAuction(AuctionStatus.RESULT_PENDING);
+            UUID winnerId = UUID.randomUUID();
+            Integer finalPrice = 10000;
+
+            // when
+            auction.markWon(winnerId, finalPrice);
+
+            // then
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.WON);
+            assertThat(auction.getWinnerId()).isEqualTo(winnerId);
+            assertThat(auction.getFinalPrice()).isEqualTo(finalPrice);
+        }
+
+        @Test
         @DisplayName("성공 - 이미 WON 상태이면 다시 처리하지 않는다")
         void success_idempotent() {
             // given
@@ -173,6 +190,16 @@ class AuctionTest {
 
             // when & then
             assertInvalidAuctionResult(() -> auction.markWon(UUID.randomUUID(), 0));
+        }
+
+        @Test
+        @DisplayName("실패 - 최종 낙찰가가 시작가보다 낮으면 낙찰 처리할 수 없다")
+        void fail_final_price_less_than_start_price() {
+            // given
+            Auction auction = createAuction(AuctionStatus.RESULT_PENDING);
+
+            // when & then
+            assertInvalidAuctionResult(() -> auction.markWon(UUID.randomUUID(), 9999));
         }
     }
 
