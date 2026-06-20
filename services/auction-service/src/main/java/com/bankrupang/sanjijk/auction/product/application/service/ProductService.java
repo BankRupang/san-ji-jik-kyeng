@@ -4,7 +4,6 @@ import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,11 +59,11 @@ public class ProductService {
     }
 
     @Transactional
-    public ProductUpdateResponse updateProduct(UUID userId, UUID productId, ProductUpdateRequest request) {
+    public ProductUpdateResponse updateProduct(UUID userId, String userRole, UUID productId, ProductUpdateRequest request) {
         validateUpdateRequest(request);
 
         Product product = getExistingProduct(productId);
-        validateProductOwnerOrMaster(product, userId);
+        validateProductOwnerOrManagerOrMaster(product, userId, userRole);
 
         product.update(
                 request.name(),
@@ -76,9 +75,9 @@ public class ProductService {
     }
 
     @Transactional
-    public void deleteProduct(UUID userId, UUID productId) {
+    public void deleteProduct(UUID userId, String userRole, UUID productId) {
         Product product = getExistingProduct(productId);
-        validateProductOwnerOrMaster(product, userId);
+        validateProductOwnerOrManagerOrMaster(product, userId, userRole);
 
         product.softDelete(userId);
     }
@@ -104,8 +103,8 @@ public class ProductService {
         }
     }
 
-    private void validateProductOwnerOrMaster(Product product, UUID userId) {
-        if (hasRole("ROLE_MASTER")) {
+    private void validateProductOwnerOrManagerOrMaster(Product product, UUID userId, String userRole) {
+        if (isManagerOrMaster(userRole)) {
             return;
         }
 
@@ -114,15 +113,11 @@ public class ProductService {
         }
     }
 
-    private boolean hasRole(String role) {
-        if (SecurityContextHolder.getContext().getAuthentication() == null) {
-            return false;
-        }
-
-        return SecurityContextHolder.getContext().getAuthentication()
-                .getAuthorities()
-                .stream()
-                .anyMatch(authority -> authority.getAuthority().equals(role));
+    private boolean isManagerOrMaster(String userRole) {
+        return "MANAGER".equalsIgnoreCase(userRole)
+                || "ROLE_MANAGER".equalsIgnoreCase(userRole)
+                || "MASTER".equalsIgnoreCase(userRole)
+                || "ROLE_MASTER".equalsIgnoreCase(userRole);
     }
 
 }

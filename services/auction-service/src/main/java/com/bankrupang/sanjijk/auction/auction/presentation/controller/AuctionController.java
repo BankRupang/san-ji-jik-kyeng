@@ -7,18 +7,25 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import lombok.RequiredArgsConstructor;
 
 import com.bankrupang.sanjijk.auction.auction.application.service.AuctionService;
+import com.bankrupang.sanjijk.auction.auction.domain.type.AuctionStatus;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCreateRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCreateResponse;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionDetailResponse;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionListResponse;
 import com.bankrupang.sanjijk.common.response.ApiResponse;
+import com.bankrupang.sanjijk.common.response.PageResponse;
 
 @RestController
 @RequiredArgsConstructor
@@ -31,13 +38,34 @@ public class AuctionController {
     @PreAuthorize("hasAnyRole('SELLER', 'MASTER')")
     public ResponseEntity<ApiResponse<AuctionCreateResponse>> createAuction(
             @RequestHeader("X-User-Id") UUID userId,
+            @RequestHeader("X-User-Role") String userRole,
             @Valid @RequestBody AuctionCreateRequest request
     ) {
-        AuctionCreateResponse response = auctionService.createAuction(userId, request);
+        AuctionCreateResponse response = auctionService.createAuction(userId, userRole, request);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.ok("경매가 생성되었습니다.", response));
+    }
+
+    @GetMapping("/{auctionId}")
+    public ResponseEntity<ApiResponse<AuctionDetailResponse>> getAuction(
+            @PathVariable UUID auctionId
+    ) {
+        AuctionDetailResponse response = auctionService.getAuction(auctionId);
+
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<PageResponse<AuctionListResponse>>> getAuctions(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) AuctionStatus status
+    ) {
+        PageResponse<AuctionListResponse> response = auctionService.getAuctions(page, size, status);
+
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
 }
