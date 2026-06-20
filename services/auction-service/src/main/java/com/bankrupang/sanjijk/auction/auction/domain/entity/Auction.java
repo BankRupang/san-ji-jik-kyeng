@@ -81,6 +81,19 @@ public class Auction extends BaseEntity {
         return auction;
     }
 
+    public void update(Integer startPrice, Integer bidUnit, LocalDateTime startAt) {
+        if (startPrice != null) {
+            this.startPrice = startPrice;
+        }
+        if (bidUnit != null) {
+            this.bidUnit = bidUnit;
+        }
+        if (startAt != null) {
+            this.startAt = startAt;
+            this.endAt = startAt.plusHours(1);
+        }
+    }
+
     private static void validateCreateRequest(
             UUID productId,
             UUID sellerId,
