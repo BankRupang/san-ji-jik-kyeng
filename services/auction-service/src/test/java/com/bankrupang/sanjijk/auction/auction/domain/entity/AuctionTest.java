@@ -454,25 +454,24 @@ class AuctionTest {
         void success_ready() {
             // given
             Auction auction = createAuction(AuctionStatus.READY);
+            String cancelReason = "판매자 요청으로 취소합니다.";
 
             // when
-            auction.cancel();
+            auction.cancel(cancelReason);
 
             // then
             assertThat(auction.getStatus()).isEqualTo(AuctionStatus.CANCELLED);
+            assertThat(auction.getCancelReason()).isEqualTo(cancelReason);
         }
 
         @Test
-        @DisplayName("성공 - PROGRESS 상태 경매를 CANCELLED 상태로 변경한다")
-        void success_progress() {
+        @DisplayName("실패 - PROGRESS 상태 경매는 취소할 수 없다")
+        void fail_progress() {
             // given
             Auction auction = createAuction(AuctionStatus.PROGRESS);
 
-            // when
-            auction.cancel();
-
-            // then
-            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.CANCELLED);
+            // when & then
+            assertInvalidStateTransition(() -> auction.cancel("진행 중 경매 취소"));
         }
 
         @Test
@@ -482,18 +481,18 @@ class AuctionTest {
             Auction auction = createAuction(AuctionStatus.CANCELLED);
 
             // when & then
-            assertThatCode(auction::cancel).doesNotThrowAnyException();
+            assertThatCode(() -> auction.cancel("이미 취소된 경매")).doesNotThrowAnyException();
             assertThat(auction.getStatus()).isEqualTo(AuctionStatus.CANCELLED);
         }
 
         @Test
-        @DisplayName("실패 - READY 또는 PROGRESS 상태가 아니면 취소할 수 없다")
+        @DisplayName("실패 - READY 상태가 아니면 취소할 수 없다")
         void fail_invalid_state() {
             // given
             Auction auction = createAuction(AuctionStatus.WON);
 
             // when & then
-            assertInvalidStateTransition(auction::cancel);
+            assertInvalidStateTransition(() -> auction.cancel("낙찰 경매 취소"));
         }
     }
 
