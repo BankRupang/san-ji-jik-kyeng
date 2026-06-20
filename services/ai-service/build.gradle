@@ -9,4 +9,8 @@ dependencies {
     implementation platform('org.springframework.ai:spring-ai-bom:1.0.0')
     implementation 'org.springframework.ai:spring-ai-starter-model-openai'
     implementation 'org.springframework.ai:spring-ai-starter-vector-store-pgvector'
+
+    // Apache Tika - 다양한 파일 포맷 텍스트 추출 (PDF, Word, Excel 등)
+    implementation 'org.apache.tika:tika-core:2.9.1'
+    implementation 'org.apache.tika:tika-parsers-standard-package:2.9.1'
 }
