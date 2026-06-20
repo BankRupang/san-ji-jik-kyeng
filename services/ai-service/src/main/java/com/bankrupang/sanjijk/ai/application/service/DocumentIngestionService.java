@@ -36,15 +36,13 @@ public class DocumentIngestionService {
         if (file.isEmpty()) {
             throw new BaseException(AiErrorCode.DOCUMENT_EMPTY);
         }
-        try (InputStream inputStream = file.getInputStream()) {
-            String title = extractTitle(file.getOriginalFilename());
-            String text = tika.parseToString(inputStream);
-            List<Document> documents = splitBySections(text, title, source);
-            List<Document> chunks = tokenTextSplitter.apply(documents);
+        String title = extractTitle(file.getOriginalFilename());
+        List<Document> chunks = parseAndSplit(file, title, source);
+        try {
             vectorStore.add(chunks);
             log.info("문서 적재 완료 - source: {}, title: {}, 청크 수: {}", source, title, chunks.size());
         } catch (Exception e) {
-            log.error("문서 적재 실패 - source: {}", source, e);
+            log.error("벡터 스토어 저장 실패 - source: {}", source, e);
             throw new BaseException(AiErrorCode.DOCUMENT_INGESTION_FAILED);
         }
     }
@@ -53,24 +51,28 @@ public class DocumentIngestionService {
         if (file.isEmpty()) {
             throw new BaseException(AiErrorCode.DOCUMENT_EMPTY);
         }
-        List<Document> chunks;
-        try (InputStream inputStream = file.getInputStream()) {
-            String title = extractTitle(file.getOriginalFilename());
-            String text = tika.parseToString(inputStream);
-            List<Document> documents = splitBySections(text, title, source);
-            chunks = tokenTextSplitter.apply(documents);
-        } catch (Exception e) {
-            log.error("문서 파싱 실패 - source: {}", source, e);
-            throw new BaseException(AiErrorCode.DOCUMENT_INGESTION_FAILED);
-        }
-        int deleted = jdbcTemplate.update(
-                "DELETE FROM ai_schema.vector_store WHERE metadata->>'source' = ?", source);
-        log.info("재임베딩 - 기존 청크 삭제: {}개", deleted);
+        String title = extractTitle(file.getOriginalFilename());
+        List<Document> chunks = parseAndSplit(file, title, source);
+        // 새 청크 먼저 적재: 실패 시 기존 데이터 보존
         try {
             vectorStore.add(chunks);
-            log.info("문서 재적재 완료 - source: {}, 청크 수: {}", source, chunks.size());
         } catch (Exception e) {
             log.error("벡터 스토어 저장 실패 - source: {}", source, e);
+            throw new BaseException(AiErrorCode.DOCUMENT_INGESTION_FAILED);
+        }
+        // 적재 성공 후 기존 청크 삭제
+        int deleted = jdbcTemplate.update(
+                "DELETE FROM ai_schema.vector_store WHERE metadata->>'source' = ?", source);
+        log.info("재임베딩 완료 - source: {}, title: {}, 삭제: {}개, 신규: {}개", source, title, deleted, chunks.size());
+    }
+
+    private List<Document> parseAndSplit(MultipartFile file, String title, String source) {
+        try (InputStream inputStream = file.getInputStream()) {
+            String text = tika.parseToString(inputStream);
+            List<Document> documents = splitBySections(text, title, source);
+            return tokenTextSplitter.apply(documents);
+        } catch (Exception e) {
+            log.error("문서 파싱 실패 - source: {}", source, e);
             throw new BaseException(AiErrorCode.DOCUMENT_INGESTION_FAILED);
         }
     }

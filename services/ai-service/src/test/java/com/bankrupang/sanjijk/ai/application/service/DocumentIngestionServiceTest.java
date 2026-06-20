@@ -28,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -161,6 +162,23 @@ class DocumentIngestionServiceTest {
             assertThatThrownBy(() -> documentIngestionService.reingest(file, "auction-rules"))
                     .isInstanceOf(BaseException.class)
                     .hasMessage(AiErrorCode.DOCUMENT_INGESTION_FAILED.getMessage());
+        }
+
+        @Test
+        @DisplayName("VectorStore 저장 실패 시 기존 데이터 삭제되지 않음")
+        void vectorStoreFailed() throws Exception {
+            // given
+            MockMultipartFile file = new MockMultipartFile(
+                    "file", "test.txt", "text/plain", "내용".getBytes());
+            given(tika.parseToString(any(InputStream.class))).willReturn("내용");
+            given(tokenTextSplitter.apply(anyList())).willReturn(List.of(new Document("청크")));
+            org.mockito.Mockito.doThrow(new RuntimeException("저장 실패")).when(vectorStore).add(anyList());
+
+            // when & then
+            assertThatThrownBy(() -> documentIngestionService.reingest(file, "auction-rules"))
+                    .isInstanceOf(BaseException.class)
+                    .hasMessage(AiErrorCode.DOCUMENT_INGESTION_FAILED.getMessage());
+            verify(jdbcTemplate, never()).update(anyString(), anyString());
         }
     }
 
