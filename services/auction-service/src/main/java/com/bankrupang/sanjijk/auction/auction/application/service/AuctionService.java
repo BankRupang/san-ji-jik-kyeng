@@ -1,7 +1,11 @@
 package com.bankrupang.sanjijk.auction.auction.application.service;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -68,9 +72,14 @@ public class AuctionService {
         Pageable pageable = PageableUtils.ofDefault(page, size);
 
         Page<Auction> auctions = findAuctions(pageable, status);
+        Map<UUID, Product> productMap = getProductMap(auctions);
 
         Page<AuctionListResponse> response = auctions.map(auction -> {
-            Product product = getExistingProduct(auction.getProductId());
+            Product product = productMap.get(auction.getProductId());
+            if (product == null) {
+                throw new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND);
+            }
+
             return AuctionListResponse.of(auction, product);
         });
 
@@ -80,6 +89,21 @@ public class AuctionService {
     private Product getExistingProduct(UUID productId) {
         return productRepository.findByIdAndDeletedAtIsNull(productId)
                 .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND));
+    }
+
+    private Map<UUID, Product> getProductMap(Page<Auction> auctions) {
+        List<UUID> productIds = auctions.getContent().stream()
+                .map(Auction::getProductId)
+                .distinct()
+                .toList();
+
+        if (productIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return productRepository.findAllByIdInAndDeletedAtIsNull(productIds)
+                .stream()
+                .collect(Collectors.toMap(Product::getId, Function.identity()));
     }
 
     private void validateProductOwnerOrMaster(Product product, UUID userId) {

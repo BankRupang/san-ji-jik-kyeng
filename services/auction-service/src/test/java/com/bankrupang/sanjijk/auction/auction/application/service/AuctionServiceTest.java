@@ -283,8 +283,8 @@ class AuctionServiceTest {
 
             given(auctionRepository.findAllByDeletedAtIsNull(any(Pageable.class)))
                     .willReturn(new PageImpl<>(List.of(firstAuction, secondAuction)));
-            given(productRepository.findByIdAndDeletedAtIsNull(firstProductId)).willReturn(Optional.of(firstProduct));
-            given(productRepository.findByIdAndDeletedAtIsNull(secondProductId)).willReturn(Optional.of(secondProduct));
+            given(productRepository.findAllByIdInAndDeletedAtIsNull(any()))
+                    .willReturn(List.of(firstProduct, secondProduct));
 
             // when
             PageResponse<AuctionListResponse> result = auctionService.getAuctions(0, 10, null);
@@ -308,6 +308,8 @@ class AuctionServiceTest {
             assertThat(pageable.getPageSize()).isEqualTo(10);
             assertThat(pageable.getSort().getOrderFor("createdAt").isDescending()).isTrue();
             verify(auctionRepository, never()).findAllByStatusAndDeletedAtIsNull(any(AuctionStatus.class), any(Pageable.class));
+            verify(productRepository).findAllByIdInAndDeletedAtIsNull(any());
+            verify(productRepository, never()).findByIdAndDeletedAtIsNull(any(UUID.class));
         }
 
         @Test
@@ -322,7 +324,8 @@ class AuctionServiceTest {
 
             given(auctionRepository.findAllByStatusAndDeletedAtIsNull(any(AuctionStatus.class), any(Pageable.class)))
                     .willReturn(new PageImpl<>(List.of(auction)));
-            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            given(productRepository.findAllByIdInAndDeletedAtIsNull(any()))
+                    .willReturn(List.of(product));
 
             // when
             PageResponse<AuctionListResponse> result = auctionService.getAuctions(0, 10, AuctionStatus.READY);
@@ -334,6 +337,28 @@ class AuctionServiceTest {
             assertThat(result.getContent().get(0).productName()).isEqualTo(product.getName());
             verify(auctionRepository).findAllByStatusAndDeletedAtIsNull(any(AuctionStatus.class), any(Pageable.class));
             verify(auctionRepository, never()).findAllByDeletedAtIsNull(any(Pageable.class));
+            verify(productRepository).findAllByIdInAndDeletedAtIsNull(any());
+            verify(productRepository, never()).findByIdAndDeletedAtIsNull(any(UUID.class));
+        }
+
+        @Test
+        @DisplayName("실패 - 경매 목록의 상품이 존재하지 않는다")
+        void fail_product_not_found() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+
+            given(auctionRepository.findAllByDeletedAtIsNull(any(Pageable.class)))
+                    .willReturn(new PageImpl<>(List.of(auction)));
+            given(productRepository.findAllByIdInAndDeletedAtIsNull(any()))
+                    .willReturn(List.of());
+
+            // when & then
+            assertThatThrownBy(() -> auctionService.getAuctions(0, 10, null))
+                    .isInstanceOf(ProductException.class)
+                    .hasMessage(ProductErrorCode.PRODUCT_NOT_FOUND.getMessage());
         }
     }
 
