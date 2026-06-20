@@ -11,8 +11,8 @@ public record AuctionCreateResponse(
         UUID productId,
         UUID sellerId,
         AuctionStatus status,
-        Integer startPrice,
-        Integer bidUnit,
+        int startPrice,
+        int bidUnit,
         LocalDateTime startAt,
         LocalDateTime endAt,
         LocalDateTime createdAt
