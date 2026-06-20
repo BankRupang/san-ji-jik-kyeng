@@ -111,7 +111,8 @@ public class OrderService {
                 return;
             }
             order.markPaymentSuccess();
-            log.info("[ORDER] 예치금 결제 완료 - orderId: {}, userId: {}", order.getId(), order.getUserId());
+            log.info("[ORDER] 예치금 결제 완료 - orderId: {}, userId: {}, auctionId: {}, orderType: {}, PENDING → PAYMENT_SUCCESS",
+                    order.getId(), order.getUserId(), event.auctionId(), order.getOrderType());
 
         } else if (order.getOrderType() == OrderType.WINNING) {
             if (order.getStatus() == OrderStatus.COMPLETED) {
@@ -120,11 +121,14 @@ public class OrderService {
             }
             if ("REPAY".equals(event.paymentType())) {
                 order.markPenaltyCompleted();
+                log.info("[ORDER] 낙찰 재결제 완료 - orderId: {}, userId: {}, auctionId: {}, orderType: {}, PENALTY_PENDING → COMPLETED",
+                        order.getId(), order.getUserId(), event.auctionId(), order.getOrderType());
             } else {
                 order.markPaymentSuccess();
                 order.markCompleted();
+                log.info("[ORDER] 낙찰 결제 완료 - orderId: {}, userId: {}, auctionId: {}, orderType: {}, PENDING → PAYMENT_SUCCESS → COMPLETED",
+                        order.getId(), order.getUserId(), event.auctionId(), order.getOrderType());
             }
-            log.info("[ORDER] 낙찰 결제 완료 - orderId: {}, userId: {}", order.getId(), order.getUserId());
         }
     }
 
@@ -148,8 +152,8 @@ public class OrderService {
 
         order.markPaymentFailed();
         order.markPenaltyPending();
-        log.warn("[ORDER] 결제 실패 → PENALTY_PENDING - orderId: {}, userId: {}, penaltyDueAt: {}",
-                order.getId(), order.getUserId(), order.getPenaltyDueAt());
+        log.warn("[ORDER] 결제 실패 - orderId: {}, userId: {}, auctionId: {}, orderType: {}, PENDING → PAYMENT_FAILED → PENALTY_PENDING, penaltyDueAt: {}",
+                order.getId(), order.getUserId(), event.auctionId(), order.getOrderType(), order.getPenaltyDueAt());
     }
 
     // DEPOSIT_FORFEITED 처리
@@ -171,7 +175,8 @@ public class OrderService {
         }
 
         order.markForfeited();
-        log.warn("[ORDER] 예치금 몰수 완료 - orderId: {}, userId: {}", order.getId(), order.getUserId());
+        log.warn("[ORDER] 예치금 몰수 - orderId: {}, userId: {}, auctionId: {}, orderType: {}, PAYMENT_SUCCESS → FORFEITED",
+                order.getId(), order.getUserId(), event.auctionId(), order.getOrderType());
     }
 
     // REFUND_COMPLETED 처리
@@ -193,6 +198,7 @@ public class OrderService {
         }
 
         order.markRefunded();
-        log.info("[ORDER] 예치금 환불 완료 - orderId: {}, userId: {}", order.getId(), order.getUserId());
+        log.info("[ORDER] 예치금 환불 완료 - orderId: {}, userId: {}, auctionId: {}, orderType: {}, PAYMENT_SUCCESS → REFUNDED",
+                order.getId(), order.getUserId(), event.auctionId(), order.getOrderType());
     }
 }

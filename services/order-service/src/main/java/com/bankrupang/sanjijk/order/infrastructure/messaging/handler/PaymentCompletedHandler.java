@@ -14,8 +14,8 @@ public class PaymentCompletedHandler {
     private final OrderService orderService;
 
     public void handle(PaymentCompletedEvent event) {
-        log.info("[HANDLER] PAYMENT_COMPLETED 처리 시작 - orderId: {}, paymentType: {}",
-                event.orderId(), event.paymentType());
+        log.info("[HANDLER] PAYMENT_COMPLETED 처리 시작 - orderId: {}, winnerId: {}, paymentType: {}, occurredAt: {}",
+                event.orderId(), event.winnerId(), event.paymentType(), event.occurredAt());
 
         orderService.completePayment(event);
 

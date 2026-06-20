@@ -17,8 +17,8 @@ public class AuctionWonHandler {
     private final UserClient userClient;
 
     public void handle(AuctionWonEvent event) {
-        log.info("[HANDLER] AUCTION_WON 처리 시작 - auctionId: {}, winnerId: {}",
-                event.auctionId(), event.winnerId());
+        log.info("[HANDLER] AUCTION_WON 처리 시작 - auctionId: {}, winnerId: {}, finalPrice: {}, occurredAt: {}",
+                event.auctionId(), event.winnerId(), event.finalPrice(), event.occurredAt());
 
         // 멱등성 체크
         if (orderService.existsWinningOrder(event.auctionId(), event.winnerId())) {

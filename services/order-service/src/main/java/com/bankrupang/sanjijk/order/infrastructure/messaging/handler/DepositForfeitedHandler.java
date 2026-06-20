@@ -14,8 +14,8 @@ public class DepositForfeitedHandler {
     private final OrderService orderService;
 
     public void handle(DepositForfeitedEvent event) {
-        log.warn("[HANDLER] DEPOSIT_FORFEITED 처리 시작 - orderId: {}, winnerId: {}",
-                event.orderId(), event.winnerId());
+        log.warn("[HANDLER] DEPOSIT_FORFEITED 처리 시작 - orderId: {}, winnerId: {}, forfeitedAmount: {}, occurredAt: {}",
+                event.orderId(), event.winnerId(), event.forfeitedAmount(), event.occurredAt());
 
         orderService.forfeitDeposit(event);
 

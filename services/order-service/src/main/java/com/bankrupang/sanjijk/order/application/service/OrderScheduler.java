@@ -7,6 +7,7 @@ import com.bankrupang.sanjijk.order.domain.repository.OrderRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +20,8 @@ import java.util.List;
 public class OrderScheduler {
 
     private final OrderRepository orderRepository;
+
+    @Lazy
     private final OrderScheduler self;  // 자기 자신 주입 (트랜잭션 분리용)
 
     @Scheduled(fixedDelay = 60000)

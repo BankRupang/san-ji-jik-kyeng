@@ -14,8 +14,8 @@ public class PaymentFailedHandler {
     private final OrderService orderService;
 
     public void handle(PaymentFailedEvent event) {
-        log.warn("[HANDLER] PAYMENT_FAILED 처리 시작 - orderId: {}, winnerId: {}",
-                event.orderId(), event.winnerId());
+        log.warn("[HANDLER] PAYMENT_FAILED 처리 시작 - orderId: {}, winnerId: {}, failureMessage: {}, occurredAt: {}",
+                event.orderId(), event.winnerId(), event.failureMessage(), event.occurredAt());
 
         orderService.failPayment(event);
 

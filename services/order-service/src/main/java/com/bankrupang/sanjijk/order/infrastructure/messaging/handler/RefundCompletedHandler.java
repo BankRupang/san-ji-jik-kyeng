@@ -14,8 +14,8 @@ public class RefundCompletedHandler {
     private final OrderService orderService;
 
     public void handle(RefundCompletedEvent event) {
-        log.info("[HANDLER] REFUND_COMPLETED 처리 시작 - orderId: {}, userId: {}",
-                event.orderId(), event.userId());
+        log.info("[HANDLER] REFUND_COMPLETED 처리 시작 - orderId: {}, userId: {}, refundAmount: {}, occurredAt: {}",
+                event.orderId(), event.userId(), event.refundAmount(), event.occurredAt());
 
         orderService.completeRefund(event);
 
