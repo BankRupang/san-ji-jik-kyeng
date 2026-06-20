@@ -24,9 +24,8 @@ public class KafkaOrderEventPublisher {
     private static final String ORDER_EVENTS_TOPIC = "order-events";
 
     @Scheduled(fixedDelay = 5000)
-    @Scheduled(fixedDelay = 5000)
     public void relay() {
-        List<OrderOutbox> outboxList = orderOutboxJpaRepository.findByStatus(OutboxStatus.PENDING);
+        List<OrderOutbox> outboxList = orderOutboxJpaRepository.findRetryableOutboxes();
         for (OrderOutbox outbox : outboxList) {
             self.relayOne(outbox);
         }
