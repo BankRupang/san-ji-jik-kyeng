@@ -1,6 +1,7 @@
 package com.bankrupang.sanjijk.ai.application.service;
 
 import com.bankrupang.sanjijk.ai.exception.AiErrorCode;
+import com.bankrupang.sanjijk.ai.infrastructure.persistence.VectorStoreRepository;
 import com.bankrupang.sanjijk.ai.presentation.dto.response.DocumentInfoResponse;
 import com.bankrupang.sanjijk.common.exception.BaseException;
 import org.apache.tika.Tika;
@@ -17,8 +18,6 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.InputStream;
@@ -38,7 +37,7 @@ class DocumentIngestionServiceTest {
     private VectorStore vectorStore;
 
     @Mock
-    private JdbcTemplate jdbcTemplate;
+    private VectorStoreRepository vectorStoreRepository;
 
     @Mock
     private Tika tika;
@@ -119,7 +118,7 @@ class DocumentIngestionServiceTest {
     class Reingest {
 
         @Test
-        @DisplayName("성공 - 기존 청크 삭제 후 재등록")
+        @DisplayName("성공 - 새 버전 적재 후 구 버전 삭제")
         void success() throws Exception {
             // given
             MockMultipartFile file = new MockMultipartFile(
@@ -127,14 +126,14 @@ class DocumentIngestionServiceTest {
                     "새로운 경매 규정입니다.".getBytes());
             given(tika.parseToString(any(InputStream.class))).willReturn("새로운 경매 규정입니다.");
             given(tokenTextSplitter.apply(anyList())).willReturn(List.of(new Document("새 청크")));
-            given(jdbcTemplate.update(anyString(), anyString())).willReturn(5);
+            given(vectorStoreRepository.deleteBySourceExcludingVersion(anyString(), anyString())).willReturn(5);
 
             // when
             documentIngestionService.reingest(file, "auction-rules");
 
             // then
-            verify(jdbcTemplate).update(anyString(), eq("auction-rules"));
             verify(vectorStore).add(anyList());
+            verify(vectorStoreRepository).deleteBySourceExcludingVersion(eq("auction-rules"), anyString());
         }
 
         @Test
@@ -178,7 +177,7 @@ class DocumentIngestionServiceTest {
             assertThatThrownBy(() -> documentIngestionService.reingest(file, "auction-rules"))
                     .isInstanceOf(BaseException.class)
                     .hasMessage(AiErrorCode.DOCUMENT_INGESTION_FAILED.getMessage());
-            verify(jdbcTemplate, never()).update(anyString(), anyString());
+            verify(vectorStoreRepository, never()).deleteBySourceExcludingVersion(anyString(), anyString());
         }
     }
 
@@ -190,20 +189,20 @@ class DocumentIngestionServiceTest {
         @DisplayName("성공")
         void success() {
             // given
-            given(jdbcTemplate.update(anyString(), anyString())).willReturn(3);
+            given(vectorStoreRepository.deleteBySource(anyString())).willReturn(3);
 
             // when
             documentIngestionService.deleteBySource("auction-rules");
 
             // then
-            verify(jdbcTemplate).update(anyString(), eq("auction-rules"));
+            verify(vectorStoreRepository).deleteBySource(eq("auction-rules"));
         }
 
         @Test
         @DisplayName("존재하지 않는 source면 DOCUMENT_NOT_FOUND 예외 발생")
         void notFound() {
             // given
-            given(jdbcTemplate.update(anyString(), anyString())).willReturn(0);
+            given(vectorStoreRepository.deleteBySource(anyString())).willReturn(0);
 
             // when & then
             assertThatThrownBy(() -> documentIngestionService.deleteBySource("not-exists"))
@@ -218,12 +217,11 @@ class DocumentIngestionServiceTest {
 
         @Test
         @DisplayName("성공")
-        @SuppressWarnings("unchecked")
         void success() {
             // given
             Pageable pageable = PageRequest.of(0, 10);
-            given(jdbcTemplate.queryForObject(anyString(), eq(Long.class))).willReturn(1L);
-            given(jdbcTemplate.query(anyString(), any(RowMapper.class), any(Object.class), any(Object.class)))
+            given(vectorStoreRepository.countDistinctDocuments()).willReturn(1L);
+            given(vectorStoreRepository.findDocuments(anyInt(), anyLong()))
                     .willReturn(List.of(new DocumentInfoResponse("auction-rules", "auction-rules", 7)));
 
             // when
@@ -237,13 +235,11 @@ class DocumentIngestionServiceTest {
 
         @Test
         @DisplayName("문서가 없으면 빈 페이지 반환")
-        @SuppressWarnings("unchecked")
         void empty() {
             // given
             Pageable pageable = PageRequest.of(0, 10);
-            given(jdbcTemplate.queryForObject(anyString(), eq(Long.class))).willReturn(0L);
-            given(jdbcTemplate.query(anyString(), any(RowMapper.class), any(Object.class), any(Object.class)))
-                    .willReturn(List.of());
+            given(vectorStoreRepository.countDistinctDocuments()).willReturn(0L);
+            given(vectorStoreRepository.findDocuments(anyInt(), anyLong())).willReturn(List.of());
 
             // when
             Page<DocumentInfoResponse> result = documentIngestionService.getDocuments(pageable);
@@ -251,23 +247,6 @@ class DocumentIngestionServiceTest {
             // then
             assertThat(result.getTotalElements()).isEqualTo(0);
             assertThat(result.getContent()).isEmpty();
-        }
-
-        @Test
-        @DisplayName("COUNT 쿼리가 null 반환 시 0으로 처리")
-        @SuppressWarnings("unchecked")
-        void nullTotal() {
-            // given
-            Pageable pageable = PageRequest.of(0, 10);
-            given(jdbcTemplate.queryForObject(anyString(), eq(Long.class))).willReturn(null);
-            given(jdbcTemplate.query(anyString(), any(RowMapper.class), any(Object.class), any(Object.class)))
-                    .willReturn(List.of());
-
-            // when
-            Page<DocumentInfoResponse> result = documentIngestionService.getDocuments(pageable);
-
-            // then
-            assertThat(result.getTotalElements()).isEqualTo(0);
         }
     }
 }
