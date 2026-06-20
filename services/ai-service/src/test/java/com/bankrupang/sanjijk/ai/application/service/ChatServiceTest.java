@@ -22,8 +22,10 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
+
+import java.util.function.Consumer;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -66,11 +68,11 @@ class ChatServiceTest {
     @SuppressWarnings("unchecked")
     void setUp() {
         ReflectionTestUtils.setField(chatService, "sessionExpireHours", 24);
-        lenient().when(transactionTemplate.execute(any(TransactionCallback.class)))
-                .thenAnswer(invocation -> {
-                    TransactionCallback<?> callback = invocation.getArgument(0);
-                    return callback.doInTransaction(null);
-                });
+        lenient().doAnswer(invocation -> {
+            Consumer<TransactionStatus> action = invocation.getArgument(0);
+            action.accept(null);
+            return null;
+        }).when(transactionTemplate).executeWithoutResult(any());
     }
 
     // ChatClient 플루언트 체인 공통 모킹

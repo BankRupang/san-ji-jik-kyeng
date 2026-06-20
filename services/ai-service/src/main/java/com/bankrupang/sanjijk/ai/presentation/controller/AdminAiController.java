@@ -7,16 +7,19 @@ import com.bankrupang.sanjijk.common.response.PageResponse;
 import com.bankrupang.sanjijk.common.util.PageableUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "AI Admin", description = "AI 관리자 API")
+@Validated
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/admin/ai")
@@ -29,7 +32,7 @@ public class AdminAiController {
     @PostMapping(value = "/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<Void>> ingestDocument(
             @RequestPart("file") MultipartFile file,
-            @RequestParam("source") String source) {
+            @NotBlank @RequestParam("source") String source) {
         documentIngestionService.ingest(file, source);
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
@@ -57,7 +60,7 @@ public class AdminAiController {
     @PreAuthorize("hasRole('MASTER')")
     @PutMapping(value = "/documents/{source}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<Void>> reingestDocument(
-            @PathVariable String source,
+            @NotBlank @PathVariable String source,
             @RequestPart("file") MultipartFile file) {
         documentIngestionService.reingest(file, source);
         return ResponseEntity.ok(ApiResponse.ok(null));

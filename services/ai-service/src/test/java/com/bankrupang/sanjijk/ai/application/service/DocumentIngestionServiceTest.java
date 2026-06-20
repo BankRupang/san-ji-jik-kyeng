@@ -124,9 +124,9 @@ class DocumentIngestionServiceTest {
             MockMultipartFile file = new MockMultipartFile(
                     "file", "auction-rules.txt", "text/plain",
                     "새로운 경매 규정입니다.".getBytes());
-            given(jdbcTemplate.update(anyString(), anyString())).willReturn(5);
             given(tika.parseToString(any(InputStream.class))).willReturn("새로운 경매 규정입니다.");
             given(tokenTextSplitter.apply(anyList())).willReturn(List.of(new Document("새 청크")));
+            given(jdbcTemplate.update(anyString(), anyString())).willReturn(5);
 
             // when
             documentIngestionService.reingest(file, "auction-rules");
@@ -142,7 +142,6 @@ class DocumentIngestionServiceTest {
             // given
             MockMultipartFile file = new MockMultipartFile(
                     "file", "empty.txt", "text/plain", new byte[0]);
-            given(jdbcTemplate.update(anyString(), anyString())).willReturn(3);
 
             // when & then
             assertThatThrownBy(() -> documentIngestionService.reingest(file, "auction-rules"))
@@ -156,7 +155,6 @@ class DocumentIngestionServiceTest {
             // given
             MockMultipartFile file = new MockMultipartFile(
                     "file", "test.txt", "text/plain", "내용".getBytes());
-            given(jdbcTemplate.update(anyString(), anyString())).willReturn(3);
             given(tika.parseToString(any(InputStream.class))).willThrow(new RuntimeException("파싱 실패"));
 
             // when & then

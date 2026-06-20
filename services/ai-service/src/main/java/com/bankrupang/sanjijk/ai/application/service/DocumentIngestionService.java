@@ -15,9 +15,9 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -36,10 +36,9 @@ public class DocumentIngestionService {
         if (file.isEmpty()) {
             throw new BaseException(AiErrorCode.DOCUMENT_EMPTY);
         }
-        try {
+        try (InputStream inputStream = file.getInputStream()) {
             String title = extractTitle(file.getOriginalFilename());
-            String text = tika.parseToString(file.getInputStream());
-
+            String text = tika.parseToString(inputStream);
             List<Document> documents = splitBySections(text, title, source);
             List<Document> chunks = tokenTextSplitter.apply(documents);
             vectorStore.add(chunks);
@@ -50,12 +49,30 @@ public class DocumentIngestionService {
         }
     }
 
-    @Transactional
     public void reingest(MultipartFile file, String source) {
+        if (file.isEmpty()) {
+            throw new BaseException(AiErrorCode.DOCUMENT_EMPTY);
+        }
+        List<Document> chunks;
+        try (InputStream inputStream = file.getInputStream()) {
+            String title = extractTitle(file.getOriginalFilename());
+            String text = tika.parseToString(inputStream);
+            List<Document> documents = splitBySections(text, title, source);
+            chunks = tokenTextSplitter.apply(documents);
+        } catch (Exception e) {
+            log.error("문서 파싱 실패 - source: {}", source, e);
+            throw new BaseException(AiErrorCode.DOCUMENT_INGESTION_FAILED);
+        }
         int deleted = jdbcTemplate.update(
                 "DELETE FROM ai_schema.vector_store WHERE metadata->>'source' = ?", source);
         log.info("재임베딩 - 기존 청크 삭제: {}개", deleted);
-        ingest(file, source);
+        try {
+            vectorStore.add(chunks);
+            log.info("문서 재적재 완료 - source: {}, 청크 수: {}", source, chunks.size());
+        } catch (Exception e) {
+            log.error("벡터 스토어 저장 실패 - source: {}", source, e);
+            throw new BaseException(AiErrorCode.DOCUMENT_INGESTION_FAILED);
+        }
     }
 
     public void deleteBySource(String source) {

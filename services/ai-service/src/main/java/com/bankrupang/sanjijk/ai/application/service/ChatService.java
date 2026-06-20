@@ -59,10 +59,9 @@ public class ChatService {
         // 4단계: Context Condensing + 응답 생성 (시스템 프롬프트에 가드레일 포함)
         String response = generateResponse(userMessage, history, documents);
 
-        transactionTemplate.execute(status -> {
+        transactionTemplate.executeWithoutResult(status -> {
             messageRepository.save(ChatMessage.of(sessionId, ChatRole.USER, userMessage));
             messageRepository.save(ChatMessage.of(sessionId, ChatRole.ASSISTANT, response));
-            return null;
         });
 
         return response;
