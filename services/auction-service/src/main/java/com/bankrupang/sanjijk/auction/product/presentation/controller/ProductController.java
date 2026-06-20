@@ -68,7 +68,7 @@ public class ProductController {
     }
 
     @PatchMapping("/{productId}")
-    @PreAuthorize("hasAnyRole('SELLER', 'MASTER')")
+    @PreAuthorize("hasAnyRole('SELLER', 'MANAGER', 'MASTER')")
     public ResponseEntity<ApiResponse<ProductUpdateResponse>> updateProduct(
             @RequestHeader("X-User-Id") UUID userId,
             @RequestHeader("X-User-Role") String userRole,
@@ -81,7 +81,7 @@ public class ProductController {
     }
 
     @DeleteMapping("/{productId}")
-    @PreAuthorize("hasAnyRole('SELLER', 'MASTER')")
+    @PreAuthorize("hasAnyRole('SELLER', 'MANAGER', 'MASTER')")
     public ResponseEntity<ApiResponse<Void>> deleteProduct(
             @RequestHeader("X-User-Id") UUID userId,
             @RequestHeader("X-User-Role") String userRole,

@@ -63,7 +63,7 @@ public class ProductService {
         validateUpdateRequest(request);
 
         Product product = getExistingProduct(productId);
-        validateProductOwnerOrMaster(product, userId, userRole);
+        validateProductOwnerOrManagerOrMaster(product, userId, userRole);
 
         product.update(
                 request.name(),
@@ -77,7 +77,7 @@ public class ProductService {
     @Transactional
     public void deleteProduct(UUID userId, String userRole, UUID productId) {
         Product product = getExistingProduct(productId);
-        validateProductOwnerOrMaster(product, userId, userRole);
+        validateProductOwnerOrManagerOrMaster(product, userId, userRole);
 
         product.softDelete(userId);
     }
@@ -103,8 +103,8 @@ public class ProductService {
         }
     }
 
-    private void validateProductOwnerOrMaster(Product product, UUID userId, String userRole) {
-        if (isMaster(userRole)) {
+    private void validateProductOwnerOrManagerOrMaster(Product product, UUID userId, String userRole) {
+        if (isManagerOrMaster(userRole)) {
             return;
         }
 
@@ -113,8 +113,10 @@ public class ProductService {
         }
     }
 
-    private boolean isMaster(String userRole) {
-        return "MASTER".equalsIgnoreCase(userRole)
+    private boolean isManagerOrMaster(String userRole) {
+        return "MANAGER".equalsIgnoreCase(userRole)
+                || "ROLE_MANAGER".equalsIgnoreCase(userRole)
+                || "MASTER".equalsIgnoreCase(userRole)
                 || "ROLE_MASTER".equalsIgnoreCase(userRole);
     }
 

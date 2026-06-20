@@ -255,6 +255,33 @@ class ProductServiceTest {
         }
 
         @Test
+        @DisplayName("성공 - 매니저가 다른 판매자의 상품을 수정한다")
+        void success_manager() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID managerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            Product product = createProduct(sellerId, productId, LocalDateTime.now());
+            ProductUpdateRequest request = new ProductUpdateRequest(
+                    "수정된 사과",
+                    null,
+                    null
+            );
+
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+
+            // when
+            ProductUpdateResponse result = productService.updateProduct(managerId, "MANAGER", productId, request);
+
+            // then
+            assertThat(result.productId()).isEqualTo(productId);
+            assertThat(result.sellerId()).isEqualTo(sellerId);
+            assertThat(result.name()).isEqualTo("수정된 사과");
+            assertThat(result.description()).isEqualTo("신선한 사과입니다.");
+            assertThat(result.quantity()).isEqualTo("10");
+        }
+
+        @Test
         @DisplayName("실패 - 상품이 존재하지 않으면 수정할 수 없다")
         void fail_product_not_found() {
             // given
@@ -375,6 +402,25 @@ class ProductServiceTest {
             // then
             assertThat(product.isDeleted()).isTrue();
             assertThat(product.getDeletedBy()).isEqualTo(masterId);
+        }
+
+        @Test
+        @DisplayName("성공 - 매니저가 다른 판매자의 상품을 삭제한다")
+        void success_manager() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID managerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            Product product = createProduct(sellerId, productId, LocalDateTime.now());
+
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+
+            // when
+            productService.deleteProduct(managerId, "MANAGER", productId);
+
+            // then
+            assertThat(product.isDeleted()).isTrue();
+            assertThat(product.getDeletedBy()).isEqualTo(managerId);
         }
 
         @Test
