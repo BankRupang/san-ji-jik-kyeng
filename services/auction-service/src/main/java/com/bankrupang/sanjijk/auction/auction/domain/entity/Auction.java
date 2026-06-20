@@ -35,7 +35,7 @@ public class Auction extends BaseEntity {
     private AuctionStatus status;
 
     @Column(name = "start_price", nullable = false)
-    private Integer startPrice;
+    private int startPrice;
 
     @Column(name = "winner_id")
     private UUID winnerId;
@@ -44,10 +44,10 @@ public class Auction extends BaseEntity {
     private Integer finalPrice;
 
     @Column(name = "bid_unit", nullable = false)
-    private Integer bidUnit;
+    private int bidUnit;
 
     @Column(name = "extension_count", nullable = false)
-    private Integer extensionCount;
+    private int extensionCount;
 
     @Column(name = "start_at", nullable = false)
     private LocalDateTime startAt;
@@ -58,8 +58,8 @@ public class Auction extends BaseEntity {
     public static Auction create(
             UUID productId,
             UUID sellerId,
-            Integer startPrice,
-            Integer bidUnit,
+            int startPrice,
+            int bidUnit,
             LocalDateTime startAt,
             LocalDateTime endAt
     ) {
@@ -155,7 +155,7 @@ public class Auction extends BaseEntity {
     }
 
     private void validateWinningResult(UUID winnerId, Integer finalPrice) {
-        if (winnerId == null || finalPrice == null || startPrice == null || finalPrice < startPrice) {
+        if (winnerId == null || finalPrice == null || finalPrice < startPrice) {
             throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_RESULT);
         }
     }
