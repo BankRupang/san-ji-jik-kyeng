@@ -103,6 +103,7 @@ public class Auction extends BaseEntity {
         }
 
         validateStatus(AuctionStatus.RESULT_PENDING);
+        validateWinningResult(winnerId, finalPrice);
         this.status = AuctionStatus.WON;
         this.winnerId = winnerId;
         this.finalPrice = finalPrice;
@@ -150,6 +151,12 @@ public class Auction extends BaseEntity {
     private void validateStatus(AuctionStatus requiredStatus) {
         if (status != requiredStatus) {
             throw new AuctionException(AuctionErrorCode.INVALID_STATE_TRANSITION);
+        }
+    }
+
+    private void validateWinningResult(UUID winnerId, Integer finalPrice) {
+        if (winnerId == null || finalPrice == null || finalPrice <= 0) {
+            throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_RESULT);
         }
     }
 

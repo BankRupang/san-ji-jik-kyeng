@@ -144,6 +144,36 @@ class AuctionTest {
             // when & then
             assertInvalidStateTransition(() -> auction.markWon(UUID.randomUUID(), 20000));
         }
+
+        @Test
+        @DisplayName("실패 - 낙찰자가 없으면 낙찰 처리할 수 없다")
+        void fail_winner_id_null() {
+            // given
+            Auction auction = createAuction(AuctionStatus.RESULT_PENDING);
+
+            // when & then
+            assertInvalidAuctionResult(() -> auction.markWon(null, 20000));
+        }
+
+        @Test
+        @DisplayName("실패 - 최종 낙찰가가 없으면 낙찰 처리할 수 없다")
+        void fail_final_price_null() {
+            // given
+            Auction auction = createAuction(AuctionStatus.RESULT_PENDING);
+
+            // when & then
+            assertInvalidAuctionResult(() -> auction.markWon(UUID.randomUUID(), null));
+        }
+
+        @Test
+        @DisplayName("실패 - 최종 낙찰가가 0 이하이면 낙찰 처리할 수 없다")
+        void fail_final_price_not_positive() {
+            // given
+            Auction auction = createAuction(AuctionStatus.RESULT_PENDING);
+
+            // when & then
+            assertInvalidAuctionResult(() -> auction.markWon(UUID.randomUUID(), 0));
+        }
     }
 
     @Nested
@@ -334,5 +364,11 @@ class AuctionTest {
         assertThatThrownBy(runnable::run)
                 .isInstanceOf(AuctionException.class)
                 .hasMessage(AuctionErrorCode.INVALID_STATE_TRANSITION.getMessage());
+    }
+
+    private void assertInvalidAuctionResult(Runnable runnable) {
+        assertThatThrownBy(runnable::run)
+                .isInstanceOf(AuctionException.class)
+                .hasMessage(AuctionErrorCode.INVALID_AUCTION_RESULT.getMessage());
     }
 }
