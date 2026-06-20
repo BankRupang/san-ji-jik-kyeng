@@ -19,22 +19,27 @@ public class KafkaOrderEventPublisher {
     private final OrderOutboxJpaRepository orderOutboxJpaRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final ObjectMapper objectMapper;
+    private final KafkaOrderEventPublisher self;  // 자기 자신 주입 (트랜잭션 분리용)
 
     private static final String ORDER_EVENTS_TOPIC = "order-events";
 
     @Scheduled(fixedDelay = 5000)
-    @Transactional
+    @Scheduled(fixedDelay = 5000)
     public void relay() {
         List<OrderOutbox> outboxList = orderOutboxJpaRepository.findByStatus(OutboxStatus.PENDING);
-
         for (OrderOutbox outbox : outboxList) {
-            try {
-                Object payload = objectMapper.readValue(outbox.getPayload(), Object.class);
-                kafkaTemplate.send(ORDER_EVENTS_TOPIC, outbox.getAggregateId().toString(), payload);
-                outbox.markPublished();
-            } catch (Exception e) {
-                outbox.markFailed();
-            }
+            self.relayOne(outbox);
+        }
+    }
+
+    @Transactional
+    public void relayOne(OrderOutbox outbox) {
+        try {
+            Object payload = objectMapper.readValue(outbox.getPayload(), Object.class);
+            kafkaTemplate.send(ORDER_EVENTS_TOPIC, outbox.getAggregateId().toString(), payload);
+            outbox.markPublished();
+        } catch (Exception e) {
+            outbox.markFailed();
         }
     }
 }

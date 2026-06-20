@@ -102,9 +102,21 @@ public class OrderService {
                 event.auctionId(), OrderType.DEPOSIT);
 
         for (Order order : depositOrders) {
+            // 멱등성 체크 - 이미 처리된 주문 스킵
+            if (order.getStatus() == OrderStatus.REFUNDED) {
+                log.warn("[ORDER] AUCTION_FAILED 중복 수신 스킵 - orderId: {}, userId: {}, orderType: {}, status: {}",
+                        order.getId(), order.getUserId(), order.getOrderType(), order.getStatus());
+                continue;
+            }
+            // PENDING 상태 체크 - 결제 전 유찰 시 markRefunded() 호출 불가
+            if (order.getStatus() != OrderStatus.PAYMENT_SUCCESS) {
+                log.warn("[ORDER] 환불 불가 상태 스킵 - orderId: {}, userId: {}, orderType: {}, status: {}",
+                        order.getId(), order.getUserId(), order.getOrderType(), order.getStatus());
+                continue;
+            }
             order.markRefunded();
-            log.info("[ORDER] 유찰 환불 처리 - orderId: {}, userId: {}, auctionId: {}",
-                    order.getId(), order.getUserId(), event.auctionId());
+            log.info("[ORDER] 유찰 환불 처리 - orderId: {}, userId: {}, orderType: {}, PAYMENT_SUCCESS → REFUNDED, auctionId: {}",
+                    order.getId(), order.getUserId(), order.getOrderType(), event.auctionId());
         }
     }
 
