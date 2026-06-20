@@ -286,7 +286,7 @@ class AuctionServiceTest {
             assertThat(result.getContent().get(1).auctionId()).isEqualTo(secondAuctionId);
             assertThat(result.getContent().get(1).productName()).isEqualTo(secondProduct.getName());
             assertThat(result.getPage()).isZero();
-            assertThat(result.getSize()).isEqualTo(2);
+            assertThat(result.getSize()).isEqualTo(10);
             assertThat(result.getTotalElements()).isEqualTo(2);
             assertThat(result.getTotalPages()).isEqualTo(1);
             assertThat(result.getSort()).isEqualTo("createdAt,DESC");
@@ -332,23 +332,32 @@ class AuctionServiceTest {
         }
 
         @Test
-        @DisplayName("실패 - 경매 목록의 상품이 존재하지 않는다")
-        void fail_product_not_found() {
+        @DisplayName("성공 - 경매 목록의 상품이 존재하지 않으면 해당 항목을 제외한다")
+        void success_exclude_missing_product() {
             // given
-            UUID sellerId = UUID.randomUUID();
-            UUID productId = UUID.randomUUID();
-            UUID auctionId = UUID.randomUUID();
-            Auction auction = createAuction(sellerId, productId, auctionId);
+            UUID firstSellerId = UUID.randomUUID();
+            UUID firstProductId = UUID.randomUUID();
+            UUID firstAuctionId = UUID.randomUUID();
+            UUID secondSellerId = UUID.randomUUID();
+            UUID secondProductId = UUID.randomUUID();
+            UUID secondAuctionId = UUID.randomUUID();
+            Auction firstAuction = createAuction(firstSellerId, firstProductId, firstAuctionId);
+            Auction secondAuction = createAuction(secondSellerId, secondProductId, secondAuctionId);
+            Product firstProduct = createProduct(firstSellerId, firstProductId);
 
             given(auctionRepository.findAllByDeletedAtIsNull(any(Pageable.class)))
-                    .willReturn(new PageImpl<>(List.of(auction)));
+                    .willReturn(new PageImpl<>(List.of(firstAuction, secondAuction)));
             given(productRepository.findAllByIdInAndDeletedAtIsNull(any()))
-                    .willReturn(List.of());
+                    .willReturn(List.of(firstProduct));
 
-            // when & then
-            assertThatThrownBy(() -> auctionService.getAuctions(0, 10, null))
-                    .isInstanceOf(ProductException.class)
-                    .hasMessage(ProductErrorCode.PRODUCT_NOT_FOUND.getMessage());
+            // when
+            PageResponse<AuctionListResponse> result = auctionService.getAuctions(0, 10, null);
+
+            // then
+            assertThat(result.getContent()).hasSize(1);
+            assertThat(result.getContent().get(0).auctionId()).isEqualTo(firstAuctionId);
+            assertThat(result.getContent().get(0).productName()).isEqualTo(firstProduct.getName());
+            assertThat(result.getTotalElements()).isEqualTo(1);
         }
     }
 
