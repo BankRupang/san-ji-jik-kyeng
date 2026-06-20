@@ -11,8 +11,8 @@ public record AuctionListResponse(
         UUID auctionId,
         String productName,
         AuctionStatus status,
-        Integer bidUnit,
-        Integer startPrice,
+        int bidUnit,
+        int startPrice,
         LocalDateTime startAt,
         LocalDateTime endAt
 ) {
