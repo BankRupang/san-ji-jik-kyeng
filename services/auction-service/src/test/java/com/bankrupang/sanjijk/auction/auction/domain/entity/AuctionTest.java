@@ -71,6 +71,40 @@ class AuctionTest {
         }
 
         @Test
+        @DisplayName("실패 - 상품 ID가 없으면 생성할 수 없다")
+        void fail_product_id_null() {
+            // given
+            LocalDateTime startAt = LocalDateTime.now().plusDays(1);
+
+            // when & then
+            assertInvalidAuctionRequest(() -> Auction.create(
+                    null,
+                    UUID.randomUUID(),
+                    10000,
+                    1000,
+                    startAt,
+                    startAt.plusHours(1)
+            ));
+        }
+
+        @Test
+        @DisplayName("실패 - 판매자 ID가 없으면 생성할 수 없다")
+        void fail_seller_id_null() {
+            // given
+            LocalDateTime startAt = LocalDateTime.now().plusDays(1);
+
+            // when & then
+            assertInvalidAuctionRequest(() -> Auction.create(
+                    UUID.randomUUID(),
+                    null,
+                    10000,
+                    1000,
+                    startAt,
+                    startAt.plusHours(1)
+            ));
+        }
+
+        @Test
         @DisplayName("실패 - 입찰 단위가 0 이하이면 생성할 수 없다")
         void fail_bid_unit_not_positive() {
             // given
@@ -84,6 +118,54 @@ class AuctionTest {
                     0,
                     startAt,
                     startAt.plusHours(1)
+            ));
+        }
+
+        @Test
+        @DisplayName("실패 - 시작 시각이 없으면 생성할 수 없다")
+        void fail_start_at_null() {
+            // when & then
+            assertInvalidAuctionRequest(() -> Auction.create(
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    10000,
+                    1000,
+                    null,
+                    LocalDateTime.now().plusDays(1)
+            ));
+        }
+
+        @Test
+        @DisplayName("실패 - 종료 시각이 없으면 생성할 수 없다")
+        void fail_end_at_null() {
+            // given
+            LocalDateTime startAt = LocalDateTime.now().plusDays(1);
+
+            // when & then
+            assertInvalidAuctionRequest(() -> Auction.create(
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    10000,
+                    1000,
+                    startAt,
+                    null
+            ));
+        }
+
+        @Test
+        @DisplayName("실패 - 시작 시각이 종료 시각보다 이전이 아니면 생성할 수 없다")
+        void fail_invalid_period() {
+            // given
+            LocalDateTime startAt = LocalDateTime.now().plusDays(1);
+
+            // when & then
+            assertInvalidAuctionPeriod(() -> Auction.create(
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    10000,
+                    1000,
+                    startAt,
+                    startAt
             ));
         }
     }
@@ -472,5 +554,11 @@ class AuctionTest {
         assertThatThrownBy(runnable::run)
                 .isInstanceOf(AuctionException.class)
                 .hasMessage(AuctionErrorCode.INVALID_AUCTION_REQUEST.getMessage());
+    }
+
+    private void assertInvalidAuctionPeriod(Runnable runnable) {
+        assertThatThrownBy(runnable::run)
+                .isInstanceOf(AuctionException.class)
+                .hasMessage(AuctionErrorCode.INVALID_AUCTION_PERIOD.getMessage());
     }
 }

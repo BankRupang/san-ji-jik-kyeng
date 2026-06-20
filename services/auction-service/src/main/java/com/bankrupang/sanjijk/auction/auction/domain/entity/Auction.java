@@ -63,7 +63,7 @@ public class Auction extends BaseEntity {
             LocalDateTime startAt,
             LocalDateTime endAt
     ) {
-        validateCreateRequest(startPrice, bidUnit);
+        validateCreateRequest(productId, sellerId, startPrice, bidUnit, startAt, endAt);
 
         Auction auction = new Auction();
 
@@ -81,9 +81,24 @@ public class Auction extends BaseEntity {
         return auction;
     }
 
-    private static void validateCreateRequest(int startPrice, int bidUnit) {
+    private static void validateCreateRequest(
+            UUID productId,
+            UUID sellerId,
+            int startPrice,
+            int bidUnit,
+            LocalDateTime startAt,
+            LocalDateTime endAt
+    ) {
+        if (productId == null || sellerId == null || startAt == null || endAt == null) {
+            throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_REQUEST);
+        }
+
         if (startPrice <= 0 || bidUnit <= 0) {
             throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_REQUEST);
+        }
+
+        if (!startAt.isBefore(endAt)) {
+            throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_PERIOD);
         }
     }
 
