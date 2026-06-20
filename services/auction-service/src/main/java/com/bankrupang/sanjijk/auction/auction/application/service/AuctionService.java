@@ -87,7 +87,7 @@ public class AuctionService {
                 .filter(Objects::nonNull)
                 .toList();
 
-        Page<AuctionListResponse> response = new PageImpl<>(content, pageable, auctions.getTotalElements());
+        Page<AuctionListResponse> response = new PageImpl<>(content, pageable, content.size());
 
         return PageResponse.of(response);
     }
