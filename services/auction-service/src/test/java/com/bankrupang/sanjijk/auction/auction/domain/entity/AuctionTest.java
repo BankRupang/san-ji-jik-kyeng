@@ -193,6 +193,17 @@ class AuctionTest {
         }
 
         @Test
+        @DisplayName("실패 - 시작가가 없으면 낙찰 처리할 수 없다")
+        void fail_start_price_null() {
+            // given
+            Auction auction = createAuction(AuctionStatus.RESULT_PENDING);
+            ReflectionTestUtils.setField(auction, "startPrice", null);
+
+            // when & then
+            assertInvalidAuctionResult(() -> auction.markWon(UUID.randomUUID(), 20000));
+        }
+
+        @Test
         @DisplayName("실패 - 최종 낙찰가가 시작가보다 낮으면 낙찰 처리할 수 없다")
         void fail_final_price_less_than_start_price() {
             // given
