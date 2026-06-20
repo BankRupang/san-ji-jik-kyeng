@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,9 +22,11 @@ import lombok.RequiredArgsConstructor;
 import com.bankrupang.sanjijk.auction.auction.application.service.AuctionService;
 import com.bankrupang.sanjijk.auction.auction.domain.type.AuctionStatus;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCreateRequest;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionUpdateRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCreateResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionDetailResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionListResponse;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionUpdateResponse;
 import com.bankrupang.sanjijk.common.response.ApiResponse;
 import com.bankrupang.sanjijk.common.response.PageResponse;
 
@@ -66,6 +69,20 @@ public class AuctionController {
         PageResponse<AuctionListResponse> response = auctionService.getAuctions(page, size, status);
 
         return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @PatchMapping("/{auctionId}")
+    @PreAuthorize("hasAnyRole('SELLER', 'MASTER', 'MANAGER')")
+    public ResponseEntity<ApiResponse<AuctionUpdateResponse>> updateAuction(
+            @RequestHeader("X-User-Id") UUID userId,
+            @RequestHeader("X-User-Role") String userRole,
+            @PathVariable UUID auctionId,
+            @Valid @RequestBody AuctionUpdateRequest request
+    ) {
+        AuctionUpdateResponse response = auctionService.updateAuction(userId, userRole, auctionId, request);
+
+        return ResponseEntity.ok(ApiResponse.ok(response));
+
     }
 
 }
