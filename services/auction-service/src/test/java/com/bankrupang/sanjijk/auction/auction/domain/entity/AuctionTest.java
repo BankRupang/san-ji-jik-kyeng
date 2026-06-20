@@ -20,6 +20,75 @@ import com.bankrupang.sanjijk.auction.auction.exception.AuctionException;
 class AuctionTest {
 
     @Nested
+    @DisplayName("create()")
+    class Create {
+
+        @Test
+        @DisplayName("성공 - 경매를 생성한다")
+        void success() {
+            // given
+            UUID productId = UUID.randomUUID();
+            UUID sellerId = UUID.randomUUID();
+            LocalDateTime startAt = LocalDateTime.now().plusDays(1);
+            LocalDateTime endAt = startAt.plusHours(1);
+
+            // when
+            Auction auction = Auction.create(
+                    productId,
+                    sellerId,
+                    10000,
+                    1000,
+                    startAt,
+                    endAt
+            );
+
+            // then
+            assertThat(auction.getProductId()).isEqualTo(productId);
+            assertThat(auction.getSellerId()).isEqualTo(sellerId);
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.READY);
+            assertThat(auction.getStartPrice()).isEqualTo(10000);
+            assertThat(auction.getBidUnit()).isEqualTo(1000);
+            assertThat(auction.getExtensionCount()).isZero();
+            assertThat(auction.getStartAt()).isEqualTo(startAt);
+            assertThat(auction.getEndAt()).isEqualTo(endAt);
+        }
+
+        @Test
+        @DisplayName("실패 - 시작가가 0 이하이면 생성할 수 없다")
+        void fail_start_price_not_positive() {
+            // given
+            LocalDateTime startAt = LocalDateTime.now().plusDays(1);
+
+            // when & then
+            assertInvalidAuctionRequest(() -> Auction.create(
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    0,
+                    1000,
+                    startAt,
+                    startAt.plusHours(1)
+            ));
+        }
+
+        @Test
+        @DisplayName("실패 - 입찰 단위가 0 이하이면 생성할 수 없다")
+        void fail_bid_unit_not_positive() {
+            // given
+            LocalDateTime startAt = LocalDateTime.now().plusDays(1);
+
+            // when & then
+            assertInvalidAuctionRequest(() -> Auction.create(
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    10000,
+                    0,
+                    startAt,
+                    startAt.plusHours(1)
+            ));
+        }
+    }
+
+    @Nested
     @DisplayName("start()")
     class Start {
 
@@ -397,5 +466,11 @@ class AuctionTest {
         assertThatThrownBy(runnable::run)
                 .isInstanceOf(AuctionException.class)
                 .hasMessage(AuctionErrorCode.INVALID_AUCTION_RESULT.getMessage());
+    }
+
+    private void assertInvalidAuctionRequest(Runnable runnable) {
+        assertThatThrownBy(runnable::run)
+                .isInstanceOf(AuctionException.class)
+                .hasMessage(AuctionErrorCode.INVALID_AUCTION_REQUEST.getMessage());
     }
 }

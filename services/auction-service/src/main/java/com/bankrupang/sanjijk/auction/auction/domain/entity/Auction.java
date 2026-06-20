@@ -63,6 +63,8 @@ public class Auction extends BaseEntity {
             LocalDateTime startAt,
             LocalDateTime endAt
     ) {
+        validateCreateRequest(startPrice, bidUnit);
+
         Auction auction = new Auction();
 
         auction.productId = productId;
@@ -77,6 +79,12 @@ public class Auction extends BaseEntity {
         auction.endAt = endAt;
 
         return auction;
+    }
+
+    private static void validateCreateRequest(int startPrice, int bidUnit) {
+        if (startPrice <= 0 || bidUnit <= 0) {
+            throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_REQUEST);
+        }
     }
 
     public void start() {
