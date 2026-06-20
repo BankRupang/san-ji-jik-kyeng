@@ -68,24 +68,26 @@ public class ProductController {
     }
 
     @PatchMapping("/{productId}")
-    @PreAuthorize("hasAnyRole('SELLER', 'MASTER')")
+    @PreAuthorize("hasAnyRole('SELLER', 'MANAGER', 'MASTER')")
     public ResponseEntity<ApiResponse<ProductUpdateResponse>> updateProduct(
             @RequestHeader("X-User-Id") UUID userId,
+            @RequestHeader("X-User-Role") String userRole,
             @PathVariable UUID productId,
             @Valid @RequestBody ProductUpdateRequest request
     ) {
-        ProductUpdateResponse response = productService.updateProduct(userId, productId, request);
+        ProductUpdateResponse response = productService.updateProduct(userId, userRole, productId, request);
 
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @DeleteMapping("/{productId}")
-    @PreAuthorize("hasAnyRole('SELLER', 'MASTER')")
+    @PreAuthorize("hasAnyRole('SELLER', 'MANAGER', 'MASTER')")
     public ResponseEntity<ApiResponse<Void>> deleteProduct(
             @RequestHeader("X-User-Id") UUID userId,
+            @RequestHeader("X-User-Role") String userRole,
             @PathVariable UUID productId
     ) {
-        productService.deleteProduct(userId, productId);
+        productService.deleteProduct(userId, userRole, productId);
 
         return ResponseEntity.ok(ApiResponse.ok("상품이 삭제되었습니다.", null));
     }
