@@ -23,13 +23,29 @@ jobs:
         uses: actions/setup-node@v3
 
       - name: Get git diff for PR
+        env:
+          EVENT_ACTION: ${{ github.event.action }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          COMMIT_BEFORE: ${{ github.event.before }}
+          COMMIT_AFTER: ${{ github.event.after }}
         run: |
-          if [ "${{ github.event.action }}" == "opened" ]; then
-            git fetch origin "${{ github.event.pull_request.base.ref }}"
-            git fetch origin "${{ github.event.pull_request.head.ref }}"
-            git diff "origin/${{ github.event.pull_request.base.ref }}"..."origin/${{ github.event.pull_request.head.ref }}" > diff.txt
-          elif [ "${{ github.event.action }}" == "synchronize" ]; then
-            git diff ${{ github.event.before }}..${{ github.event.after }} > diff.txt
+          if [ "$EVENT_ACTION" == "opened" ]; then
+            # PR 오픈 시: Base와 Head 브랜치 간 전체 diff 추출
+            git fetch origin "$BASE_REF"
+            git fetch origin "$HEAD_REF"
+            git diff "origin/$BASE_REF"..."origin/$HEAD_REF" > diff.txt
+
+          elif [ "$EVENT_ACTION" == "synchronize" ]; then
+            # 커밋 푸시 시: 머지 커밋 여부를 확인
+            PARENT_COUNT=$(git cat-file -p "$COMMIT_AFTER" | grep "^parent " | wc -l)
+
+            if [ "$PARENT_COUNT" -gt 1 ]; then
+              echo "Merge commit detected. Extracting conflict resolution diff..."
+              git show --format="" --cc "$COMMIT_AFTER" > diff.txt
+            else
+              git diff "$COMMIT_BEFORE".."$COMMIT_AFTER" > diff.txt
+            fi
           fi
 
       - name: Run Gemini Review
@@ -75,7 +91,7 @@ jobs:
                 "Content-Type": "application/json"
               },
               body: JSON.stringify({
-                model: "google/gemini-2.5-flash",
+                model: "google/gemini-3.1-pro-preview",
                 messages: [{ role: "user", content: prompt }]
               })
             });
