@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -23,9 +22,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.bankrupang.sanjijk.auction.auction.domain.entity.Auction;
@@ -56,11 +52,6 @@ class AuctionServiceTest {
     @Mock
     private ProductRepository productRepository;
 
-    @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();
-    }
-
     @Nested
     @DisplayName("createAuction()")
     class CreateAuction {
@@ -86,7 +77,7 @@ class AuctionServiceTest {
             });
 
             // when
-            AuctionCreateResponse result = auctionService.createAuction(sellerId, request);
+            AuctionCreateResponse result = auctionService.createAuction(sellerId, "SELLER", request);
 
             // then
             assertThat(result.auctionId()).isEqualTo(auctionId);
@@ -121,7 +112,6 @@ class AuctionServiceTest {
             AuctionCreateRequest request = createRequest(productId, startAt);
             Product product = createProduct(sellerId, productId);
 
-            setAuthentication("ROLE_MASTER");
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
             given(auctionRepository.save(any(Auction.class))).willAnswer(invocation -> {
                 Auction auction = invocation.getArgument(0);
@@ -131,7 +121,7 @@ class AuctionServiceTest {
             });
 
             // when
-            AuctionCreateResponse result = auctionService.createAuction(masterId, request);
+            AuctionCreateResponse result = auctionService.createAuction(masterId, "MASTER", request);
 
             // then
             assertThat(result.auctionId()).isEqualTo(auctionId);
@@ -152,7 +142,7 @@ class AuctionServiceTest {
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> auctionService.createAuction(sellerId, request))
+            assertThatThrownBy(() -> auctionService.createAuction(sellerId, "SELLER", request))
                     .isInstanceOf(ProductException.class)
                     .hasMessage(ProductErrorCode.PRODUCT_NOT_FOUND.getMessage());
             verify(auctionRepository, never()).save(any(Auction.class));
@@ -171,7 +161,7 @@ class AuctionServiceTest {
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
 
             // when & then
-            assertThatThrownBy(() -> auctionService.createAuction(otherSellerId, request))
+            assertThatThrownBy(() -> auctionService.createAuction(otherSellerId, "SELLER", request))
                     .isInstanceOf(AuctionException.class)
                     .hasMessage(AuctionErrorCode.AUCTION_FORBIDDEN.getMessage());
             verify(auctionRepository, never()).save(any(Auction.class));
@@ -189,7 +179,7 @@ class AuctionServiceTest {
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
 
             // when & then
-            assertThatThrownBy(() -> auctionService.createAuction(sellerId, request))
+            assertThatThrownBy(() -> auctionService.createAuction(sellerId, "SELLER", request))
                     .isInstanceOf(AuctionException.class)
                     .hasMessage(AuctionErrorCode.INVALID_AUCTION_PERIOD.getMessage());
             verify(auctionRepository, never()).save(any(Auction.class));
@@ -396,13 +386,4 @@ class AuctionServiceTest {
         return auction;
     }
 
-    private void setAuthentication(String role) {
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(
-                        UUID.randomUUID().toString(),
-                        null,
-                        List.of(new SimpleGrantedAuthority(role))
-                )
-        );
-    }
 }

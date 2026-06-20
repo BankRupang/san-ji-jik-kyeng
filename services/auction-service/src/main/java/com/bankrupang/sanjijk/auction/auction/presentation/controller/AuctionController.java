@@ -38,9 +38,10 @@ public class AuctionController {
     @PreAuthorize("hasAnyRole('SELLER', 'MASTER')")
     public ResponseEntity<ApiResponse<AuctionCreateResponse>> createAuction(
             @RequestHeader("X-User-Id") UUID userId,
+            @RequestHeader("X-User-Role") String userRole,
             @Valid @RequestBody AuctionCreateRequest request
     ) {
-        AuctionCreateResponse response = auctionService.createAuction(userId, request);
+        AuctionCreateResponse response = auctionService.createAuction(userId, userRole, request);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)

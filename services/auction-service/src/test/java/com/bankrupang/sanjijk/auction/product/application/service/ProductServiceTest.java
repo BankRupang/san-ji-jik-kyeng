@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -23,9 +22,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
@@ -48,11 +44,6 @@ class ProductServiceTest {
 
     @Mock
     private ProductRepository productRepository;
-
-    @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();
-    }
 
     @Nested
     @DisplayName("createProduct()")
@@ -226,7 +217,7 @@ class ProductServiceTest {
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
 
             // when
-            ProductUpdateResponse result = productService.updateProduct(sellerId, productId, request);
+            ProductUpdateResponse result = productService.updateProduct(sellerId, "SELLER", productId, request);
 
             // then
             assertThat(result.productId()).isEqualTo(productId);
@@ -250,11 +241,10 @@ class ProductServiceTest {
                     null
             );
 
-            setAuthentication("ROLE_MASTER");
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
 
             // when
-            ProductUpdateResponse result = productService.updateProduct(masterId, productId, request);
+            ProductUpdateResponse result = productService.updateProduct(masterId, "MASTER", productId, request);
 
             // then
             assertThat(result.productId()).isEqualTo(productId);
@@ -279,7 +269,7 @@ class ProductServiceTest {
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> productService.updateProduct(sellerId, productId, request))
+            assertThatThrownBy(() -> productService.updateProduct(sellerId, "SELLER", productId, request))
                     .isInstanceOf(ProductException.class)
                     .hasMessage(ProductErrorCode.PRODUCT_NOT_FOUND.getMessage());
         }
@@ -301,7 +291,7 @@ class ProductServiceTest {
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
 
             // when & then
-            assertThatThrownBy(() -> productService.updateProduct(otherSellerId, productId, request))
+            assertThatThrownBy(() -> productService.updateProduct(otherSellerId, "SELLER", productId, request))
                     .isInstanceOf(ProductException.class)
                     .hasMessage(ProductErrorCode.PRODUCT_FORBIDDEN.getMessage());
             assertThat(product.getName()).isEqualTo("사과");
@@ -320,7 +310,7 @@ class ProductServiceTest {
             );
 
             // when & then
-            assertThatThrownBy(() -> productService.updateProduct(sellerId, productId, request))
+            assertThatThrownBy(() -> productService.updateProduct(sellerId, "SELLER", productId, request))
                     .isInstanceOf(ProductException.class)
                     .hasMessage(ProductErrorCode.INVALID_PRODUCT_REQUEST.getMessage());
             verify(productRepository, never()).findByIdAndDeletedAtIsNull(any(UUID.class));
@@ -339,7 +329,7 @@ class ProductServiceTest {
             );
 
             // when & then
-            assertThatThrownBy(() -> productService.updateProduct(sellerId, productId, request))
+            assertThatThrownBy(() -> productService.updateProduct(sellerId, "SELLER", productId, request))
                     .isInstanceOf(ProductException.class)
                     .hasMessage(ProductErrorCode.INVALID_PRODUCT_REQUEST.getMessage());
             verify(productRepository, never()).findByIdAndDeletedAtIsNull(any(UUID.class));
@@ -361,7 +351,7 @@ class ProductServiceTest {
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
 
             // when
-            productService.deleteProduct(sellerId, productId);
+            productService.deleteProduct(sellerId, "SELLER", productId);
 
             // then
             assertThat(product.isDeleted()).isTrue();
@@ -377,11 +367,10 @@ class ProductServiceTest {
             UUID productId = UUID.randomUUID();
             Product product = createProduct(sellerId, productId, LocalDateTime.now());
 
-            setAuthentication("ROLE_MASTER");
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
 
             // when
-            productService.deleteProduct(masterId, productId);
+            productService.deleteProduct(masterId, "MASTER", productId);
 
             // then
             assertThat(product.isDeleted()).isTrue();
@@ -398,7 +387,7 @@ class ProductServiceTest {
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> productService.deleteProduct(sellerId, productId))
+            assertThatThrownBy(() -> productService.deleteProduct(sellerId, "SELLER", productId))
                     .isInstanceOf(ProductException.class)
                     .hasMessage(ProductErrorCode.PRODUCT_NOT_FOUND.getMessage());
         }
@@ -415,7 +404,7 @@ class ProductServiceTest {
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
 
             // when & then
-            assertThatThrownBy(() -> productService.deleteProduct(otherSellerId, productId))
+            assertThatThrownBy(() -> productService.deleteProduct(otherSellerId, "SELLER", productId))
                     .isInstanceOf(ProductException.class)
                     .hasMessage(ProductErrorCode.PRODUCT_FORBIDDEN.getMessage());
             assertThat(product.isDeleted()).isFalse();
@@ -434,13 +423,4 @@ class ProductServiceTest {
         return product;
     }
 
-    private void setAuthentication(String role) {
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(
-                        UUID.randomUUID().toString(),
-                        null,
-                        List.of(new SimpleGrantedAuthority(role))
-                )
-        );
-    }
 }

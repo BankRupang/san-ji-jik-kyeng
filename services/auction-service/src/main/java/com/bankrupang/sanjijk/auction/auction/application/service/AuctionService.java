@@ -9,7 +9,6 @@ import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,9 +39,9 @@ public class AuctionService {
     private final ProductRepository productRepository;
 
     @Transactional
-    public AuctionCreateResponse createAuction(UUID userId, AuctionCreateRequest request) {
+    public AuctionCreateResponse createAuction(UUID userId, String userRole, AuctionCreateRequest request) {
         Product product = getExistingProduct(request.productId());
-        validateProductOwnerOrMaster(product, userId);
+        validateProductOwnerOrMaster(product, userId, userRole);
         validateStartAt(request.startAt());
 
         LocalDateTime endAt = request.startAt().plusHours(1);
@@ -106,8 +105,8 @@ public class AuctionService {
                 .collect(Collectors.toMap(Product::getId, Function.identity()));
     }
 
-    private void validateProductOwnerOrMaster(Product product, UUID userId) {
-        if (hasRole("ROLE_MASTER")) {
+    private void validateProductOwnerOrMaster(Product product, UUID userId, String userRole) {
+        if (isMaster(userRole)) {
             return;
         }
 
@@ -122,15 +121,8 @@ public class AuctionService {
         }
     }
 
-    private boolean hasRole(String role) {
-        if (SecurityContextHolder.getContext().getAuthentication() == null) {
-            return false;
-        }
-
-        return SecurityContextHolder.getContext().getAuthentication()
-                .getAuthorities()
-                .stream()
-                .anyMatch(authority -> authority.getAuthority().equals(role));
+    private boolean isMaster(String userRole) {
+        return "MASTER".equalsIgnoreCase(userRole) || "ROLE_MASTER".equalsIgnoreCase(userRole);
     }
 
     private Auction getExistingAuction(UUID auctionId) {
