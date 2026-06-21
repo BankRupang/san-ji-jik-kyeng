@@ -20,6 +20,7 @@ import org.springframework.web.client.RestClient;
 public class TossPaymentsRestClient implements TossPaymentsClient{
 
     private final RestClient tossPaymentsRestClient;
+    private final ObjectMapper objectMapper;
 
     @Override
     public TossPaymentResponse confirm(TossConfirmRequest request){
@@ -63,7 +64,7 @@ public class TossPaymentsRestClient implements TossPaymentsClient{
 
     private TossErrorResponse readError(ClientHttpResponse res){
         try{
-            return new ObjectMapper().readValue(res.getBody(), TossErrorResponse.class);
+            return objectMapper.readValue(res.getBody(), TossErrorResponse.class);
         } catch (Exception e){
             return new TossErrorResponse("UNKNOWN", "TossPayments 오류 응답 파싱 실패");
         }
