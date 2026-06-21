@@ -1,0 +1,14 @@
+package com.bankrupang.sanjijk.order.infrastructure.messaging.producer.dto;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+public record DepositCreatedEvent(
+        UUID orderId,
+        UUID userId,
+        UUID auctionId,
+        String auctionTitle,
+        int depositAmount,
+        LocalDateTime occurredAt
+) {
+}
