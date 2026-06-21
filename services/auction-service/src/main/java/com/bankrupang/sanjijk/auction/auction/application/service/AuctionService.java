@@ -220,21 +220,30 @@ public class AuctionService {
     }
 
     private void validateCloseRequest(Auction auction, AuctionCloseRequest request) {
-        if (request == null || isEmptyCloseRequest(request)) {
+        if (request == null) {
             return;
         }
 
-        if (!hasWinningResult(request) || request.finalPrice() < auction.getStartPrice()) {
+        if (isInvalidWinningResultPair(request)) {
+            throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_RESULT);
+        }
+
+        if (!hasWinningResult(request)) {
+            return;
+        }
+
+        if (request.finalPrice() < auction.getStartPrice()) {
             throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_RESULT);
         }
     }
 
-    private boolean isEmptyCloseRequest(AuctionCloseRequest request) {
-        return request.winnerId() == null && request.finalPrice() == null;
-    }
-
     private boolean hasWinningResult(AuctionCloseRequest request) {
         return request != null && request.winnerId() != null && request.finalPrice() != null;
+    }
+
+    private boolean isInvalidWinningResultPair(AuctionCloseRequest request) {
+        return (request.winnerId() == null && request.finalPrice() != null)
+                || (request.winnerId() != null && request.finalPrice() == null);
     }
 
     private void validateAuctionOwnerOrMasterOrManager(Auction auction, UUID userId, String userRole) {
