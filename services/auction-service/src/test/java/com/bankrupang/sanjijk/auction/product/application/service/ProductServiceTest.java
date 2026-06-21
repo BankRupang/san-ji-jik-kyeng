@@ -24,6 +24,9 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.bankrupang.sanjijk.auction.auction.domain.entity.Auction;
+import com.bankrupang.sanjijk.auction.auction.domain.repository.AuctionRepository;
+import com.bankrupang.sanjijk.auction.auction.domain.type.AuctionStatus;
 import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepository;
 import com.bankrupang.sanjijk.auction.product.exception.ProductErrorCode;
@@ -44,6 +47,9 @@ class ProductServiceTest {
 
     @Mock
     private ProductRepository productRepository;
+
+    @Mock
+    private AuctionRepository auctionRepository;
 
     @Nested
     @DisplayName("createProduct()")
@@ -215,6 +221,7 @@ class ProductServiceTest {
             );
 
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            given(auctionRepository.findByProductIdAndDeletedAtIsNull(productId)).willReturn(Optional.empty());
 
             // when
             ProductUpdateResponse result = productService.updateProduct(sellerId, "SELLER", productId, request);
@@ -242,6 +249,7 @@ class ProductServiceTest {
             );
 
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            given(auctionRepository.findByProductIdAndDeletedAtIsNull(productId)).willReturn(Optional.empty());
 
             // when
             ProductUpdateResponse result = productService.updateProduct(masterId, "MASTER", productId, request);
@@ -269,6 +277,7 @@ class ProductServiceTest {
             );
 
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            given(auctionRepository.findByProductIdAndDeletedAtIsNull(productId)).willReturn(Optional.empty());
 
             // when
             ProductUpdateResponse result = productService.updateProduct(managerId, "MANAGER", productId, request);
@@ -279,6 +288,57 @@ class ProductServiceTest {
             assertThat(result.name()).isEqualTo("수정된 사과");
             assertThat(result.description()).isEqualTo("신선한 사과입니다.");
             assertThat(result.quantity()).isEqualTo("10");
+        }
+
+        @Test
+        @DisplayName("성공 - 연결된 경매가 READY 상태이면 상품을 수정할 수 있다")
+        void success_linked_ready_auction() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Product product = createProduct(sellerId, productId, LocalDateTime.now());
+            Auction auction = createAuction(sellerId, productId, auctionId, AuctionStatus.READY);
+            ProductUpdateRequest request = new ProductUpdateRequest(
+                    "수정된 사과",
+                    null,
+                    null
+            );
+
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            given(auctionRepository.findByProductIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(auction));
+
+            // when
+            ProductUpdateResponse result = productService.updateProduct(sellerId, "SELLER", productId, request);
+
+            // then
+            assertThat(result.name()).isEqualTo("수정된 사과");
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.READY);
+        }
+
+        @Test
+        @DisplayName("실패 - 연결된 경매가 READY 상태가 아니면 상품을 수정할 수 없다")
+        void fail_linked_not_ready_auction() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Product product = createProduct(sellerId, productId, LocalDateTime.now());
+            Auction auction = createAuction(sellerId, productId, auctionId, AuctionStatus.PROGRESS);
+            ProductUpdateRequest request = new ProductUpdateRequest(
+                    "수정된 사과",
+                    null,
+                    null
+            );
+
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            given(auctionRepository.findByProductIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(auction));
+
+            // when & then
+            assertThatThrownBy(() -> productService.updateProduct(sellerId, "SELLER", productId, request))
+                    .isInstanceOf(ProductException.class)
+                    .hasMessage(ProductErrorCode.PRODUCT_NOT_EDITABLE.getMessage());
+            assertThat(product.getName()).isEqualTo("사과");
         }
 
         @Test
@@ -376,6 +436,7 @@ class ProductServiceTest {
             Product product = createProduct(sellerId, productId, LocalDateTime.now());
 
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            given(auctionRepository.findByProductIdAndDeletedAtIsNull(productId)).willReturn(Optional.empty());
 
             // when
             productService.deleteProduct(sellerId, "SELLER", productId);
@@ -395,6 +456,7 @@ class ProductServiceTest {
             Product product = createProduct(sellerId, productId, LocalDateTime.now());
 
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            given(auctionRepository.findByProductIdAndDeletedAtIsNull(productId)).willReturn(Optional.empty());
 
             // when
             productService.deleteProduct(masterId, "MASTER", productId);
@@ -414,6 +476,7 @@ class ProductServiceTest {
             Product product = createProduct(sellerId, productId, LocalDateTime.now());
 
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            given(auctionRepository.findByProductIdAndDeletedAtIsNull(productId)).willReturn(Optional.empty());
 
             // when
             productService.deleteProduct(managerId, "MANAGER", productId);
@@ -421,6 +484,53 @@ class ProductServiceTest {
             // then
             assertThat(product.isDeleted()).isTrue();
             assertThat(product.getDeletedBy()).isEqualTo(managerId);
+        }
+
+        @Test
+        @DisplayName("성공 - 연결된 READY 경매가 있으면 경매와 상품을 함께 삭제한다")
+        void success_delete_linked_ready_auction() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Product product = createProduct(sellerId, productId, LocalDateTime.now());
+            Auction auction = createAuction(sellerId, productId, auctionId, AuctionStatus.READY);
+
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            given(auctionRepository.findByProductIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(auction));
+
+            // when
+            productService.deleteProduct(sellerId, "SELLER", productId);
+
+            // then
+            assertThat(product.isDeleted()).isTrue();
+            assertThat(product.getDeletedBy()).isEqualTo(sellerId);
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.CANCELLED);
+            assertThat(auction.getCancelReason()).isEqualTo("상품 삭제로 경매가 취소되었습니다.");
+            assertThat(auction.isDeleted()).isTrue();
+            assertThat(auction.getDeletedBy()).isEqualTo(sellerId);
+        }
+
+        @Test
+        @DisplayName("실패 - 연결된 경매가 READY 상태가 아니면 상품을 삭제할 수 없다")
+        void fail_delete_linked_not_ready_auction() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Product product = createProduct(sellerId, productId, LocalDateTime.now());
+            Auction auction = createAuction(sellerId, productId, auctionId, AuctionStatus.PROGRESS);
+
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            given(auctionRepository.findByProductIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(auction));
+
+            // when & then
+            assertThatThrownBy(() -> productService.deleteProduct(sellerId, "SELLER", productId))
+                    .isInstanceOf(ProductException.class)
+                    .hasMessage(ProductErrorCode.PRODUCT_NOT_EDITABLE.getMessage());
+            assertThat(product.isDeleted()).isFalse();
+            assertThat(auction.isDeleted()).isFalse();
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.PROGRESS);
         }
 
         @Test
@@ -467,6 +577,21 @@ class ProductServiceTest {
         ReflectionTestUtils.setField(product, "id", productId);
         ReflectionTestUtils.setField(product, "createdAt", createdAt);
         return product;
+    }
+
+    private Auction createAuction(UUID sellerId, UUID productId, UUID auctionId, AuctionStatus status) {
+        LocalDateTime startAt = LocalDateTime.now().plusDays(1);
+        Auction auction = Auction.create(
+                productId,
+                sellerId,
+                10000,
+                1000,
+                startAt,
+                startAt.plusHours(1)
+        );
+        ReflectionTestUtils.setField(auction, "id", auctionId);
+        ReflectionTestUtils.setField(auction, "status", status);
+        return auction;
     }
 
 }
