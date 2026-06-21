@@ -29,7 +29,9 @@ import com.bankrupang.sanjijk.auction.auction.domain.repository.AuctionRepositor
 import com.bankrupang.sanjijk.auction.auction.domain.type.AuctionStatus;
 import com.bankrupang.sanjijk.auction.auction.exception.AuctionErrorCode;
 import com.bankrupang.sanjijk.auction.auction.exception.AuctionException;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCloseRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCreateRequest;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCloseResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCreateResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionDetailResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionListResponse;
@@ -358,6 +360,63 @@ class AuctionServiceTest {
             assertThat(result.getContent().get(0).auctionId()).isEqualTo(firstAuctionId);
             assertThat(result.getContent().get(0).productName()).isEqualTo(firstProduct.getName());
             assertThat(result.getTotalElements()).isEqualTo(1);
+        }
+    }
+
+    @Nested
+    @DisplayName("closeAuctionManually()")
+    class CloseAuctionManually {
+
+        @Test
+        @DisplayName("성공 - 이미 낙찰 처리된 경매는 현재 상태를 그대로 반환한다")
+        void success_idempotent_won() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            UUID winnerId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start();
+            auction.markResultPending();
+            auction.markWon(winnerId, 15000);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when
+            AuctionCloseResponse result = auctionService.closeAuctionManually(
+                    auctionId,
+                    new AuctionCloseRequest(winnerId, 15000)
+            );
+
+            // then
+            assertThat(result.auctionId()).isEqualTo(auctionId);
+            assertThat(result.status()).isEqualTo(AuctionStatus.WON);
+            assertThat(result.winnerId()).isEqualTo(winnerId);
+            assertThat(result.finalPrice()).isEqualTo(15000);
+        }
+
+        @Test
+        @DisplayName("성공 - 이미 유찰 처리된 경매는 현재 상태를 그대로 반환한다")
+        void success_idempotent_fail() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start();
+            auction.markResultPending();
+            auction.markFailed();
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when
+            AuctionCloseResponse result = auctionService.closeAuctionManually(auctionId, null);
+
+            // then
+            assertThat(result.auctionId()).isEqualTo(auctionId);
+            assertThat(result.status()).isEqualTo(AuctionStatus.FAIL);
+            assertThat(result.winnerId()).isNull();
+            assertThat(result.finalPrice()).isNull();
         }
     }
 

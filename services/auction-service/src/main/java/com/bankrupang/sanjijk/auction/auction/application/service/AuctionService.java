@@ -22,12 +22,15 @@ import com.bankrupang.sanjijk.auction.auction.domain.type.AuctionStatus;
 import com.bankrupang.sanjijk.auction.auction.exception.AuctionErrorCode;
 import com.bankrupang.sanjijk.auction.auction.exception.AuctionException;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCancelRequest;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCloseRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCreateRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionUpdateRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCancelResponse;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCloseResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCreateResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionDetailResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionListResponse;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionStartResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionUpdateResponse;
 import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepository;
@@ -124,6 +127,35 @@ public class AuctionService {
         return AuctionCancelResponse.from(auction);
     }
 
+    @Transactional
+    public AuctionStartResponse startAuctionManually(UUID auctionId) {
+        Auction auction = getExistingAuction(auctionId);
+
+        auction.start();
+
+        return AuctionStartResponse.from(auction);
+    }
+
+    @Transactional
+    public AuctionCloseResponse closeAuctionManually(UUID auctionId, AuctionCloseRequest request) {
+        Auction auction = getExistingAuction(auctionId);
+        if (isAlreadyClosed(auction)) {
+            return AuctionCloseResponse.from(auction);
+        }
+
+        validateCloseRequest(auction, request);
+
+        auction.markResultPending();
+
+        if (hasWinningResult(request)) {
+            auction.markWon(request.winnerId(), request.finalPrice());
+        } else {
+            auction.markFailed();
+        }
+
+        return AuctionCloseResponse.from(auction);
+    }
+
     private Product getExistingProduct(UUID productId) {
         return productRepository.findByIdAndDeletedAtIsNull(productId)
                 .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND));
@@ -181,6 +213,28 @@ public class AuctionService {
         if (request.startPrice() == null && request.bidUnit() == null && request.startAt() == null) {
             throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_REQUEST);
         }
+    }
+
+    private boolean isAlreadyClosed(Auction auction) {
+        return auction.getStatus() == AuctionStatus.WON || auction.getStatus() == AuctionStatus.FAIL;
+    }
+
+    private void validateCloseRequest(Auction auction, AuctionCloseRequest request) {
+        if (request == null || isEmptyCloseRequest(request)) {
+            return;
+        }
+
+        if (!hasWinningResult(request) || request.finalPrice() < auction.getStartPrice()) {
+            throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_RESULT);
+        }
+    }
+
+    private boolean isEmptyCloseRequest(AuctionCloseRequest request) {
+        return request.winnerId() == null && request.finalPrice() == null;
+    }
+
+    private boolean hasWinningResult(AuctionCloseRequest request) {
+        return request != null && request.winnerId() != null && request.finalPrice() != null;
     }
 
     private void validateAuctionOwnerOrMasterOrManager(Auction auction, UUID userId, String userRole) {
