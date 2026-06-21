@@ -16,6 +16,11 @@ public class BidEventProducer {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
+    public void sendBidOvertaken(BidOvertakenEvent event) {
+        kafkaTemplate.send(BID_OVERTAKEN_TOPIC, event.getAuctionId(), event);
+        log.info("BID_OVERTAKEN 발행 - auctionId: {}, previousBidderId: {}", event.getAuctionId(), event.getPreviousBidderId());
+    }
+
     public void sendAuctionEnded(AuctionEndedEvent event) {
         kafkaTemplate.send("AUCTION_ENDED", event.getAuctionId(), event);
         log.info("AUCTION_ENDED 발행 - auctionId: {}, winnerId: {}", event.getAuctionId(), event.getWinnerId());
