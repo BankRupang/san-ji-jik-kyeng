@@ -13,7 +13,7 @@ public class AuctionEventTopicResolver {
     private static final String AUCTION_EVENTS_TOPIC = "auction-events";
 
     public String resolve(AuctionEventType eventType) {
-        Objects.requireNonNull(eventType, "eventType must not be null");
+        Objects.requireNonNull(eventType, "이벤트 타입은 null일 수 없습니다.");
 
         return switch (eventType) {
             case AUCTION_START -> AUCTION_START_TOPIC;
