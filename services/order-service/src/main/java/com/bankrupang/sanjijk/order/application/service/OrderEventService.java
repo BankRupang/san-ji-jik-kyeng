@@ -9,9 +9,9 @@ import com.bankrupang.sanjijk.order.infrastructure.messaging.producer.dto.Deposi
 import com.bankrupang.sanjijk.order.infrastructure.messaging.producer.dto.WinningCreatedEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
