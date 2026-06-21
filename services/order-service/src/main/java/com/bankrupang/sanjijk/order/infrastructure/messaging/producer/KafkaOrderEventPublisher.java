@@ -26,7 +26,9 @@ public class KafkaOrderEventPublisher {
     @Lazy
     private final KafkaOrderEventPublisher self;  // 자기 자신 주입 (트랜잭션 분리용)
 
-    private static final String ORDER_EVENTS_TOPIC = "order-events";
+    //payment-service가 order-events 토픽을 수신할 때 DEPOSIT_CREATED인지 WINNING_CREATED인지 구분
+    private static final String DEPOSIT_CREATED_TOPIC = "deposit-created";
+    private static final String WINNING_CREATED_TOPIC = "winning-created";
 
     @Scheduled(fixedDelay = 5000)
     public void relay() {
@@ -40,7 +42,8 @@ public class KafkaOrderEventPublisher {
     public void relayOne(OrderOutbox outbox) {
         try {
             Object payload = objectMapper.readValue(outbox.getPayload(), Object.class);
-            kafkaTemplate.send(ORDER_EVENTS_TOPIC, outbox.getAggregateId().toString(), payload);
+            String topic = resolveTopic(outbox.getEventType());
+            kafkaTemplate.send(topic, outbox.getAggregateId().toString(), payload);
             outbox.markPublished();
             log.info("[OUTBOX] 이벤트 발행 완료 - outboxId: {}, eventType: {}, aggregateId: {}",
                     outbox.getId(), outbox.getEventType(), outbox.getAggregateId());
@@ -49,5 +52,13 @@ public class KafkaOrderEventPublisher {
             log.error("[OUTBOX] 이벤트 발행 실패 - outboxId: {}, eventType: {}, aggregateId: {}, retryCount: {}",
                     outbox.getId(), outbox.getEventType(), outbox.getAggregateId(), outbox.getRetryCount());
         }
+    }
+
+    private String resolveTopic(String eventType) {
+        return switch (eventType) {
+            case "DEPOSIT_CREATED" -> DEPOSIT_CREATED_TOPIC;
+            case "WINNING_CREATED" -> WINNING_CREATED_TOPIC;
+            default -> throw new IllegalArgumentException("알 수 없는 이벤트 타입: " + eventType);
+        };
     }
 }
