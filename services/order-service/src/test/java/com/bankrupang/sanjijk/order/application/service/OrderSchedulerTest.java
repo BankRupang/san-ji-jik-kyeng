@@ -1,6 +1,5 @@
 package com.bankrupang.sanjijk.order.application.service;
 
-import com.bankrupang.sanjijk.order.application.service.OrderScheduler;
 import com.bankrupang.sanjijk.order.domain.entity.Order;
 import com.bankrupang.sanjijk.order.domain.enums.OrderStatus;
 import com.bankrupang.sanjijk.order.domain.enums.OrderType;
@@ -12,7 +11,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.annotation.Lazy;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -25,14 +23,10 @@ import static org.mockito.BDDMockito.given;
 class OrderSchedulerTest {
 
     @InjectMocks
-    private OrderScheduler orderScheduler;
+    private OrderSchedulerTransaction orderSchedulerTransaction;
 
     @Mock
     private OrderRepository orderRepository;
-
-    @Mock
-    @Lazy
-    private OrderScheduler self;
 
     @Nested
     @DisplayName("expireUnpaidOne()")
@@ -49,7 +43,7 @@ class OrderSchedulerTest {
                     50000, null);
 
             // when
-            orderScheduler.expireUnpaidOne(winningOrder);
+            orderSchedulerTransaction.expireUnpaidOne(winningOrder);
 
             // then
             assertThat(winningOrder.getStatus()).isEqualTo(OrderStatus.PENALTY_PENDING);
@@ -85,7 +79,7 @@ class OrderSchedulerTest {
                     .willReturn(Optional.of(depositOrder));
 
             // when
-            orderScheduler.expirePenaltyOne(winningOrder);
+            orderSchedulerTransaction.expirePenaltyOne(winningOrder);
 
             // then
             assertThat(winningOrder.getStatus()).isEqualTo(OrderStatus.EXPIRED);
@@ -112,7 +106,7 @@ class OrderSchedulerTest {
                     .willReturn(Optional.empty());
 
             // when
-            orderScheduler.expirePenaltyOne(winningOrder);
+            orderSchedulerTransaction.expirePenaltyOne(winningOrder);
 
             // then
             assertThat(winningOrder.getStatus()).isEqualTo(OrderStatus.EXPIRED);
