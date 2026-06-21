@@ -16,6 +16,7 @@ public class KafkaOrderEventPublisherTransaction {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final ObjectMapper objectMapper;
+    private final OrderOutboxJpaRepository orderOutboxJpaRepository;
 
     //payment-service가 order-events 토픽을 수신할 때 DEPOSIT_CREATED인지 WINNING_CREATED인지 구분
     private static final String DEPOSIT_CREATED_TOPIC = "deposit-created";
@@ -35,6 +36,7 @@ public class KafkaOrderEventPublisherTransaction {
             log.error("[OUTBOX] 이벤트 발행 실패 - outboxId: {}, eventType: {}, aggregateId: {}, retryCount: {}",
                     outbox.getId(), outbox.getEventType(), outbox.getAggregateId(), outbox.getRetryCount());
         }
+        orderOutboxJpaRepository.save(outbox); //DB에 저장 안 되는 부분 해결
     }
 
     private String resolveTopic(String eventType) {

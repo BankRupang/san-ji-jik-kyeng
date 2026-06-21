@@ -15,8 +15,6 @@ public interface OrderOutboxJpaRepository extends JpaRepository<OrderOutbox, UUI
 
     List<OrderOutbox> findByStatus(OutboxStatus status);
 
-    @Query("SELECT o FROM OrderOutbox o WHERE o.status = 'PENDING' " +
-            "OR (o.status = 'FAILED' AND o.retryCount < 3) " +
-            "ORDER BY o.createdAt ASC")
+    @Query("SELECT o FROM OrderOutbox o WHERE o.status = 'PENDING' ORDER BY o.createdAt ASC")
     List<OrderOutbox> findRetryableOutboxes(Pageable pageable);
 }

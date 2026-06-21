@@ -4,7 +4,6 @@ import com.bankrupang.sanjijk.order.domain.entity.Order;
 import com.bankrupang.sanjijk.order.domain.enums.OrderStatus;
 import com.bankrupang.sanjijk.order.domain.enums.OrderType;
 import com.bankrupang.sanjijk.order.domain.repository.OrderRepository;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
