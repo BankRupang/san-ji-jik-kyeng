@@ -37,6 +37,7 @@ public class OrderEventService implements OrderEventPublisher {
         saveOutbox(order.getId(), "DEPOSIT_CREATED", event);
     }
 
+    @Override
     @Transactional
     public void publishWinningCreated(Order order, int depositAmount) {
         WinningCreatedEvent event = new WinningCreatedEvent(
