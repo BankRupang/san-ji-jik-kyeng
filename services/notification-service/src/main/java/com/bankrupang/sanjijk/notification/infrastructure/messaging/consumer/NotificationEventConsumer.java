@@ -62,10 +62,10 @@ public class NotificationEventConsumer {
     private void dispatch(String payload) {
         try {
             JsonNode node = objectMapper.readTree(payload);
-            String type = node.path("type").asText("");
+            String type = node.path("eventType").asText("");
 
             if (type.isEmpty()) {
-                log.warn("type 필드 없는 이벤트 스킵");
+                log.warn("eventType 필드 없는 이벤트 스킵");
                 return;
             }
 
