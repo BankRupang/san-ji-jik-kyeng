@@ -12,7 +12,8 @@ import java.util.Base64;
 @Configuration
 public class TossPaymentsConfig {
 
-    private static final String BASE_URL =  "https://api.tosspayments.com";
+    @Value("${toss.payments.base-url}")
+    private String BASE_URL;
 
     @Value("${toss.payments.secret-key}")
     private String secretKey;
