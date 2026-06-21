@@ -40,6 +40,9 @@ public class AuctionEventConsumer {
         redisTemplate.opsForHash().putAll(hashKey, auctionInfo);
         redisTemplate.expire(hashKey, Duration.ofSeconds(ttlSeconds));
 
+        // 경매 종료 스케줄링을 위해 Sorted Set에 등록 (score = endAt Unix timestamp)
+        redisTemplate.opsForZSet().add("auction:endings", auctionId, endAt.toEpochSecond(java.time.ZoneOffset.UTC));
+
         log.info("Redis 경매 정보 저장 완료 - auctionId: {}, endAt: {}", auctionId, endAt);
     }
 }
