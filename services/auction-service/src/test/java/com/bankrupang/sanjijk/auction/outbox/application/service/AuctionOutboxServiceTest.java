@@ -106,6 +106,7 @@ class AuctionOutboxServiceTest {
             assertThat(outbox.getAggregateId()).isEqualTo(auctionId);
             assertThat(outbox.getEventType()).isEqualTo(AuctionEventType.AUCTION_WON);
             assertThat(outbox.isPublished()).isFalse();
+            assertThat(payload.get("eventType").asText()).isEqualTo("AUCTION_WON");
             assertThat(payload.get("auctionId").asText()).isEqualTo(auctionId.toString());
             assertThat(payload.get("auctionTitle").asText()).isEqualTo(product.getName());
             assertThat(payload.get("winnerId").asText()).isEqualTo(winnerId.toString());
@@ -145,6 +146,7 @@ class AuctionOutboxServiceTest {
             assertThat(outbox.getAggregateId()).isEqualTo(auctionId);
             assertThat(outbox.getEventType()).isEqualTo(AuctionEventType.AUCTION_FAILED);
             assertThat(outbox.isPublished()).isFalse();
+            assertThat(payload.get("eventType").asText()).isEqualTo("AUCTION_FAILED");
             assertThat(payload.get("auctionId").asText()).isEqualTo(auctionId.toString());
             assertThat(payload.get("auctionTitle").asText()).isEqualTo(product.getName());
             assertThat(payload.get("sellerId").asText()).isEqualTo(sellerId.toString());
