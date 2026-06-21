@@ -2,7 +2,10 @@ package com.bankrupang.sanjijk.bid.application.service;
 
 import com.bankrupang.sanjijk.bid.domain.exception.BidErrorCode;
 import com.bankrupang.sanjijk.bid.domain.exception.BidException;
+import com.bankrupang.sanjijk.bid.presentation.dto.BidBroadcastDto;
 import com.bankrupang.sanjijk.bid.presentation.dto.BidRequestDto;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -10,8 +13,9 @@ import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -23,6 +27,7 @@ public class BidService {
 
     private final RedissonClient redissonClient;
     private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
 
     public void bid(UUID auctionId, UUID userId, BidRequestDto request) {
         String lockKey = "auction:" + auctionId + ":lock";
@@ -75,13 +80,32 @@ public class BidService {
                 long newTtl = Duration.between(LocalDateTime.now(), newEndAt).getSeconds();
                 redisTemplate.opsForHash().put(hashKey, "endAt", newEndAt.toString());
                 redisTemplate.expire(hashKey, Duration.ofSeconds(newTtl));
+                redisTemplate.opsForZSet().add("auction:endings", auctionId.toString(), newEndAt.toEpochSecond(ZoneOffset.UTC));
                 log.info("안티스나이핑 발동 - auctionId: {}, newEndAt: {}", auctionId, newEndAt);
             }
 
-            // 4. Redis 현재가 갱신
             redisTemplate.opsForHash().put(hashKey, "currentPrice", String.valueOf(request.getBidPrice()));
             redisTemplate.opsForHash().put(hashKey, "highestBidderId", userId.toString());
             log.info("현재가 갱신 - auctionId: {}, newPrice: {}, highestBidder: {}", auctionId, request.getBidPrice(), userId);
+
+            Long bidUnit = Long.parseLong((String) info.get("bidUnit"));
+            BidBroadcastDto broadcast = new BidBroadcastDto(
+                    "BID_UPDATED",
+                    auctionId.toString(),
+                    request.getBidPrice(),
+                    highestBidderId,
+                    userId.toString(),
+                    request.getBidPrice() + bidUnit
+            );
+            try {
+                String payload = objectMapper.writeValueAsString(broadcast);
+                redisTemplate.convertAndSend("auction:" + auctionId + ":bid-event", payload);
+                log.info("브로드캐스트 발행 - channel: auction:{}:bid-event", auctionId);
+            } catch (JsonProcessingException e) {
+                log.error("브로드캐스트 직렬화 실패 - auctionId: {}", auctionId, e);
+            }
+
+            // TODO: Kafka BID_OVERTAKEN 이벤트 발행
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
