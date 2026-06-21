@@ -21,8 +21,10 @@ import com.bankrupang.sanjijk.auction.auction.domain.repository.AuctionRepositor
 import com.bankrupang.sanjijk.auction.auction.domain.type.AuctionStatus;
 import com.bankrupang.sanjijk.auction.auction.exception.AuctionErrorCode;
 import com.bankrupang.sanjijk.auction.auction.exception.AuctionException;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCancelRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCreateRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionUpdateRequest;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCancelResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCreateResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionDetailResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionListResponse;
@@ -109,6 +111,17 @@ public class AuctionService {
         );
 
         return AuctionUpdateResponse.from(auction);
+    }
+
+    @Transactional
+    public AuctionCancelResponse cancelAuction(UUID userId, String userRole, UUID auctionId, AuctionCancelRequest request) {
+        Auction auction = getExistingAuction(auctionId);
+        validateAuctionOwnerOrMasterOrManager(auction, userId, userRole);
+        auction.validateEditable();
+
+        auction.cancel(request.reason());
+
+        return AuctionCancelResponse.from(auction);
     }
 
     private Product getExistingProduct(UUID productId) {
