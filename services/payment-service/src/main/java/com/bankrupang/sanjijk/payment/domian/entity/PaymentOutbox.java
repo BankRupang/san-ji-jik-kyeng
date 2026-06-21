@@ -19,6 +19,8 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PaymentOutbox {
 
+    private static final int MAX_RETRY_COUNT = 3;
+
     @Id
     @UuidGenerator(style = UuidGenerator.Style.TIME)
     @Column(name = "id", updatable = false, nullable = false)
@@ -87,5 +89,13 @@ public class PaymentOutbox {
 
     public void incrementRetry() {
         this.retryCount++;
+    }
+
+    // ================================
+    // 재시도 가능 여부
+    // ================================
+
+    public boolean isRetryable() {
+        return this.retryCount < MAX_RETRY_COUNT;
     }
 }
