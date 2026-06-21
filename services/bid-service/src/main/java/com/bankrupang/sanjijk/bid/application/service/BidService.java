@@ -1,5 +1,6 @@
 package com.bankrupang.sanjijk.bid.application.service;
 
+import com.bankrupang.sanjijk.bid.domain.event.AuctionExtendedEvent;
 import com.bankrupang.sanjijk.bid.domain.event.BidOvertakenEvent;
 import com.bankrupang.sanjijk.bid.domain.exception.BidErrorCode;
 import com.bankrupang.sanjijk.bid.domain.exception.BidException;
@@ -85,6 +86,7 @@ public class BidService {
                 redisTemplate.expire(hashKey, Duration.ofSeconds(newTtl));
                 redisTemplate.opsForZSet().add("auction:endings", auctionId.toString(), newEndAt.toEpochSecond(ZoneOffset.UTC));
                 log.info("안티스나이핑 발동 - auctionId: {}, newEndAt: {}", auctionId, newEndAt);
+                bidEventProducer.sendAuctionExtended(new AuctionExtendedEvent(auctionId.toString(), newEndAt));
             }
 
             redisTemplate.opsForHash().put(hashKey, "currentPrice", String.valueOf(request.getBidPrice()));
