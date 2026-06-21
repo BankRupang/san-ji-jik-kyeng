@@ -21,10 +21,17 @@ import com.bankrupang.sanjijk.auction.auction.domain.repository.AuctionRepositor
 import com.bankrupang.sanjijk.auction.auction.domain.type.AuctionStatus;
 import com.bankrupang.sanjijk.auction.auction.exception.AuctionErrorCode;
 import com.bankrupang.sanjijk.auction.auction.exception.AuctionException;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCancelRequest;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCloseRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCreateRequest;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionUpdateRequest;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCancelResponse;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCloseResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCreateResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionDetailResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionListResponse;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionStartResponse;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionUpdateResponse;
 import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepository;
 import com.bankrupang.sanjijk.auction.product.exception.ProductErrorCode;
@@ -92,6 +99,63 @@ public class AuctionService {
         return PageResponse.of(response);
     }
 
+    @Transactional
+    public AuctionUpdateResponse updateAuction(UUID userId, String userRole, UUID auctionId, AuctionUpdateRequest request) {
+        validateUpdateRequest(request);
+
+        Auction auction = getExistingAuction(auctionId);
+        validateAuctionOwnerOrMasterOrManager(auction, userId, userRole);
+        auction.validateEditable();
+
+        auction.update(
+                request.startPrice(),
+                request.bidUnit(),
+                request.startAt()
+        );
+
+        return AuctionUpdateResponse.from(auction);
+    }
+
+    @Transactional
+    public AuctionCancelResponse cancelAuction(UUID userId, String userRole, UUID auctionId, AuctionCancelRequest request) {
+        Auction auction = getExistingAuction(auctionId);
+        validateAuctionOwnerOrMasterOrManager(auction, userId, userRole);
+        auction.validateEditable();
+
+        auction.cancel(request.reason());
+
+        return AuctionCancelResponse.from(auction);
+    }
+
+    @Transactional
+    public AuctionStartResponse startAuctionManually(UUID auctionId) {
+        Auction auction = getExistingAuction(auctionId);
+
+        auction.start();
+
+        return AuctionStartResponse.from(auction);
+    }
+
+    @Transactional
+    public AuctionCloseResponse closeAuctionManually(UUID auctionId, AuctionCloseRequest request) {
+        Auction auction = getExistingAuction(auctionId);
+        if (isAlreadyClosed(auction)) {
+            return AuctionCloseResponse.from(auction);
+        }
+
+        validateCloseRequest(auction, request);
+
+        auction.markResultPending();
+
+        if (hasWinningResult(request)) {
+            auction.markWon(request.winnerId(), request.finalPrice());
+        } else {
+            auction.markFailed();
+        }
+
+        return AuctionCloseResponse.from(auction);
+    }
+
     private Product getExistingProduct(UUID productId) {
         return productRepository.findByIdAndDeletedAtIsNull(productId)
                 .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND));
@@ -143,6 +207,57 @@ public class AuctionService {
         }
 
         return auctionRepository.findAllByStatusAndDeletedAtIsNull(status, pageable);
+    }
+
+    private void validateUpdateRequest(AuctionUpdateRequest request) {
+        if (request.startPrice() == null && request.bidUnit() == null && request.startAt() == null) {
+            throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_REQUEST);
+        }
+    }
+
+    private boolean isAlreadyClosed(Auction auction) {
+        return auction.getStatus() == AuctionStatus.WON || auction.getStatus() == AuctionStatus.FAIL;
+    }
+
+    private void validateCloseRequest(Auction auction, AuctionCloseRequest request) {
+        if (request == null) {
+            return;
+        }
+
+        if (isInvalidWinningResultPair(request)) {
+            throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_RESULT);
+        }
+
+        if (!hasWinningResult(request)) {
+            return;
+        }
+
+        if (request.finalPrice() < auction.getStartPrice()) {
+            throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_RESULT);
+        }
+    }
+
+    private boolean hasWinningResult(AuctionCloseRequest request) {
+        return request != null && request.winnerId() != null && request.finalPrice() != null;
+    }
+
+    private boolean isInvalidWinningResultPair(AuctionCloseRequest request) {
+        return (request.winnerId() == null && request.finalPrice() != null)
+                || (request.winnerId() != null && request.finalPrice() == null);
+    }
+
+    private void validateAuctionOwnerOrMasterOrManager(Auction auction, UUID userId, String userRole) {
+        if (isMaster(userRole) || isManager(userRole)) {
+            return;
+        }
+
+        if (!auction.getSellerId().equals(userId)) {
+            throw new AuctionException(AuctionErrorCode.AUCTION_FORBIDDEN);
+        }
+    }
+
+    private boolean isManager(String userRole) {
+        return "MANAGER".equalsIgnoreCase(userRole) || "ROLE_MANAGER".equalsIgnoreCase(userRole);
     }
 
 }

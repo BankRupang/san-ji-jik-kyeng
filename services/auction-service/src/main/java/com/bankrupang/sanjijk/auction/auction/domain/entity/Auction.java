@@ -55,6 +55,9 @@ public class Auction extends BaseEntity {
     @Column(name = "end_at", nullable = false)
     private LocalDateTime endAt;
 
+    @Column(name = "cancel_reason")
+    private String cancelReason;
+
     public static Auction create(
             UUID productId,
             UUID sellerId,
@@ -79,6 +82,19 @@ public class Auction extends BaseEntity {
         auction.endAt = endAt;
 
         return auction;
+    }
+
+    public void update(Integer startPrice, Integer bidUnit, LocalDateTime startAt) {
+        if (startPrice != null) {
+            this.startPrice = startPrice;
+        }
+        if (bidUnit != null) {
+            this.bidUnit = bidUnit;
+        }
+        if (startAt != null) {
+            this.startAt = startAt;
+            this.endAt = startAt.plusHours(1);
+        }
     }
 
     private static void validateCreateRequest(
@@ -153,16 +169,15 @@ public class Auction extends BaseEntity {
         this.status = AuctionStatus.FAIL;
     }
 
-    public void cancel() {
+    public void cancel(String cancelReason) {
         if (status == AuctionStatus.CANCELLED) {
             return;
         }
 
-        if (status != AuctionStatus.READY && status != AuctionStatus.PROGRESS) {
-            throw new AuctionException(AuctionErrorCode.INVALID_STATE_TRANSITION);
-        }
+        validateStatus(AuctionStatus.READY);
 
         this.status = AuctionStatus.CANCELLED;
+        this.cancelReason = cancelReason;
     }
 
     public void validateEditable() {
