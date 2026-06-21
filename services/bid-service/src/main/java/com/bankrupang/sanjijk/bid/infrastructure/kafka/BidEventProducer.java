@@ -1,6 +1,7 @@
 package com.bankrupang.sanjijk.bid.infrastructure.kafka;
 
 import com.bankrupang.sanjijk.bid.domain.event.AuctionEndedEvent;
+import com.bankrupang.sanjijk.bid.domain.event.AuctionExtendedEvent;
 import com.bankrupang.sanjijk.bid.domain.event.BidOvertakenEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,11 @@ public class BidEventProducer {
     public void sendBidOvertaken(BidOvertakenEvent event) {
         kafkaTemplate.send(BID_OVERTAKEN_TOPIC, event.getAuctionId(), event);
         log.info("BID_OVERTAKEN 발행 - auctionId: {}, previousBidderId: {}", event.getAuctionId(), event.getPreviousBidderId());
+    }
+
+    public void sendAuctionExtended(AuctionExtendedEvent event) {
+        kafkaTemplate.send("AUCTION_EXTENDED", event.getAuctionId(), event);
+        log.info("AUCTION_EXTENDED 발행 - auctionId: {}, newEndAt: {}", event.getAuctionId(), event.getNewEndAt());
     }
 
     public void sendAuctionEnded(AuctionEndedEvent event) {
