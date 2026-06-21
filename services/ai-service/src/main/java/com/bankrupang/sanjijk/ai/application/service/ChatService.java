@@ -9,7 +9,10 @@ import com.bankrupang.sanjijk.ai.domain.repository.ChatSessionRepository;
 import com.bankrupang.sanjijk.ai.exception.AiErrorCode;
 import com.bankrupang.sanjijk.ai.infrastructure.ai.HybridSearchService;
 import com.bankrupang.sanjijk.common.exception.BaseException;
-import lombok.RequiredArgsConstructor;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -28,7 +31,6 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ChatService {
 
     private final ChatClient chatClient;
@@ -36,6 +38,31 @@ public class ChatService {
     private final ChatMessageRepository messageRepository;
     private final HybridSearchService hybridSearchService;
     private final TransactionTemplate transactionTemplate;
+    private final ObservationRegistry observationRegistry;
+    private final Counter reformulationSuccessCounter;
+    private final Counter reformulationFailCounter;
+    private final Counter aiResponseFailCounter;
+
+    public ChatService(ChatClient chatClient, ChatSessionRepository sessionRepository,
+                       ChatMessageRepository messageRepository, HybridSearchService hybridSearchService,
+                       TransactionTemplate transactionTemplate,
+                       ObservationRegistry observationRegistry, MeterRegistry meterRegistry) {
+        this.chatClient = chatClient;
+        this.sessionRepository = sessionRepository;
+        this.messageRepository = messageRepository;
+        this.hybridSearchService = hybridSearchService;
+        this.transactionTemplate = transactionTemplate;
+        this.observationRegistry = observationRegistry;
+        this.reformulationSuccessCounter = Counter.builder("query.reformulation.success")
+                .description("쿼리 재작성 성공 횟수")
+                .register(meterRegistry);
+        this.reformulationFailCounter = Counter.builder("query.reformulation.fail")
+                .description("쿼리 재작성 실패 횟수")
+                .register(meterRegistry);
+        this.aiResponseFailCounter = Counter.builder("ai.response.fail")
+                .description("AI 응답 생성 실패 횟수")
+                .register(meterRegistry);
+    }
 
     @Value("${ai.chat.session-expire-hours}")
     private int sessionExpireHours;
@@ -48,23 +75,27 @@ public class ChatService {
     public String chat(UUID sessionId, UUID userId, String userMessage) {
         validateSession(sessionId, userId);
 
-        List<ChatMessage> history = messageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
+        return Observation.createNotStarted("chat.pipeline", observationRegistry)
+                .highCardinalityKeyValue("user.id", userId.toString())
+                .observe(() -> {
+                    List<ChatMessage> history = messageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
 
-        // 2단계: Query Reformulation - 대화 기록 기반 쿼리 재작성
-        String searchQuery = reformulateQuery(userMessage, history);
+                    // 2단계: Query Reformulation - 대화 기록 기반 쿼리 재작성
+                    String searchQuery = reformulateQuery(userMessage, history);
 
-        // 3단계: Hybrid Search - RRF 융합 검색
-        List<String> documents = hybridSearchService.search(searchQuery);
+                    // 3단계: Hybrid Search - RRF 융합 검색
+                    List<String> documents = hybridSearchService.search(searchQuery);
 
-        // 4단계: Context Condensing + 응답 생성 (시스템 프롬프트에 가드레일 포함)
-        String response = generateResponse(userMessage, history, documents);
+                    // 4단계: Context Condensing + 응답 생성 (시스템 프롬프트에 가드레일 포함)
+                    String response = generateResponse(userMessage, history, documents);
 
-        transactionTemplate.executeWithoutResult(status -> {
-            messageRepository.save(ChatMessage.of(sessionId, ChatRole.USER, userMessage));
-            messageRepository.save(ChatMessage.of(sessionId, ChatRole.ASSISTANT, response));
-        });
+                    transactionTemplate.executeWithoutResult(status -> {
+                        messageRepository.save(ChatMessage.of(sessionId, ChatRole.USER, userMessage));
+                        messageRepository.save(ChatMessage.of(sessionId, ChatRole.ASSISTANT, response));
+                    });
 
-        return response;
+                    return response;
+                });
     }
 
     @Transactional(readOnly = true)
@@ -123,8 +154,14 @@ public class ChatService {
                     .user("대화 기록:\n" + historyText + "\n\n재작성할 질문: " + userMessage)
                     .call()
                     .content();
-            return (reformulated != null && !reformulated.isBlank()) ? reformulated : userMessage;
+            if (reformulated != null && !reformulated.isBlank()) {
+                reformulationSuccessCounter.increment();
+                return reformulated;
+            }
+            reformulationFailCounter.increment();
+            return userMessage;
         } catch (Exception e) {
+            reformulationFailCounter.increment();
             log.warn("쿼리 재작성 실패, 원본 쿼리 사용 - error: {}", e.getMessage());
             return userMessage;
         }
@@ -147,8 +184,11 @@ public class ChatService {
             }
             return content;
         } catch (BaseException e) {
+            aiResponseFailCounter.increment();
+            log.error("AI 응답 생성 실패 - error: {}", e.getMessage());
             throw e;
         } catch (Exception e) {
+            aiResponseFailCounter.increment();
             throw new BaseException(AiErrorCode.AI_RESPONSE_UNAVAILABLE);
         }
     }

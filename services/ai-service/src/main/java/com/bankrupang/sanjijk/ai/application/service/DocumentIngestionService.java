@@ -4,7 +4,9 @@ import com.bankrupang.sanjijk.ai.exception.AiErrorCode;
 import com.bankrupang.sanjijk.ai.infrastructure.persistence.VectorStoreRepository;
 import com.bankrupang.sanjijk.ai.presentation.dto.response.DocumentInfoResponse;
 import com.bankrupang.sanjijk.common.exception.BaseException;
-import lombok.RequiredArgsConstructor;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
 import org.apache.tika.exception.TikaException;
@@ -26,13 +28,36 @@ import java.util.UUID;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class DocumentIngestionService {
 
     private final VectorStore vectorStore;
     private final VectorStoreRepository vectorStoreRepository;
     private final Tika tika;
     private final TokenTextSplitter tokenTextSplitter;
+    private final Counter ingestSuccessCounter;
+    private final Counter ingestFailCounter;
+    private final Counter reingestCounter;
+    private final DistributionSummary chunkDistribution;
+
+    public DocumentIngestionService(VectorStore vectorStore, VectorStoreRepository vectorStoreRepository,
+                                     Tika tika, TokenTextSplitter tokenTextSplitter, MeterRegistry meterRegistry) {
+        this.vectorStore = vectorStore;
+        this.vectorStoreRepository = vectorStoreRepository;
+        this.tika = tika;
+        this.tokenTextSplitter = tokenTextSplitter;
+        this.ingestSuccessCounter = Counter.builder("document.ingest.success")
+                .description("문서 적재 성공 횟수")
+                .register(meterRegistry);
+        this.ingestFailCounter = Counter.builder("document.ingest.fail")
+                .description("문서 적재 실패 횟수")
+                .register(meterRegistry);
+        this.reingestCounter = Counter.builder("document.reingest")
+                .description("문서 재임베딩 횟수")
+                .register(meterRegistry);
+        this.chunkDistribution = DistributionSummary.builder("document.ingest.chunks")
+                .description("문서 적재 시 생성된 청크 수 분포")
+                .register(meterRegistry);
+    }
 
     public void ingest(MultipartFile file, String source) {
         if (file.isEmpty()) {
@@ -40,11 +65,17 @@ public class DocumentIngestionService {
         }
         String title = extractTitle(file.getOriginalFilename());
         String version = UUID.randomUUID().toString();
-        List<Document> chunks = parseAndSplit(file, title, source, version);
         try {
+            List<Document> chunks = parseAndSplit(file, title, source, version);
             vectorStore.add(chunks);
+            ingestSuccessCounter.increment();
+            chunkDistribution.record(chunks.size());
             log.info("문서 적재 완료 - source: {}, title: {}, 청크 수: {}", source, title, chunks.size());
+        } catch (BaseException e) {
+            ingestFailCounter.increment();
+            throw e;
         } catch (Exception e) {
+            ingestFailCounter.increment();
             log.error("벡터 스토어 저장 실패 - source: {}", source, e);
             throw new BaseException(AiErrorCode.DOCUMENT_INGESTION_FAILED);
         }
@@ -56,17 +87,24 @@ public class DocumentIngestionService {
         }
         String title = extractTitle(file.getOriginalFilename());
         String newVersion = UUID.randomUUID().toString();
-        List<Document> chunks = parseAndSplit(file, title, source, newVersion);
         // 새 버전 먼저 적재: 실패 시 기존 데이터 보존
         try {
+            List<Document> chunks = parseAndSplit(file, title, source, newVersion);
             vectorStore.add(chunks);
+            // 새 버전 제외 기존 청크 삭제 (version 없는 구버전 포함)
+            int deleted = vectorStoreRepository.deleteBySourceExcludingVersion(source, newVersion);
+            ingestSuccessCounter.increment();
+            reingestCounter.increment();
+            chunkDistribution.record(chunks.size());
+            log.info("재임베딩 완료 - source: {}, title: {}, 삭제: {}개, 신규: {}개", source, title, deleted, chunks.size());
+        } catch (BaseException e) {
+            ingestFailCounter.increment();
+            throw e;
         } catch (Exception e) {
+            ingestFailCounter.increment();
             log.error("벡터 스토어 저장 실패 - source: {}", source, e);
             throw new BaseException(AiErrorCode.DOCUMENT_INGESTION_FAILED);
         }
-        // 새 버전 제외 기존 청크 삭제 (version 없는 구버전 포함)
-        int deleted = vectorStoreRepository.deleteBySourceExcludingVersion(source, newVersion);
-        log.info("재임베딩 완료 - source: {}, title: {}, 삭제: {}개, 신규: {}개", source, title, deleted, chunks.size());
     }
 
     public void deleteBySource(String source) {

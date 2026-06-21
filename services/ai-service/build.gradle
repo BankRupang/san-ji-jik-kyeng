@@ -13,4 +13,8 @@ dependencies {
     // Apache Tika - 다양한 파일 포맷 텍스트 추출 (PDF, Word, Excel 등)
     implementation 'org.apache.tika:tika-core:2.9.1'
     implementation 'org.apache.tika:tika-parsers-standard-package:2.9.1'
+
+    // OTLP Tracing (Langfuse 연동)
+    implementation 'io.micrometer:micrometer-tracing-bridge-otel'
+    implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
 }

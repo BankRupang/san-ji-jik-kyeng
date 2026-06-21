@@ -1,10 +1,13 @@
 package com.bankrupang.sanjijk.ai.infrastructure.ai;
 
-import lombok.RequiredArgsConstructor;
+import com.bankrupang.sanjijk.ai.infrastructure.persistence.VectorStoreRepository;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
@@ -12,11 +15,26 @@ import java.util.List;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class HybridSearchService {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final VectorStoreRepository vectorStoreRepository;
     private final EmbeddingModel embeddingModel;
+    private final ObservationRegistry observationRegistry;
+    private final Counter emptySearchCounter;
+    private final Counter searchFailCounter;
+
+    public HybridSearchService(VectorStoreRepository vectorStoreRepository, EmbeddingModel embeddingModel,
+                                ObservationRegistry observationRegistry, MeterRegistry meterRegistry) {
+        this.vectorStoreRepository = vectorStoreRepository;
+        this.embeddingModel = embeddingModel;
+        this.observationRegistry = observationRegistry;
+        this.emptySearchCounter = Counter.builder("hybrid.search.empty")
+                .description("검색 결과 없음 발생 횟수")
+                .register(meterRegistry);
+        this.searchFailCounter = Counter.builder("hybrid.search.fail")
+                .description("하이브리드 검색 실패 횟수")
+                .register(meterRegistry);
+    }
 
     @Value("${ai.chat.similarity-threshold:0.7}")
     private double similarityThreshold;
@@ -24,50 +42,27 @@ public class HybridSearchService {
     @Value("${ai.chat.top-k:3}")
     private int topK;
 
-    // RRF 상수 k=60 (Reciprocal Rank Fusion 표준값)
-    private static final String HYBRID_SEARCH_SQL = """
-            WITH vector_results AS (
-                SELECT id, content,
-                       ROW_NUMBER() OVER (ORDER BY embedding <=> CAST(? AS vector)) AS rank
-                FROM ai_schema.vector_store
-                WHERE 1 - (embedding <=> CAST(? AS vector)) >= ?
-                LIMIT ?
-            ),
-            text_results AS (
-                SELECT id, content,
-                       ROW_NUMBER() OVER (
-                           ORDER BY ts_rank(to_tsvector('simple', content), plainto_tsquery('simple', ?)) DESC
-                       ) AS rank
-                FROM ai_schema.vector_store
-                WHERE to_tsvector('simple', content) @@ plainto_tsquery('simple', ?)
-                LIMIT ?
-            ),
-            rrf_scores AS (
-                SELECT
-                    COALESCE(v.id, t.id) AS id,
-                    COALESCE(v.content, t.content) AS content,
-                    COALESCE(1.0 / (60 + v.rank), 0.0) + COALESCE(1.0 / (60 + t.rank), 0.0) AS rrf_score
-                FROM vector_results v
-                FULL OUTER JOIN text_results t ON v.id = t.id
-            )
-            SELECT content FROM rrf_scores ORDER BY rrf_score DESC LIMIT ?
-            """;
-
     public List<String> search(String query) {
+        return Observation.createNotStarted("hybrid.search", observationRegistry)
+                .observe(() -> doSearch(query));
+    }
+
+    private List<String> doSearch(String query) {
         try {
             String prefixedQuery = "task: question answering | query: " + query;
             float[] embedding = embeddingModel.embed(prefixedQuery);
             String vectorStr = toVectorString(embedding);
             int searchLimit = topK * 2;
 
-            List<String> results = jdbcTemplate.queryForList(HYBRID_SEARCH_SQL, String.class,
-                    vectorStr, vectorStr, similarityThreshold, searchLimit,
-                    query, query, searchLimit,
-                    topK);
+            List<String> results = vectorStoreRepository.hybridSearch(vectorStr, query, similarityThreshold, searchLimit, topK);
 
+            if (results.isEmpty()) {
+                emptySearchCounter.increment();
+            }
             log.info("하이브리드 검색 결과 - query: {}, threshold: {}, 결과 수: {}", query, similarityThreshold, results.size());
             return results;
         } catch (Exception e) {
+            searchFailCounter.increment();
             log.warn("하이브리드 검색 실패 - query: {}, error: {}", query, e.getMessage());
             return Collections.emptyList();
         }

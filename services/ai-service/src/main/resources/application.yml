@@ -44,6 +44,13 @@ spring:
         distance-type: COSINE_DISTANCE
         dimensions: 768
         schema-name: ai_schema
+    chat:
+      observations:
+        include-prompt: true
+        include-completion: true
+    embedding:
+      observations:
+        include-input: false
 
 eureka:
   client:
@@ -59,3 +66,14 @@ ai:
     chunk-size: 500
     chunk-overlap: 50
     tika-max-string-length: 500000
+
+management:
+  otlp:
+    tracing:
+      endpoint: ${LANGFUSE_OTLP_ENDPOINT:http://langfuse:3000/api/public/otel/v1/traces}
+      headers:
+        Authorization: "Basic ${LANGFUSE_AUTH_HEADER:}"
+  tracing:
+    sampling:
+      probability: 1.0
+
