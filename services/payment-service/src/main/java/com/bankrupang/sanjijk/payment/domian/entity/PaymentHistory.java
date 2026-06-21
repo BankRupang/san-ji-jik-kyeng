@@ -22,7 +22,7 @@ import java.util.UUID;
 public class PaymentHistory {
 
     @Id
-    @UuidGenerator
+    @UuidGenerator(style = UuidGenerator.Style.TIME)
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 

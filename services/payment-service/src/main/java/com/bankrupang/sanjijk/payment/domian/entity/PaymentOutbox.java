@@ -20,7 +20,7 @@ import java.util.UUID;
 public class PaymentOutbox {
 
     @Id
-    @UuidGenerator
+    @UuidGenerator(style = UuidGenerator.Style.TIME)
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 

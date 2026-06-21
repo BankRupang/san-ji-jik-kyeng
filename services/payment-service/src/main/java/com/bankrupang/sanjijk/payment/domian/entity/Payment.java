@@ -33,7 +33,7 @@ public class Payment extends BaseEntity {
     @Column(name = "toss_order_id", nullable = false, unique = true, length = 64)
     private String tossOrderId;
 
-    @Column(name = "payment_key", nullable = false, unique = true, length = 200)
+    @Column(name = "payment_key", unique = true, length = 200)
     private String paymentKey;
 
     @Enumerated(EnumType.STRING)
@@ -108,7 +108,7 @@ public class Payment extends BaseEntity {
         payment.auctionId = auctionId;
         payment.auctionTitle = auctionTitle;
         payment.tossOrderId = tossOrderId;
-        payment.paymentKey = "";       // 토스 confirm 응답 전 빈 문자열
+        payment.paymentKey = null;       // 토스 confirm 응답 전 빈 문자열
         payment.paymentType = paymentType;
         payment.status = PaymentStatus.READY;
         payment.amount = amount;
@@ -156,7 +156,7 @@ public class Payment extends BaseEntity {
         this.status = PaymentStatus.EXPIRED;
     }
 
-    public void cancel(int cancelAmount, String cancelReason) {
+    public void refund(int cancelAmount, String cancelReason) {
         this.cancelAmount = cancelAmount;
         this.cancelReason = cancelReason;
         this.canceledAt = LocalDateTime.now();
