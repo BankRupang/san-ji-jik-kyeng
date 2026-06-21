@@ -2,6 +2,7 @@ package com.bankrupang.sanjijk.order.infrastructure.outbox;
 
 import com.bankrupang.sanjijk.order.domain.entity.OrderOutbox;
 import com.bankrupang.sanjijk.order.domain.enums.OutboxStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -14,6 +15,8 @@ public interface OrderOutboxJpaRepository extends JpaRepository<OrderOutbox, UUI
 
     List<OrderOutbox> findByStatus(OutboxStatus status);
 
-    @Query("SELECT o FROM OrderOutbox o WHERE o.status = 'PENDING' OR (o.status = 'FAILED' AND o.retryCount < 3)")
-    List<OrderOutbox> findRetryableOutboxes();
+    @Query("SELECT o FROM OrderOutbox o WHERE o.status = 'PENDING' " +
+            "OR (o.status = 'FAILED' AND o.retryCount < 3) " +
+            "ORDER BY o.createdAt ASC")
+    List<OrderOutbox> findRetryableOutboxes(Pageable pageable);
 }

@@ -17,6 +17,7 @@ public class KafkaOrderEventPublisherTransaction {
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final ObjectMapper objectMapper;
 
+    //payment-service가 order-events 토픽을 수신할 때 DEPOSIT_CREATED인지 WINNING_CREATED인지 구분
     private static final String DEPOSIT_CREATED_TOPIC = "deposit-created";
     private static final String WINNING_CREATED_TOPIC = "winning-created";
 

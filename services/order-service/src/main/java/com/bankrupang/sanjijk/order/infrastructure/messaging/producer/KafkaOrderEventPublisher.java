@@ -4,6 +4,7 @@ import com.bankrupang.sanjijk.order.domain.entity.OrderOutbox;
 import com.bankrupang.sanjijk.order.infrastructure.outbox.OrderOutboxJpaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -25,13 +26,11 @@ public class KafkaOrderEventPublisher {
      */
     private final KafkaOrderEventPublisherTransaction kafkaOrderEventPublisherTransaction;
 
-    //payment-service가 order-events 토픽을 수신할 때 DEPOSIT_CREATED인지 WINNING_CREATED인지 구분
-    private static final String DEPOSIT_CREATED_TOPIC = "deposit-created";
-    private static final String WINNING_CREATED_TOPIC = "winning-created";
 
     @Scheduled(fixedDelay = 5000)
     public void relay() {
-        List<OrderOutbox> outboxList = orderOutboxJpaRepository.findRetryableOutboxes();
+        List<OrderOutbox> outboxList = orderOutboxJpaRepository
+                .findRetryableOutboxes(PageRequest.of(0, 100));
         for (OrderOutbox outbox : outboxList) {
             kafkaOrderEventPublisherTransaction.relayOne(outbox);
         }
