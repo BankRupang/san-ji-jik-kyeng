@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.util.List;
@@ -14,18 +15,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.bankrupang.sanjijk.auction.outbox.domain.entity.AuctionOutbox;
-import com.bankrupang.sanjijk.auction.outbox.domain.repository.AuctionOutboxRepository;
 import com.bankrupang.sanjijk.auction.outbox.domain.type.AuctionEventType;
 
 @DisplayName("AuctionOutboxRelay 테스트")
@@ -36,7 +33,7 @@ class AuctionOutboxRelayTest {
     private AuctionOutboxRelay auctionOutboxRelay;
 
     @Mock
-    private AuctionOutboxRepository auctionOutboxRepository;
+    private AuctionOutboxRelayTransactionService auctionOutboxRelayTransactionService;
 
     @Mock
     private AuctionEventTopicResolver auctionEventTopicResolver;
@@ -63,8 +60,8 @@ class AuctionOutboxRelayTest {
             );
 
             ReflectionTestUtils.setField(auctionOutboxRelay, "batchSize", batchSize);
-            given(auctionOutboxRepository.findByPublishedFalseOrderByCreatedAtAsc(any(Pageable.class)))
-                    .willReturn(new PageImpl<>(List.of(outbox)));
+            given(auctionOutboxRelayTransactionService.findPendingEvents(batchSize))
+                    .willReturn(List.of(outbox));
             given(auctionEventTopicResolver.resolve(AuctionEventType.AUCTION_START))
                     .willReturn("auction-start");
             given(kafkaTemplate.send("auction-start", auctionId.toString(), payload))
@@ -74,15 +71,12 @@ class AuctionOutboxRelayTest {
             auctionOutboxRelay.publishPendingEvents();
 
             // then
-            assertThat(outbox.isPublished()).isTrue();
-            assertThat(outbox.getPublishedAt()).isNotNull();
-
-            ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-            verify(auctionOutboxRepository).findByPublishedFalseOrderByCreatedAtAsc(pageableCaptor.capture());
-            assertThat(pageableCaptor.getValue().getPageNumber()).isZero();
-            assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(batchSize);
+            assertThat(outbox.isPublished()).isFalse();
+            assertThat(outbox.getPublishedAt()).isNull();
+            verify(auctionOutboxRelayTransactionService).findPendingEvents(batchSize);
             verify(auctionEventTopicResolver).resolve(AuctionEventType.AUCTION_START);
             verify(kafkaTemplate).send("auction-start", auctionId.toString(), payload);
+            verify(auctionOutboxRelayTransactionService).markPublished(outbox.getId());
         }
 
         @Test
@@ -98,8 +92,8 @@ class AuctionOutboxRelayTest {
             );
 
             ReflectionTestUtils.setField(auctionOutboxRelay, "batchSize", 100);
-            given(auctionOutboxRepository.findByPublishedFalseOrderByCreatedAtAsc(any(Pageable.class)))
-                    .willReturn(new PageImpl<>(List.of(outbox)));
+            given(auctionOutboxRelayTransactionService.findPendingEvents(100))
+                    .willReturn(List.of(outbox));
             given(auctionEventTopicResolver.resolve(AuctionEventType.AUCTION_WON))
                     .willReturn("auction-events");
             given(kafkaTemplate.send("auction-events", auctionId.toString(), payload))
@@ -112,6 +106,7 @@ class AuctionOutboxRelayTest {
             assertThat(outbox.isPublished()).isFalse();
             assertThat(outbox.getPublishedAt()).isNull();
             verify(kafkaTemplate).send("auction-events", auctionId.toString(), payload);
+            verify(auctionOutboxRelayTransactionService, never()).markPublished(any(UUID.class));
         }
     }
 }
