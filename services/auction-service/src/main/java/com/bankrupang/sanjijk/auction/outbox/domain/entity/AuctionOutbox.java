@@ -7,6 +7,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 
 import org.hibernate.annotations.JdbcTypeCode;
@@ -20,7 +21,13 @@ import com.bankrupang.sanjijk.auction.outbox.domain.type.AuctionEventType;
 import com.bankrupang.sanjijk.common.entity.BaseEntity;
 
 @Entity
-@Table(name = "p_auction_outbox")
+@Table(
+        name = "p_auction_outbox",
+        indexes = @Index(
+                name = "idx_auction_outbox_published_created_at",
+                columnList = "published, created_at"
+        )
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class AuctionOutbox extends BaseEntity {
