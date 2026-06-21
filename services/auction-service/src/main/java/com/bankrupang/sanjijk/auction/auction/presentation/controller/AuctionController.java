@@ -21,8 +21,10 @@ import lombok.RequiredArgsConstructor;
 
 import com.bankrupang.sanjijk.auction.auction.application.service.AuctionService;
 import com.bankrupang.sanjijk.auction.auction.domain.type.AuctionStatus;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCancelRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCreateRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionUpdateRequest;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCancelResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCreateResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionDetailResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionListResponse;
@@ -83,6 +85,19 @@ public class AuctionController {
 
         return ResponseEntity.ok(ApiResponse.ok(response));
 
+    }
+
+    @PostMapping("/{auctionId}/cancel")
+    @PreAuthorize("hasAnyRole('SELLER', 'MASTER', 'MANAGER')")
+    public ResponseEntity<ApiResponse<AuctionCancelResponse>> cancelAuction(
+            @RequestHeader("X-User-Id") UUID userId,
+            @RequestHeader("X-User-Role") String userRole,
+            @PathVariable UUID auctionId,
+            @Valid @RequestBody AuctionCancelRequest request
+    ) {
+        AuctionCancelResponse response = auctionService.cancelAuction(userId, userRole, auctionId, request);
+
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
 }
