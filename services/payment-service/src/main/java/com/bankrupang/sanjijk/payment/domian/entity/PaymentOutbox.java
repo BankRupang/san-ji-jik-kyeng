@@ -87,10 +87,6 @@ public class PaymentOutbox {
         this.retryCount++;
     }
 
-    public void incrementRetry() {
-        this.retryCount++;
-    }
-
     // ================================
     // 재시도 가능 여부
     // ================================
