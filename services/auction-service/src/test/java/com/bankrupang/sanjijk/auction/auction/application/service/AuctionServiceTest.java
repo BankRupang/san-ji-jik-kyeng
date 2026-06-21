@@ -35,6 +35,7 @@ import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionC
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCreateResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionDetailResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionListResponse;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionStartResponse;
 import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepository;
 import com.bankrupang.sanjijk.auction.product.exception.ProductErrorCode;
@@ -364,8 +365,102 @@ class AuctionServiceTest {
     }
 
     @Nested
+    @DisplayName("startAuctionManually()")
+    class StartAuctionManually {
+
+        @Test
+        @DisplayName("성공 - READY 상태 경매를 PROGRESS 상태로 변경한다")
+        void success() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when
+            AuctionStartResponse result = auctionService.startAuctionManually(auctionId);
+
+            // then
+            assertThat(result.auctionId()).isEqualTo(auctionId);
+            assertThat(result.status()).isEqualTo(AuctionStatus.PROGRESS);
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.PROGRESS);
+        }
+
+        @Test
+        @DisplayName("실패 - READY 상태가 아니면 시작할 수 없다")
+        void fail_invalid_state() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            UUID winnerId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start();
+            auction.markResultPending();
+            auction.markWon(winnerId, 15000);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when & then
+            assertThatThrownBy(() -> auctionService.startAuctionManually(auctionId))
+                    .isInstanceOf(AuctionException.class)
+                    .hasMessage(AuctionErrorCode.INVALID_STATE_TRANSITION.getMessage());
+        }
+    }
+
+    @Nested
     @DisplayName("closeAuctionManually()")
     class CloseAuctionManually {
+
+        @Test
+        @DisplayName("성공 - 최고가와 낙찰자가 있으면 낙찰 처리한다")
+        void success_won() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            UUID winnerId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start();
+            AuctionCloseRequest request = new AuctionCloseRequest(winnerId, 15000);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when
+            AuctionCloseResponse result = auctionService.closeAuctionManually(auctionId, request);
+
+            // then
+            assertThat(result.auctionId()).isEqualTo(auctionId);
+            assertThat(result.status()).isEqualTo(AuctionStatus.WON);
+            assertThat(result.winnerId()).isEqualTo(winnerId);
+            assertThat(result.finalPrice()).isEqualTo(15000);
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.WON);
+        }
+
+        @Test
+        @DisplayName("성공 - 낙찰 정보가 없으면 유찰 처리한다")
+        void success_fail() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start();
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when
+            AuctionCloseResponse result = auctionService.closeAuctionManually(auctionId, null);
+
+            // then
+            assertThat(result.auctionId()).isEqualTo(auctionId);
+            assertThat(result.status()).isEqualTo(AuctionStatus.FAIL);
+            assertThat(result.winnerId()).isNull();
+            assertThat(result.finalPrice()).isNull();
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.FAIL);
+        }
 
         @Test
         @DisplayName("성공 - 이미 낙찰 처리된 경매는 현재 상태를 그대로 반환한다")
@@ -417,6 +512,65 @@ class AuctionServiceTest {
             assertThat(result.status()).isEqualTo(AuctionStatus.FAIL);
             assertThat(result.winnerId()).isNull();
             assertThat(result.finalPrice()).isNull();
+        }
+
+        @Test
+        @DisplayName("실패 - PROGRESS 상태가 아니면 마감할 수 없다")
+        void fail_invalid_state() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when & then
+            assertThatThrownBy(() -> auctionService.closeAuctionManually(auctionId, null))
+                    .isInstanceOf(AuctionException.class)
+                    .hasMessage(AuctionErrorCode.INVALID_STATE_TRANSITION.getMessage());
+        }
+
+        @Test
+        @DisplayName("실패 - 낙찰자와 최종 낙찰가 중 하나만 있으면 마감할 수 없다")
+        void fail_incomplete_winning_result() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            UUID winnerId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start();
+            AuctionCloseRequest request = new AuctionCloseRequest(winnerId, null);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when & then
+            assertThatThrownBy(() -> auctionService.closeAuctionManually(auctionId, request))
+                    .isInstanceOf(AuctionException.class)
+                    .hasMessage(AuctionErrorCode.INVALID_AUCTION_RESULT.getMessage());
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.PROGRESS);
+        }
+
+        @Test
+        @DisplayName("실패 - 최종 낙찰가가 시작가보다 낮으면 마감할 수 없다")
+        void fail_final_price_less_than_start_price() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            UUID winnerId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start();
+            AuctionCloseRequest request = new AuctionCloseRequest(winnerId, 9000);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when & then
+            assertThatThrownBy(() -> auctionService.closeAuctionManually(auctionId, request))
+                    .isInstanceOf(AuctionException.class)
+                    .hasMessage(AuctionErrorCode.INVALID_AUCTION_RESULT.getMessage());
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.PROGRESS);
         }
     }
 
