@@ -1,5 +1,7 @@
 package com.bankrupang.sanjijk.bid.infrastructure.scheduler;
 
+import com.bankrupang.sanjijk.bid.domain.event.AuctionEndedEvent;
+import com.bankrupang.sanjijk.bid.infrastructure.kafka.BidEventProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -10,6 +12,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Set;
 
 @Slf4j
@@ -20,6 +24,7 @@ public class AuctionEndScheduler {
     private final StringRedisTemplate redisTemplate;
     private final RedissonClient redissonClient;
     private final SimpMessagingTemplate messagingTemplate;
+    private final BidEventProducer bidEventProducer;
 
     @Scheduled(fixedDelay = 10000)
     public void checkAuctionEndings() {
@@ -44,7 +49,21 @@ public class AuctionEndScheduler {
                             "{\"type\":\"AUCTION_ENDED\"}"
                     );
 
-                    // TODO: AUCTION_ENDED Kafka 이벤트 발행
+                    // Kafka AUCTION_ENDED 이벤트 발행
+                    Map<Object, Object> info = redisTemplate.opsForHash()
+                            .entries("auction:" + auctionId + ":info");
+                    String highestBidderId = (String) info.get("highestBidderId");
+                    String currentPrice = (String) info.get("currentPrice");
+                    boolean hasBid = highestBidderId != null && !highestBidderId.isBlank() && !highestBidderId.equals("none");
+
+                    AuctionEndedEvent endedEvent = new AuctionEndedEvent(
+                            auctionId,
+                            hasBid,
+                            hasBid ? highestBidderId : null,
+                            hasBid ? Long.parseLong(currentPrice) : null,
+                            LocalDateTime.now()
+                    );
+                    bidEventProducer.sendAuctionEnded(endedEvent);
 
                     redisTemplate.opsForZSet().remove("auction:endings", auctionId);
 
