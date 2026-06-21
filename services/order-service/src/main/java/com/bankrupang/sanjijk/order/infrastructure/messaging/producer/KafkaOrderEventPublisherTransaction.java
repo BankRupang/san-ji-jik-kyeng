@@ -9,6 +9,8 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.concurrent.TimeUnit;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -27,7 +29,10 @@ public class KafkaOrderEventPublisherTransaction {
         try {
             Object payload = objectMapper.readValue(outbox.getPayload(), Object.class);
             String topic = resolveTopic(outbox.getEventType());
-            kafkaTemplate.send(topic, outbox.getAggregateId().toString(), payload);
+
+            //kafkaTemplate.send()가 비동기라 전송 실패해도 catch에 안 걸리는 문제
+            // -> 일단 동기 대기로 실제 전송 실패 시 catch에 걸리게
+            kafkaTemplate.send(topic, outbox.getAggregateId().toString(), payload).get(5, TimeUnit.SECONDS);
             outbox.markPublished();
             log.info("[OUTBOX] 이벤트 발행 완료 - outboxId: {}, eventType: {}, aggregateId: {}",
                     outbox.getId(), outbox.getEventType(), outbox.getAggregateId());

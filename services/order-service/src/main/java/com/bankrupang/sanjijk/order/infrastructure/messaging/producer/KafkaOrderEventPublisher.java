@@ -32,7 +32,11 @@ public class KafkaOrderEventPublisher {
         List<OrderOutbox> outboxList = orderOutboxJpaRepository
                 .findRetryableOutboxes(PageRequest.of(0, 100));
         for (OrderOutbox outbox : outboxList) {
-            kafkaOrderEventPublisherTransaction.relayOne(outbox);
+            try {
+                kafkaOrderEventPublisherTransaction.relayOne(outbox);
+            } catch (Exception e) {
+                log.error("[OUTBOX] relay 처리 중 오류 - outboxId: {}", outbox.getId(), e);
+            }
         }
     }
 }
