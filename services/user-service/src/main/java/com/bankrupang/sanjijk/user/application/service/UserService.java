@@ -6,12 +6,10 @@ import com.bankrupang.sanjijk.user.domain.entity.User;
 import com.bankrupang.sanjijk.user.domain.exception.*;
 import com.bankrupang.sanjijk.user.domain.repository.UserRepository;
 import com.bankrupang.sanjijk.user.infrastructure.keycloak.KeycloakService;
-import com.bankrupang.sanjijk.user.presentation.dto.response.KeycloakTokenResponse;
+import com.bankrupang.sanjijk.user.presentation.dto.response.*;
 import com.bankrupang.sanjijk.user.presentation.dto.request.UserAdminSignupRequest;
 import com.bankrupang.sanjijk.user.presentation.dto.request.UserLoginRequest;
 import com.bankrupang.sanjijk.user.presentation.dto.request.UserSignupRequest;
-import com.bankrupang.sanjijk.user.presentation.dto.response.UserLoginResponse;
-import com.bankrupang.sanjijk.user.presentation.dto.response.UserResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -161,5 +159,17 @@ public class UserService {
         } catch (Exception e) {
             log.error("Keycloak 롤백 실패. 수동 삭제 필요. keycloakId={}", keycloakId, e);
         }
+    }
+
+    // 알림 허용 여부 검증 [internal]
+    public UserNotifyResponse notificationAllow(UUID userId) {
+        User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
+        return UserNotifyResponse.from(user);
+    }
+
+    // 사용자 정보 조회 [internal]
+    public UserInfoResponse userInfo(UUID userId) {
+        User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
+        return UserInfoResponse.from(user);
     }
 }

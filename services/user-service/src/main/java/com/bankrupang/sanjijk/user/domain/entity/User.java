@@ -36,7 +36,7 @@ public class User extends BaseEntity {
     private String businessNumber;
 
     @Column(name = "slack_id", nullable = false)
-    private UUID slackId;
+    private String slackId;
 
     @Column(name = "notification_allow")
     private boolean notificationAllow;
@@ -50,7 +50,7 @@ public class User extends BaseEntity {
 
     @Builder(access = AccessLevel.PRIVATE)
     public User(UUID userId, String username, String name, String email, String phone,
-                String businessNumber, UUID slackId, boolean notificationAllow,
+                String businessNumber, String slackId, boolean notificationAllow,
                 UserRole role, UserStatus status) {
         if (userId != null) {
             this.assignId(userId);
@@ -67,7 +67,7 @@ public class User extends BaseEntity {
     }
 
     public static User create(UUID keycloakId, String username, String name, String email,
-                              String phone, String businessNumber, UUID slackId,
+                              String phone, String businessNumber, String slackId,
                               boolean notificationAllow, UserRole role) {
         return User.builder()
                 .userId(keycloakId)
