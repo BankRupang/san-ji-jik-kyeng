@@ -5,6 +5,7 @@ import com.bankrupang.sanjijk.payment.domian.entity.Payment;
 import com.bankrupang.sanjijk.payment.domian.entity.PaymentHistory;
 import com.bankrupang.sanjijk.payment.domian.enums.PaymentStatus;
 import com.bankrupang.sanjijk.payment.domian.enums.PaymentType;
+import com.bankrupang.sanjijk.payment.domian.exception.PaymentAmountMismatchException;
 import com.bankrupang.sanjijk.payment.domian.exception.PaymentNotFoundException;
 import com.bankrupang.sanjijk.payment.domian.repository.PaymentHistoryRepository;
 import com.bankrupang.sanjijk.payment.domian.repository.PaymentRepository;
@@ -12,6 +13,7 @@ import com.bankrupang.sanjijk.payment.infrastructure.external.dto.request.TossCo
 import com.bankrupang.sanjijk.payment.infrastructure.external.dto.response.TossPaymentResponse;
 import com.bankrupang.sanjijk.payment.infrastructure.messaging.producer.dto.PaymentCompletedEvent;
 import com.bankrupang.sanjijk.payment.infrastructure.messaging.producer.dto.PaymentFailedEvent;
+import com.bankrupang.sanjijk.payment.presentation.dto.request.PaymentConfirmRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -34,6 +36,28 @@ public class PaymentConfirmTransaction {
     private final PaymentHistoryRepository paymentHistoryRepository;
     private final PaymentEventPublisher paymentEventPublisher;
     private final RedisTemplate<String, String> redisTemplate;
+
+    // Payment 조회 + 금액 검증 + READY → IN_PROGRESS (프록시 통해 호출 - self-invocation 방지)
+    @Transactional
+    public UUID prepareConfirm(PaymentConfirmRequest request, UUID userId) {
+        Payment payment = paymentRepository.findByTossOrderId(request.tossOrderId())
+                .orElseThrow(PaymentNotFoundException::new);
+
+        if (payment.getAmount() != request.amount()) {
+            log.warn("[CONFIRM] 금액 불일치 - expected: {}, actual: {}", payment.getAmount(), request.amount());
+            throw new PaymentAmountMismatchException();
+        }
+
+        payment.inProgress();
+        paymentHistoryRepository.save(PaymentHistory.of(
+                payment.getId(), payment.getOrderId(), payment.getPaymentType(),
+                PaymentStatus.READY, PaymentStatus.IN_PROGRESS, "결제 승인 요청",
+                payment.getAmount(), null, null, userId
+        ));
+
+        log.info("[CONFIRM] READY → IN_PROGRESS - paymentId: {}", payment.getId());
+        return payment.getId();
+    }
 
     // Toss confirm API 호출 (트랜잭션 밖)
     public TossPaymentResponse callTossConfirm(String paymentKey, String tossOrderId, int amount) {
