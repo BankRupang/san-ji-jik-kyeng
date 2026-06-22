@@ -5,6 +5,7 @@ import com.bankrupang.sanjijk.payment.domian.entity.Payment;
 import com.bankrupang.sanjijk.payment.domian.entity.PaymentHistory;
 import com.bankrupang.sanjijk.payment.domian.enums.PaymentStatus;
 import com.bankrupang.sanjijk.payment.domian.enums.PaymentType;
+import com.bankrupang.sanjijk.payment.domian.exception.PaymentNotFoundException;
 import com.bankrupang.sanjijk.payment.domian.repository.PaymentHistoryRepository;
 import com.bankrupang.sanjijk.payment.domian.repository.PaymentRepository;
 import com.bankrupang.sanjijk.payment.infrastructure.external.dto.request.TossConfirmRequest;
@@ -15,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
@@ -41,10 +43,9 @@ public class PaymentConfirmTransaction {
 
     // 결제 성공 DB 업데이트 + Redis write (REPAY만) + Outbox 적재
     @Transactional
-    public void completeConfirm(UUID paymentId, TossPaymentResponse tossResponse,
-                                UUID auctionId, UUID userId, LocalDateTime endAt) {
+    public void completeConfirm(UUID paymentId, TossPaymentResponse tossResponse, UUID userId) {
         Payment payment = paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new RuntimeException("Payment not found"));
+                .orElseThrow(PaymentNotFoundException::new);
 
         TossPaymentResponse.Card card = tossResponse.card();
         payment.confirm(
@@ -64,13 +65,13 @@ public class PaymentConfirmTransaction {
                 payment.getAmount(), null, null, userId
         ));
 
-        // 보증금(REPAY)이면 Redis write
+        // 보증금(REPAY)이면 Redis write - endAt은 Payment에서 가져옴
         if (payment.getPaymentType() == PaymentType.REPAY) {
-            if (endAt == null) {
+            if (payment.getEndAt() == null) {
                 log.warn("[CONFIRM] 보증금 결제인데 endAt이 null - Redis 키 등록 생략 - paymentId: {}", paymentId);
             } else {
-                String redisKey = "auction:" + auctionId + ":deposit:" + userId;
-                long ttlSeconds = Duration.between(LocalDateTime.now(), endAt.plusHours(2)).getSeconds();
+                String redisKey = "auction:" + payment.getAuctionId() + ":deposit:" + payment.getUserId();
+                long ttlSeconds = Duration.between(LocalDateTime.now(), payment.getEndAt().plusHours(2)).getSeconds();
                 redisTemplate.opsForValue().set(redisKey, "true", Duration.ofSeconds(Math.max(ttlSeconds, 1)));
                 log.info("[CONFIRM] Redis 보증금 키 등록 - key: {}, ttl: {}s", redisKey, ttlSeconds);
             }
@@ -92,11 +93,11 @@ public class PaymentConfirmTransaction {
         log.info("[CONFIRM] 결제 승인 완료 - paymentId: {}, paymentType: {}", paymentId, payment.getPaymentType());
     }
 
-    // 결제 실패 DB 업데이트 + Outbox 적재
-    @Transactional
+    // 결제 실패 DB 업데이트 + Outbox 적재 (REQUIRES_NEW - 롤백 방지)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void failConfirm(UUID paymentId, UUID userId, String failureCode, String failureMessage) {
         Payment payment = paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new RuntimeException("Payment not found"));
+                .orElseThrow(PaymentNotFoundException::new);
 
         payment.fail(failureCode, failureMessage);
 

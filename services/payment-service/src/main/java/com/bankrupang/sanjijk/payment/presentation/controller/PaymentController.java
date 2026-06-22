@@ -3,13 +3,12 @@ package com.bankrupang.sanjijk.payment.presentation.controller;
 import com.bankrupang.sanjijk.payment.application.service.PaymentService;
 import com.bankrupang.sanjijk.payment.presentation.dto.request.PaymentConfirmRequest;
 import com.bankrupang.sanjijk.payment.presentation.dto.response.PaymentResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Slf4j
@@ -23,12 +22,11 @@ public class PaymentController {
     // 결제 승인 (보증금 / 낙찰 잔금 공통)
     @PostMapping("/confirm")
     public ResponseEntity<PaymentResponse> confirmPayment(
-            @RequestBody PaymentConfirmRequest request,
-            @RequestHeader("X-User-Id") UUID userId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endAt
+            @RequestBody @Valid PaymentConfirmRequest request,
+            @RequestHeader("X-User-Id") UUID userId
     ) {
         log.info("[API] POST /confirm - userId: {}, tossOrderId: {}", userId, request.tossOrderId());
-        return ResponseEntity.ok(paymentService.confirmPayment(request, userId, endAt));
+        return ResponseEntity.ok(paymentService.confirmPayment(request, userId));
     }
 
     // 단건 조회

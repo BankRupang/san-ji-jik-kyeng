@@ -50,6 +50,10 @@ public class Payment extends BaseEntity {
     @Column(name = "original_amount")
     private Integer originalAmount;
 
+    // 보증금(REPAY)일 때만 사용 - Redis TTL 계산용 (endAt + 2시간)
+    @Column(name = "end_at")
+    private LocalDateTime endAt;
+
     @Column(name = "card_issuer_code", length = 2)
     private String cardIssuerCode;
 
@@ -99,7 +103,8 @@ public class Payment extends BaseEntity {
             String tossOrderId,
             PaymentType paymentType,
             int amount,
-            Integer originalAmount
+            Integer originalAmount,
+            LocalDateTime endAt
     ) {
         Payment payment = new Payment();
         payment.orderId = orderId;
@@ -108,11 +113,12 @@ public class Payment extends BaseEntity {
         payment.auctionId = auctionId;
         payment.auctionTitle = auctionTitle;
         payment.tossOrderId = tossOrderId;
-        payment.paymentKey = null;       // 토스 confirm 응답 전 빈 문자열
+        payment.paymentKey = null;
         payment.paymentType = paymentType;
         payment.status = PaymentStatus.READY;
         payment.amount = amount;
         payment.originalAmount = originalAmount;
+        payment.endAt = endAt;  // REPAY만 값 있음, NORMAL은 null
         payment.installmentMonths = 0;
         payment.requestedAt = LocalDateTime.now();
         return payment;

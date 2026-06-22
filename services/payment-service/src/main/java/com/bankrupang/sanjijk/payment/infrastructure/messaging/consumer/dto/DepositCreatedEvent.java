@@ -8,7 +8,7 @@ public record DepositCreatedEvent(
         UUID userId,
         UUID auctionId,
         String auctionTitle,
-        int depositAmount,   // → Payment.amount
+        int depositAmount,
+        LocalDateTime endAt,       // 경매 종료 시각 - Redis TTL 계산용 (endAt + 2시간)
         LocalDateTime occurredAt
-) {
-}
+) {}
