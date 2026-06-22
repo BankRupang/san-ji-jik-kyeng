@@ -14,7 +14,6 @@ dependencies {
     implementation 'org.apache.tika:tika-core:2.9.1'
     implementation 'org.apache.tika:tika-parsers-standard-package:2.9.1'
 
-    // OTLP Tracing (Langfuse 연동)
+    // Tracing (Langfuse 연동 - LangfuseSpanExporter로 직접 전송)
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
-    implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
 }

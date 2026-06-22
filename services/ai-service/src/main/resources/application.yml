@@ -33,6 +33,7 @@ spring:
       chat:
         options:
           model: gemini-2.5-flash
+          reasoning-effort: low
       embedding:
         options:
           model: gemini-embedding-2
@@ -46,8 +47,8 @@ spring:
         schema-name: ai_schema
     chat:
       observations:
-        include-prompt: true
-        include-completion: true
+        include-prompt: false
+        include-completion: false
     embedding:
       observations:
         include-input: false
@@ -60,6 +61,7 @@ eureka:
 ai:
   chat:
     session-expire-hours: 24
+    max-history: 10
     similarity-threshold: 0.7
     top-k: 3
   document:
@@ -67,12 +69,11 @@ ai:
     chunk-overlap: 50
     tika-max-string-length: 500000
 
+langfuse:
+  host: ${LANGFUSE_HOST:http://localhost:3001}
+  auth-header: ${LANGFUSE_AUTH_HEADER:}
+
 management:
-  otlp:
-    tracing:
-      endpoint: ${LANGFUSE_OTLP_ENDPOINT:http://langfuse:3000/api/public/otel/v1/traces}
-      headers:
-        Authorization: "Basic ${LANGFUSE_AUTH_HEADER:}"
   tracing:
     sampling:
       probability: 1.0
