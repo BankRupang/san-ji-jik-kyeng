@@ -1,8 +1,10 @@
 package com.bankrupang.sanjijk.payment.infrastructure.messaging.handler;
 
 import com.bankrupang.sanjijk.payment.application.port.PaymentEventPublisher;
+import com.bankrupang.sanjijk.payment.application.service.PaymentService;
 import com.bankrupang.sanjijk.payment.domian.entity.Payment;
 import com.bankrupang.sanjijk.payment.domian.entity.PaymentOutbox;
+import com.bankrupang.sanjijk.payment.domian.enums.PaymentStatus;
 import com.bankrupang.sanjijk.payment.domian.exception.PaymentNotFoundException;
 import com.bankrupang.sanjijk.payment.domian.repository.PaymentRepository;
 import com.bankrupang.sanjijk.payment.infrastructure.external.TossPaymentsClient;
@@ -26,12 +28,12 @@ public class RefundRequestHandler {
     private final PaymentRepository paymentRepository;
     private final TossPaymentsClient tossPaymentsClient;
     private final PaymentEventPublisher paymentEventPublisher;
+    private final PaymentService paymentService;
     private final ObjectMapper objectMapper;
 
     @Transactional
     public void handle(PaymentOutbox outbox) {
         try {
-            // payload 파싱
             Map<String, Object> payload = objectMapper.readValue(outbox.getPayload(), Map.class);
             UUID paymentId = UUID.fromString((String) payload.get("paymentId"));
             int cancelAmount = (int) payload.get("cancelAmount");
@@ -52,6 +54,9 @@ public class RefundRequestHandler {
 
             // Payment 상태 CANCELED로 전이
             payment.refund(cancelAmount, cancelReason);
+
+            // 히스토리 적재 (DONE → CANCELED)
+            paymentService.saveHistory(payment, PaymentStatus.DONE, PaymentStatus.CANCELED, cancelReason);
 
             // REFUND_COMPLETED 이벤트 Outbox 적재
             paymentEventPublisher.publishRefundCompleted(new RefundCompletedEvent(

@@ -2,8 +2,10 @@ package com.bankrupang.sanjijk.payment.application.service;
 
 import com.bankrupang.sanjijk.payment.application.port.PaymentEventPublisher;
 import com.bankrupang.sanjijk.payment.domian.entity.Payment;
+import com.bankrupang.sanjijk.payment.domian.entity.PaymentHistory;
 import com.bankrupang.sanjijk.payment.domian.enums.PaymentStatus;
 import com.bankrupang.sanjijk.payment.domian.enums.PaymentType;
+import com.bankrupang.sanjijk.payment.domian.repository.PaymentHistoryRepository;
 import com.bankrupang.sanjijk.payment.domian.repository.PaymentRepository;
 import com.bankrupang.sanjijk.payment.infrastructure.messaging.consumer.dto.AuctionFailedEvent;
 import com.bankrupang.sanjijk.payment.infrastructure.messaging.consumer.dto.DepositCreatedEvent;
@@ -23,6 +25,7 @@ import java.util.UUID;
 public class PaymentService {
 
     private final PaymentRepository paymentRepository;
+    private final PaymentHistoryRepository paymentHistoryRepository;
     private final PaymentEventPublisher paymentEventPublisher;
 
     // ================================
@@ -44,15 +47,28 @@ public class PaymentService {
             Payment payment = Payment.create(
                     event.orderId(),
                     event.userId(),
-                    null,                        // 보증금은 sellerId 없음
+                    null,
                     event.auctionId(),
                     event.auctionTitle(),
-                    event.orderId().toString(),  // tossOrderId = orderId
+                    event.orderId().toString(),
                     PaymentType.REPAY,
                     event.depositAmount(),
                     null
             );
             paymentRepository.save(payment);
+
+            // 히스토리 적재 (최초 생성 → READY)
+            paymentHistoryRepository.save(PaymentHistory.of(
+                    payment.getId(),
+                    payment.getOrderId(),
+                    payment.getPaymentType(),
+                    null,
+                    PaymentStatus.READY,
+                    "보증금 Payment 생성",
+                    payment.getAmount(),
+                    null,
+                    null
+            ));
 
             log.info("[PAYMENT] 보증금 Payment 생성 완료 - paymentId: {}, orderId: {}, amount: {}",
                     payment.getId(), event.orderId(), event.depositAmount());
@@ -84,12 +100,25 @@ public class PaymentService {
                     event.sellerId(),
                     event.auctionId(),
                     event.auctionTitle(),
-                    event.orderId().toString(),  // tossOrderId = orderId
+                    event.orderId().toString(),
                     PaymentType.NORMAL,
                     event.remainingAmount(),
                     event.finalPrice()
             );
             paymentRepository.save(payment);
+
+            // 히스토리 적재 (최초 생성 → READY)
+            paymentHistoryRepository.save(PaymentHistory.of(
+                    payment.getId(),
+                    payment.getOrderId(),
+                    payment.getPaymentType(),
+                    null,
+                    PaymentStatus.READY,
+                    "낙찰 잔금 Payment 생성",
+                    payment.getAmount(),
+                    null,
+                    null
+            ));
 
             log.info("[PAYMENT] 낙찰 잔금 Payment 생성 완료 - paymentId: {}, orderId: {}, remainingAmount: {}",
                     payment.getId(), event.orderId(), event.remainingAmount());
@@ -151,6 +180,24 @@ public class PaymentService {
         } finally {
             MDC.clear();
         }
+    }
+
+    // ================================
+    // 히스토리 적재 헬퍼
+    // ================================
+
+    public void saveHistory(Payment payment, PaymentStatus prevStatus, PaymentStatus nextStatus, String reason) {
+        paymentHistoryRepository.save(PaymentHistory.of(
+                payment.getId(),
+                payment.getOrderId(),
+                payment.getPaymentType(),
+                prevStatus,
+                nextStatus,
+                reason,
+                payment.getAmount(),
+                payment.getFailureCode(),
+                payment.getFailureMessage()
+        ));
     }
 
     // ================================
