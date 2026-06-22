@@ -4,6 +4,8 @@ import com.bankrupang.sanjijk.order.domain.entity.Order;
 import com.bankrupang.sanjijk.order.domain.enums.OrderStatus;
 import com.bankrupang.sanjijk.order.domain.enums.OrderType;
 import com.bankrupang.sanjijk.order.domain.repository.OrderRepository;
+import com.bankrupang.sanjijk.order.infrastructure.outbox.OrderOutboxJpaRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -27,6 +29,12 @@ class OrderSchedulerTest {
 
     @Mock
     private OrderRepository orderRepository;
+
+    @Mock
+    private OrderOutboxJpaRepository orderOutboxJpaRepository;
+
+    @Mock
+    private ObjectMapper objectMapper;
 
     @Nested
     @DisplayName("expireUnpaidOne()")

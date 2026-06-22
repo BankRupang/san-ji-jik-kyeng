@@ -16,6 +16,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
@@ -66,7 +67,7 @@ class OrderEventServiceTest {
             given(objectMapper.writeValueAsString(any())).willReturn("{\"orderId\":\"test\"}");
 
             // when
-            orderEventService.publishDepositCreated(depositOrder);
+            orderEventService.publishDepositCreated(depositOrder, LocalDateTime.now().plusDays(1));
 
             // then
             ArgumentCaptor<OrderOutbox> captor = ArgumentCaptor.forClass(OrderOutbox.class);
@@ -86,7 +87,7 @@ class OrderEventServiceTest {
                     .willThrow(new JsonProcessingException("직렬화 실패"){});
 
             // when + then
-            assertThatThrownBy(() -> orderEventService.publishDepositCreated(depositOrder))
+            assertThatThrownBy(() -> orderEventService.publishDepositCreated(depositOrder, LocalDateTime.now().plusDays(1)))
                     .isInstanceOf(OrderEventPublishFailedException.class);
 
             verify(orderOutboxJpaRepository, never()).save(any());
