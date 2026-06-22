@@ -29,8 +29,10 @@ public class BidEventProducer {
         log.info("auction-extended 발행 - auctionId: {}, newEndAt: {}", event.getAuctionId(), event.getNewEndAt());
     }
 
-    public void sendAuctionEnded(AuctionEndedEvent event) {
-        kafkaTemplate.send(AUCTION_ENDED_TOPIC, event.getAuctionId(), event);
+    public void sendAuctionEnded(AuctionEndedEvent event) throws Exception {
+        kafkaTemplate.send(AUCTION_ENDED_TOPIC, event.getAuctionId(), event)
+                .get(3, java.util.concurrent.TimeUnit.SECONDS);
         log.info("auction-ended 발행 - auctionId: {}, winnerId: {}", event.getAuctionId(), event.getWinnerId());
     }
+
 }
