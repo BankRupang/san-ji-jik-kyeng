@@ -1,5 +1,6 @@
 package com.bankrupang.sanjijk.auction.outbox.infrastructure.messaging;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -25,8 +26,11 @@ public class AuctionOutboxRelayTransactionService {
     }
 
     @Transactional
-    public void markPublished(UUID outboxId) {
-        auctionOutboxRepository.findById(outboxId)
-                .ifPresent(AuctionOutbox::markPublished);
+    public void markPublished(List<UUID> outboxIds) {
+        if (outboxIds.isEmpty()) {
+            return;
+        }
+
+        auctionOutboxRepository.markAllAsPublished(outboxIds, LocalDateTime.now());
     }
 }

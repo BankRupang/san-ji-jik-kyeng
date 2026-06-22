@@ -51,6 +51,7 @@ class AuctionOutboxRelayTest {
         void success() {
             // given
             int batchSize = 50;
+            UUID outboxId = UUID.randomUUID();
             UUID auctionId = UUID.randomUUID();
             String payload = "{\"auctionId\":\"" + auctionId + "\"}";
             AuctionOutbox outbox = AuctionOutbox.create(
@@ -58,6 +59,7 @@ class AuctionOutboxRelayTest {
                     AuctionEventType.AUCTION_START,
                     payload
             );
+            ReflectionTestUtils.setField(outbox, "id", outboxId);
 
             ReflectionTestUtils.setField(auctionOutboxRelay, "batchSize", batchSize);
             given(auctionOutboxRelayTransactionService.findPendingEvents(batchSize))
@@ -76,7 +78,7 @@ class AuctionOutboxRelayTest {
             verify(auctionOutboxRelayTransactionService).findPendingEvents(batchSize);
             verify(auctionEventTopicResolver).resolve(AuctionEventType.AUCTION_START);
             verify(kafkaTemplate).send("auction-start", auctionId.toString(), payload);
-            verify(auctionOutboxRelayTransactionService).markPublished(outbox.getId());
+            verify(auctionOutboxRelayTransactionService).markPublished(List.of(outboxId));
         }
 
         @Test
@@ -106,7 +108,7 @@ class AuctionOutboxRelayTest {
             assertThat(outbox.isPublished()).isFalse();
             assertThat(outbox.getPublishedAt()).isNull();
             verify(kafkaTemplate).send("auction-events", auctionId.toString(), payload);
-            verify(auctionOutboxRelayTransactionService, never()).markPublished(any(UUID.class));
+            verify(auctionOutboxRelayTransactionService, never()).markPublished(any());
         }
     }
 }
