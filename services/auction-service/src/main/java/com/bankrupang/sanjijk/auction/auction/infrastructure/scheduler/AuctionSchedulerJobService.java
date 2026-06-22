@@ -72,6 +72,7 @@ public class AuctionSchedulerJobService {
             return;
         }
 
+        // TODO: AUCTION_ENDED 이벤트 수신 로직 구현 후 스케줄러 마감 확인 잡의 역할을 재검토한다.
         log.info("스케줄러 마감 확인 완료 - bid-service의 AUCTION_ENDED 이벤트를 대기합니다. auctionId: {}",
                 auction.getId());
     }
