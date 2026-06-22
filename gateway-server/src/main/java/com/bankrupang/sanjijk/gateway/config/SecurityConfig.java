@@ -30,8 +30,7 @@ public class SecurityConfig {
         config.setAllowedOrigins(List.of(
                 "http://localhost:63342",
                 "http://localhost:3000",
-                "http://localhost:8080",
-                "null"  // file:// 프로토콜 (브라우저가 Origin: null 전송)
+                "http://localhost:8080"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
