@@ -42,6 +42,17 @@ services:
     ports: ["3000:3000"]
     depends_on: [prometheus, loki]
 
+  # LLM 트레이싱 (Langfuse v2 self-hosted)
+  langfuse:
+    image: ghcr.io/langfuse/langfuse:2
+    restart: unless-stopped
+    ports: ["3001:3000"]
+    environment:
+      DATABASE_URL: ${LANGFUSE_DATABASE_URL}
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET}
+      NEXTAUTH_URL: ${LANGFUSE_URL}
+      SALT: ${LANGFUSE_SALT}
+
   # Kafka EC2 브로커 상태 확인용 UI
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
