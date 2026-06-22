@@ -26,11 +26,12 @@ public class AuctionSchedulerConfig {
 
     @Bean
     public LockProvider lockProvider(DataSource dataSource) {
-        return new JdbcTemplateLockProvider(
+        LockProvider lockProvider = new JdbcTemplateLockProvider(
                 JdbcTemplateLockProvider.Configuration.builder()
                         .withJdbcTemplate(new JdbcTemplate(dataSource))
                         .usingDbTime()
                         .build()
         );
+        return new LoggingShedLockProvider(lockProvider);
     }
 }

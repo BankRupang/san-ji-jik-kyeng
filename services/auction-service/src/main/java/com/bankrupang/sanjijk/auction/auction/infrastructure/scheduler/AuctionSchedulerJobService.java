@@ -33,7 +33,7 @@ public class AuctionSchedulerJobService {
     @SchedulerLock(name = "'auction-start-' + #auctionId", lockAtMostFor = "10m", lockAtLeastFor = "1s")
     public void startAuction(UUID auctionId) {
         AuctionLogContext.runWithAuctionId(auctionId, () -> {
-            log.info("ShedLock 획득 - jobType: AUCTION_START, auctionId: {}", auctionId);
+            log.info("경매 스케줄러 잡 실행 - jobType: AUCTION_START, auctionId: {}", auctionId);
             auctionRepository.findByIdAndDeletedAtIsNull(auctionId)
                     .ifPresentOrElse(this::startAuctionIfReady, () ->
                             log.warn("스케줄러 시작 대상 경매를 찾을 수 없습니다. auctionId: {}", auctionId));
@@ -70,7 +70,7 @@ public class AuctionSchedulerJobService {
     @SchedulerLock(name = "'auction-end-check-' + #auctionId", lockAtMostFor = "10m", lockAtLeastFor = "1s")
     public void checkAuctionEnd(UUID auctionId) {
         AuctionLogContext.runWithAuctionId(auctionId, () -> {
-            log.info("ShedLock 획득 - jobType: AUCTION_END_CHECK, auctionId: {}", auctionId);
+            log.info("경매 스케줄러 잡 실행 - jobType: AUCTION_END_CHECK, auctionId: {}", auctionId);
             auctionRepository.findByIdAndDeletedAtIsNull(auctionId)
                     .ifPresentOrElse(this::checkAuctionEndIfProgress, () ->
                             log.warn("스케줄러 마감 확인 대상 경매를 찾을 수 없습니다. auctionId: {}", auctionId));
