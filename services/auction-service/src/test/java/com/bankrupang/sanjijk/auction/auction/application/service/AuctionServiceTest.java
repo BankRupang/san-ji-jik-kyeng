@@ -854,6 +854,105 @@ class AuctionServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("extendAuctionByExtendedEvent()")
+    class ExtendAuctionByExtendedEvent {
+
+        @Test
+        @DisplayName("성공 - 진행 중인 경매의 종료 시각을 갱신하고 마감 확인 잡을 재등록한다")
+        void success() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start();
+            LocalDateTime newEndAt = auction.getEndAt().plusMinutes(5);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            executeAfterCommitImmediately();
+
+            // when
+            auctionService.extendAuctionByExtendedEvent(auctionId, newEndAt);
+
+            // then
+            assertThat(auction.getEndAt()).isEqualTo(newEndAt);
+            assertThat(auction.getExtensionCount()).isEqualTo(1);
+            verify(transactionAfterCommitExecutor).execute(any(Runnable.class));
+            verify(auctionScheduleManager).scheduleEndCheckJob(any(UUID.class), any(LocalDateTime.class), any(Runnable.class));
+        }
+
+        @Test
+        @DisplayName("성공 - 이미 종료된 경매의 연장 이벤트는 무시한다")
+        void success_ignore_already_closed() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            UUID winnerId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start();
+            auction.markResultPending();
+            auction.markWon(winnerId, 15000);
+            LocalDateTime originalEndAt = auction.getEndAt();
+            LocalDateTime newEndAt = originalEndAt.plusMinutes(5);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when
+            auctionService.extendAuctionByExtendedEvent(auctionId, newEndAt);
+
+            // then
+            assertThat(auction.getEndAt()).isEqualTo(originalEndAt);
+            assertThat(auction.getExtensionCount()).isZero();
+            verify(transactionAfterCommitExecutor, never()).execute(any(Runnable.class));
+            verify(auctionScheduleManager, never()).scheduleEndCheckJob(any(UUID.class), any(LocalDateTime.class), any(Runnable.class));
+        }
+
+        @Test
+        @DisplayName("성공 - 기존 종료 시각 이후가 아닌 연장 이벤트는 무시한다")
+        void success_ignore_stale_event() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start();
+            LocalDateTime originalEndAt = auction.getEndAt();
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when
+            auctionService.extendAuctionByExtendedEvent(auctionId, originalEndAt);
+
+            // then
+            assertThat(auction.getEndAt()).isEqualTo(originalEndAt);
+            assertThat(auction.getExtensionCount()).isZero();
+            verify(transactionAfterCommitExecutor, never()).execute(any(Runnable.class));
+            verify(auctionScheduleManager, never()).scheduleEndCheckJob(any(UUID.class), any(LocalDateTime.class), any(Runnable.class));
+        }
+
+        @Test
+        @DisplayName("실패 - 새 종료 시각이 없으면 예외가 발생한다")
+        void fail_null_new_end_at() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start();
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when & then
+            assertThatThrownBy(() -> auctionService.extendAuctionByExtendedEvent(auctionId, null))
+                    .isInstanceOf(AuctionException.class)
+                    .hasMessage(AuctionErrorCode.INVALID_AUCTION_PERIOD.getMessage());
+            verify(transactionAfterCommitExecutor, never()).execute(any(Runnable.class));
+            verify(auctionScheduleManager, never()).scheduleEndCheckJob(any(UUID.class), any(LocalDateTime.class), any(Runnable.class));
+        }
+    }
+
     private AuctionCreateRequest createRequest(UUID productId, LocalDateTime startAt) {
         return new AuctionCreateRequest(
                 productId,

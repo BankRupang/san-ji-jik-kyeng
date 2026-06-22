@@ -48,7 +48,7 @@ public class AuctionExternalEventConsumer {
         log.info("[KAFKA][CONSUME] AUCTION_EXTENDED 수신 - auctionId: {}, newEndAt: {}",
                 event.auctionId(), event.newEndAt());
 
-        // TODO: AUCTION_EXTENDED 수신 시 endAt 갱신 및 마감 확인 잡 재조정을 처리한다.
+        auctionService.extendAuctionByExtendedEvent(event.auctionId(), event.newEndAt());
     }
 
     @KafkaListener(topics = "payment-completed", groupId = AUCTION_SERVICE_GROUP_ID)
