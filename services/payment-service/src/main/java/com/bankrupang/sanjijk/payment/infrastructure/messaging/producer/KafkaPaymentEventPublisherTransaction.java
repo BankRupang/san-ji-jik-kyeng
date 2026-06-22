@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class KafkaPaymentEventPublisherTransaction {
 
-    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final KafkaTemplate<String, String> kafkaTemplate;
     private final PaymentOutboxJpaRepository paymentOutboxJpaRepository;
     private final ObjectMapper objectMapper;
 
@@ -29,12 +29,12 @@ public class KafkaPaymentEventPublisherTransaction {
     @Transactional
     public void relayOne(PaymentOutbox outbox) {
         try {
-            Object payload = objectMapper.readValue(outbox.getPayload(), Object.class);
             String topic = resolveTopic(outbox.getEventType());
 
             // kafkaTemplate.send()는 비동기 → .get()으로 동기 대기
+            // TODO: 다중 인스턴스 환경에서 비동기 콜백 방식으로 리팩토링 필요
             // 실제 전송 실패 시 catch에 걸리게 함
-            kafkaTemplate.send(topic, outbox.getAggregateId().toString(), payload)
+            kafkaTemplate.send(topic, outbox.getAggregateId().toString(), outbox.getPayload())
                     .get(5, TimeUnit.SECONDS);
 
             outbox.markPublished();

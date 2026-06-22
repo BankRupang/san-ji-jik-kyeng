@@ -66,6 +66,7 @@ public class TossPaymentsRestClient implements TossPaymentsClient{
         try{
             return objectMapper.readValue(res.getBody(), TossErrorResponse.class);
         } catch (Exception e){
+            log.error("[TossPayments] 에러 응답 파싱 실패", e);
             return new TossErrorResponse("UNKNOWN", "TossPayments 오류 응답 파싱 실패");
         }
     }
