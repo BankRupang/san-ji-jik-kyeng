@@ -5,17 +5,20 @@ import com.bankrupang.sanjijk.payment.domian.entity.Payment;
 import com.bankrupang.sanjijk.payment.domian.entity.PaymentHistory;
 import com.bankrupang.sanjijk.payment.domian.enums.PaymentStatus;
 import com.bankrupang.sanjijk.payment.domian.enums.PaymentType;
+import com.bankrupang.sanjijk.payment.domian.exception.PaymentNotFoundException;
 import com.bankrupang.sanjijk.payment.domian.repository.PaymentHistoryRepository;
 import com.bankrupang.sanjijk.payment.domian.repository.PaymentRepository;
 import com.bankrupang.sanjijk.payment.infrastructure.messaging.consumer.dto.AuctionFailedEvent;
 import com.bankrupang.sanjijk.payment.infrastructure.messaging.consumer.dto.DepositCreatedEvent;
 import com.bankrupang.sanjijk.payment.infrastructure.messaging.consumer.dto.WinningCreatedEvent;
+import com.bankrupang.sanjijk.payment.infrastructure.messaging.producer.dto.RefundCompletedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -38,7 +41,6 @@ public class PaymentService {
         log.info("[PAYMENT] 보증금 Payment 생성 시작 - orderId: {}, userId: {}, auctionId: {}",
                 event.orderId(), event.userId(), event.auctionId());
         try {
-            // 멱등성 체크
             if (paymentRepository.findByTossOrderId(event.orderId().toString()).isPresent()) {
                 log.warn("[PAYMENT] 이미 처리된 보증금 Payment - orderId: {}", event.orderId());
                 return;
@@ -57,7 +59,6 @@ public class PaymentService {
             );
             paymentRepository.save(payment);
 
-            // 히스토리 적재 (최초 생성 → READY)
             paymentHistoryRepository.save(PaymentHistory.of(
                     payment.getId(),
                     payment.getOrderId(),
@@ -67,7 +68,8 @@ public class PaymentService {
                     "보증금 Payment 생성",
                     payment.getAmount(),
                     null,
-                    null
+                    null,
+                    null   // createdBy — Kafka 컨텍스트
             ));
 
             log.info("[PAYMENT] 보증금 Payment 생성 완료 - paymentId: {}, orderId: {}, amount: {}",
@@ -87,13 +89,11 @@ public class PaymentService {
         log.info("[PAYMENT] 낙찰 잔금 Payment 생성 시작 - orderId: {}, userId: {}, auctionId: {}",
                 event.orderId(), event.userId(), event.auctionId());
         try {
-            // 멱등성 체크
             if (paymentRepository.findByTossOrderId(event.orderId().toString()).isPresent()) {
                 log.warn("[PAYMENT] 이미 처리된 낙찰 Payment - orderId: {}", event.orderId());
                 return;
             }
 
-            // 낙찰자 잔금 Payment 생성 (NORMAL)
             Payment payment = Payment.create(
                     event.orderId(),
                     event.userId(),
@@ -107,7 +107,6 @@ public class PaymentService {
             );
             paymentRepository.save(payment);
 
-            // 히스토리 적재 (최초 생성 → READY)
             paymentHistoryRepository.save(PaymentHistory.of(
                     payment.getId(),
                     payment.getOrderId(),
@@ -117,13 +116,13 @@ public class PaymentService {
                     "낙찰 잔금 Payment 생성",
                     payment.getAmount(),
                     null,
-                    null
+                    null,
+                    null   // createdBy — Kafka 컨텍스트
             ));
 
             log.info("[PAYMENT] 낙찰 잔금 Payment 생성 완료 - paymentId: {}, orderId: {}, remainingAmount: {}",
                     payment.getId(), event.orderId(), event.remainingAmount());
 
-            // 낙찰 실패자 보증금 환불 요청 (REFUND_REQUEST Outbox 적재)
             List<Payment> loserPayments = paymentRepository
                     .findByAuctionIdAndPaymentTypeAndStatusAndUserIdNot(
                             event.auctionId(),
@@ -183,6 +182,28 @@ public class PaymentService {
     }
 
     // ================================
+    // Toss cancel 완료 후 DB 업데이트 (RefundRequestHandler에서 호출)
+    // ================================
+
+    @Transactional
+    public void completeRefund(UUID paymentId, int cancelAmount, String cancelReason) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(PaymentNotFoundException::new);
+        payment.refund(cancelAmount, cancelReason);
+        saveHistory(payment, PaymentStatus.DONE, PaymentStatus.CANCELED, cancelReason);
+        paymentEventPublisher.publishRefundCompleted(new RefundCompletedEvent(
+                payment.getId(),
+                payment.getOrderId(),
+                payment.getUserId(),
+                payment.getAuctionId(),
+                payment.getAuctionTitle(),
+                cancelAmount,
+                cancelReason,
+                LocalDateTime.now()
+        ));
+    }
+
+    // ================================
     // 히스토리 적재 헬퍼
     // ================================
 
@@ -196,7 +217,8 @@ public class PaymentService {
                 reason,
                 payment.getAmount(),
                 payment.getFailureCode(),
-                payment.getFailureMessage()
+                payment.getFailureMessage(),
+                null   // createdBy — Kafka/Scheduler 컨텍스트
         ));
     }
 

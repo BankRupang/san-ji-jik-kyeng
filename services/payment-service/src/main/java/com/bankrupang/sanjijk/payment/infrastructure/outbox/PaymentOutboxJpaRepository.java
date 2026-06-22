@@ -21,20 +21,14 @@ public interface PaymentOutboxJpaRepository extends JpaRepository<PaymentOutbox,
             """)
     List<PaymentOutbox> findRetryableOutboxes(Pageable pageable, @Param("maxRetryCount") int maxRetryCount);
 
-    // 선점: PENDING → IN_PROGRESS (다중 인스턴스 중복 발행 방지)
+    // 선점: PENDING / FAILED → IN_PROGRESS (다중 인스턴스 중복 발행 방지)
     @Modifying
     @Query("""
             UPDATE PaymentOutbox o
             SET o.status = 'IN_PROGRESS'
-            WHERE o.id IN :ids AND o.status = 'PENDING'
+            WHERE o.id IN :ids AND o.status IN ('PENDING', 'FAILED')
             """)
     int markInProgress(@Param("ids") List<UUID> ids);
 
-    // IN_PROGRESS 상태인 것도 재시도 대상에서 제외되므로 별도 조회
-    @Query("""
-            SELECT o FROM PaymentOutbox o
-            WHERE o.status = 'FAILED' AND o.retryCount < :maxRetryCount
-            ORDER BY o.createdAt ASC
-            """)
-    List<PaymentOutbox> findRetryableFailedOutboxes(Pageable pageable, @Param("maxRetryCount") int maxRetryCount);
+    List<PaymentOutbox> findByIdInAndStatus(List<UUID> ids, OutboxStatus status);
 }

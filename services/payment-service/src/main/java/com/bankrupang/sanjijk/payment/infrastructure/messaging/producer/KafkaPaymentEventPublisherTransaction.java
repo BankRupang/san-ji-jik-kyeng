@@ -7,8 +7,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -25,6 +28,21 @@ public class KafkaPaymentEventPublisherTransaction {
     private static final String REFUND_COMPLETED_TOPIC = "refund-completed";
     private static final String DEPOSIT_FORFEITED_TOPIC = "deposit-forfeited";
 
+    // PENDING/FAILED → IN_PROGRESS 선점 (즉시 커밋 - 다중 인스턴스 중복 방지)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int claimBatch(List<UUID> ids) {
+        return paymentOutboxJpaRepository.markInProgress(ids);
+    }
+
+    // 처리 실패 시 FAILED로 전이 (즉시 커밋 - IN_PROGRESS 고착 방지)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markOneFailed(UUID outboxId) {
+        paymentOutboxJpaRepository.findById(outboxId).ifPresent(o -> {
+            o.markFailed();
+            paymentOutboxJpaRepository.save(o);
+        });
+    }
+
     @Transactional
     public void relayOne(PaymentOutbox outbox) {
         try {
@@ -39,7 +57,6 @@ public class KafkaPaymentEventPublisherTransaction {
 
         } catch (Exception e) {
             outbox.markFailed();
-
             if (outbox.isRetryable()) {
                 log.warn("[OUTBOX] 이벤트 발행 실패, 재시도 예정 - outboxId: {}, retryCount: {}",
                         outbox.getId(), outbox.getRetryCount());
@@ -48,7 +65,6 @@ public class KafkaPaymentEventPublisherTransaction {
                         outbox.getId(), outbox.getEventType(), outbox.getAggregateId());
             }
         }
-
         paymentOutboxJpaRepository.save(outbox);
     }
 
