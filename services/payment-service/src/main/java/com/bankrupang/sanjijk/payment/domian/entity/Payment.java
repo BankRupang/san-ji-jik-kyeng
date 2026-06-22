@@ -161,6 +161,7 @@ public class Payment extends BaseEntity {
         this.cancelAmount = cancelAmount;
         this.cancelReason = cancelReason;
         this.canceledAt = LocalDateTime.now();
+        this.status = PaymentStatus.CANCELED;
     }
 
     public void inProgress() {
