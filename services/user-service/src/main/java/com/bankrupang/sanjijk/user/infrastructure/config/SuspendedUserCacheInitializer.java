@@ -17,8 +17,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SuspendedUserCacheInitializer implements ApplicationRunner {
 
-    private static final String SUSPENDED_USERS_KEY = "suspended:users";
-
     private final UserRepository userRepository;
     private final StringRedisTemplate redisTemplate;
 
@@ -35,7 +33,7 @@ public class SuspendedUserCacheInitializer implements ApplicationRunner {
                 .map(user -> user.getId().toString())
                 .toArray(String[]::new);
 
-        redisTemplate.opsForSet().add(SUSPENDED_USERS_KEY, userIds);
+        redisTemplate.opsForSet().add(RedisKeys.SUSPENDED_USERS, userIds);
         log.info("[Redis] 정지 유저 {}명 캐시 동기화 완료", suspendedUsers.size());
     }
 }

@@ -8,6 +8,7 @@ import com.bankrupang.sanjijk.user.domain.entity.User;
 import com.bankrupang.sanjijk.user.domain.exception.*;
 import com.bankrupang.sanjijk.user.domain.repository.UserRepository;
 import com.bankrupang.sanjijk.user.domain.repository.UserSpecification;
+import com.bankrupang.sanjijk.user.infrastructure.config.RedisKeys;
 import com.bankrupang.sanjijk.user.infrastructure.keycloak.KeycloakService;
 import com.bankrupang.sanjijk.user.presentation.dto.request.*;
 import com.bankrupang.sanjijk.user.presentation.dto.response.*;
@@ -169,7 +170,7 @@ public class UserService {
     public void suspendUser(UserSuspendedRequest request) {
         User user = findUserByIdOrElseThrow(request.userId());
         user.suspendUser();
-        redisTemplate.opsForSet().add("suspended:users", request.userId().toString());
+        redisTemplate.opsForSet().add(RedisKeys.SUSPENDED_USERS, request.userId().toString());
     }
 
     // 유저 계정 일시정지 혜지 [마스터 전용]
@@ -177,7 +178,7 @@ public class UserService {
     public void unsuspendUser(UserSuspendedRequest request) {
         User user = findUserByIdOrElseThrow(request.userId());
         user.unsuspendUser();
-        redisTemplate.opsForSet().remove("suspended:users", request.userId().toString());
+        redisTemplate.opsForSet().remove(RedisKeys.SUSPENDED_USERS, request.userId().toString());
     }
 
     // 일반 가입 롤 검증 — BUYER, SELLER만 허용

@@ -18,14 +18,21 @@ import java.util.List;
 public class SecurityConfig {
 
     /**
-     * [CORS] Spring Security WebFlux는 gateway globalcors보다 먼저 실행되므로
-     * Security 레벨에서도 CORS를 허용해야 OPTIONS preflight가 통과된다.
-     * allowedOriginPatterns("*") + allowCredentials(true) 조합으로 file://, localhost 등 모두 허용.
+     * [CORS] 개발 환경 전용 설정.
+     * - allowedOrigins: 로컬 브라우저 접근만 허용 (file://, localhost 계열)
+     * - prod에서는 실제 도메인으로 교체 필요
+     * - allowedOriginPatterns("*") + allowCredentials(true) 조합은 보안 위험이 있으므로
+     *   명시적 Origin 목록으로 제한
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("*"));
+        config.setAllowedOrigins(List.of(
+                "http://localhost:63342",
+                "http://localhost:3000",
+                "http://localhost:8080",
+                "null"  // file:// 프로토콜 (브라우저가 Origin: null 전송)
+        ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
@@ -38,10 +45,10 @@ public class SecurityConfig {
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         return http
-                .cors(Customizer.withDefaults())  // corsConfigurationSource 빈 자동 사용
+                .cors(Customizer.withDefaults())
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
-                        .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()  // preflight 허용
+                        .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .pathMatchers(HttpMethod.POST, "/api/v1/auth/signup").permitAll()
                         .pathMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                         .pathMatchers(HttpMethod.POST, "/api/v1/auth/admin/signup").permitAll()
