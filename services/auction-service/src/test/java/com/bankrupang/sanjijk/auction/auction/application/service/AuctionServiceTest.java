@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -219,6 +220,26 @@ class AuctionServiceTest {
             assertThatThrownBy(() -> auctionService.createAuction(sellerId, "SELLER", request))
                     .isInstanceOf(AuctionException.class)
                     .hasMessage(AuctionErrorCode.INVALID_AUCTION_PERIOD.getMessage());
+            verify(auctionRepository, never()).save(any(Auction.class));
+        }
+
+        @Test
+        @DisplayName("실패 - 이미 진행 중이거나 대기 중인 경매가 존재하면 경매를 생성할 수 없다")
+        void fail_duplicate_auction() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            AuctionCreateRequest request = createRequest(productId, LocalDateTime.now().plusDays(1));
+            Product product = createProduct(sellerId, productId);
+
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            given(auctionRepository.existsByProductIdAndStatusInAndDeletedAtIsNull(any(UUID.class), any(Collection.class)))
+                    .willReturn(true);
+
+            // when & then
+            assertThatThrownBy(() -> auctionService.createAuction(sellerId, "SELLER", request))
+                    .isInstanceOf(AuctionException.class)
+                    .hasMessage(AuctionErrorCode.DUPLICATE_AUCTION.getMessage());
             verify(auctionRepository, never()).save(any(Auction.class));
         }
     }

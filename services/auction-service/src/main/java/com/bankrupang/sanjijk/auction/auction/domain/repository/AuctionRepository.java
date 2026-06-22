@@ -18,6 +18,8 @@ public interface AuctionRepository extends JpaRepository<Auction, UUID> {
 
     Optional<Auction> findByProductIdAndDeletedAtIsNull(UUID productId);
 
+    boolean existsByProductIdAndStatusInAndDeletedAtIsNull(UUID productId, Collection<AuctionStatus> statuses);
+
     Page<Auction> findAllByDeletedAtIsNull(Pageable pageable);
 
     Page<Auction> findAllByStatusAndDeletedAtIsNull(AuctionStatus status, Pageable pageable);

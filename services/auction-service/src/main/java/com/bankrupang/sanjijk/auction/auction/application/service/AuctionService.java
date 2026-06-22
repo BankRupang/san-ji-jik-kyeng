@@ -63,6 +63,7 @@ public class AuctionService {
         Product product = getExistingProduct(request.productId());
         validateProductOwnerOrMaster(product, userId, userRole);
         validateStartAt(request.startAt());
+        validateDuplicateAuction(product.getId());
 
         LocalDateTime endAt = request.startAt().plusHours(1);
 
@@ -308,6 +309,16 @@ public class AuctionService {
     private void validateStartAt(LocalDateTime startAt) {
         if (!startAt.isAfter(LocalDateTime.now())) {
             throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_PERIOD);
+        }
+    }
+
+    private void validateDuplicateAuction(UUID productId) {
+        boolean hasActiveAuction = auctionRepository.existsByProductIdAndStatusInAndDeletedAtIsNull(
+                productId,
+                List.of(AuctionStatus.READY, AuctionStatus.PROGRESS)
+        );
+        if (hasActiveAuction) {
+            throw new AuctionException(AuctionErrorCode.DUPLICATE_AUCTION);
         }
     }
 

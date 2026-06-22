@@ -17,7 +17,8 @@ public enum AuctionErrorCode implements ErrorCode {
     AUCTION_FORBIDDEN(HttpStatus.FORBIDDEN, "AUCTION-004", "경매에 대한 권한이 없습니다."),
     INVALID_AUCTION_PERIOD(HttpStatus.BAD_REQUEST, "AUCTION-005", "경매 시간이 올바르지 않습니다."),
     INVALID_AUCTION_RESULT(HttpStatus.BAD_REQUEST, "AUCTION-006", "경매 결과가 올바르지 않습니다."),
-    INVALID_AUCTION_REQUEST(HttpStatus.BAD_REQUEST, "AUCTION-007", "경매 요청 값이 올바르지 않습니다.");
+    INVALID_AUCTION_REQUEST(HttpStatus.BAD_REQUEST, "AUCTION-007", "경매 요청 값이 올바르지 않습니다."),
+    DUPLICATE_AUCTION(HttpStatus.CONFLICT, "AUCTION-008", "이미 진행 중이거나 대기 중인 경매가 존재합니다.");
 
     private final HttpStatus status;
     private final String code;
