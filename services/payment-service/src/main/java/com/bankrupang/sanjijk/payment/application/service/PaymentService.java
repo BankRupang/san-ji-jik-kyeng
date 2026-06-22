@@ -140,11 +140,6 @@ public class PaymentService {
             log.info("[PAYMENT] 유찰 환불 대상: {}명 - auctionId: {}", depositPayments.size(), event.auctionId());
 
             for (Payment depositPayment : depositPayments) {
-                // ⑤ 서비스 레벨 멱등성 - 이미 CANCELED면 스킵
-                if (depositPayment.getStatus() == PaymentStatus.CANCELED) {
-                    log.warn("[PAYMENT] 이미 취소된 보증금 스킵 - paymentId: {}", depositPayment.getId());
-                    continue;
-                }
                 paymentEventPublisher.publishRefundRequest(
                         depositPayment.getOrderId(), depositPayment.getId(),
                         depositPayment.getAmount(), "유찰로 인한 보증금 환불");
