@@ -20,6 +20,7 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,6 +68,9 @@ public class ChatService {
     @Value("${ai.chat.session-expire-hours}")
     private int sessionExpireHours;
 
+    @Value("${ai.chat.max-history:10}")
+    private int maxHistory;
+
     @Transactional
     public ChatSession createSession(UUID userId) {
         return sessionRepository.save(ChatSession.create(userId, sessionExpireHours));
@@ -78,7 +82,9 @@ public class ChatService {
         return Observation.createNotStarted("chat.pipeline", observationRegistry)
                 .highCardinalityKeyValue("user.id", userId.toString())
                 .observe(() -> {
-                    List<ChatMessage> history = messageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
+                    List<ChatMessage> history = messageRepository
+                            .findBySessionIdOrderByIdDesc(sessionId, PageRequest.of(0, maxHistory))
+                            .reversed();
 
                     // 2단계: Query Reformulation - 대화 기록 기반 쿼리 재작성
                     String searchQuery = reformulateQuery(userMessage, history);
@@ -124,14 +130,20 @@ public class ChatService {
     }
 
     private void validateSession(UUID sessionId, UUID userId) {
-        ChatSession session = sessionRepository.findByIdAndDeletedAtIsNull(sessionId)
-                .orElseThrow(() -> new BaseException(AiErrorCode.CHAT_SESSION_NOT_FOUND));
-        if (!session.getUserId().equals(userId)) {
-            throw new BaseException(AiErrorCode.CHAT_SESSION_ACCESS_DENIED);
-        }
-        if (session.isExpired()) {
-            session.expire();
-            sessionRepository.save(session);
+        boolean expired = Boolean.TRUE.equals(transactionTemplate.execute(status -> {
+            ChatSession session = sessionRepository.findByIdAndDeletedAtIsNull(sessionId)
+                    .orElseThrow(() -> new BaseException(AiErrorCode.CHAT_SESSION_NOT_FOUND));
+            if (!session.getUserId().equals(userId)) {
+                throw new BaseException(AiErrorCode.CHAT_SESSION_ACCESS_DENIED);
+            }
+            if (session.isExpired()) {
+                session.expire();
+                sessionRepository.save(session);
+                return true;
+            }
+            return false;
+        }));
+        if (expired) {
             throw new BaseException(AiErrorCode.CHAT_SESSION_EXPIRED);
         }
     }
@@ -189,6 +201,7 @@ public class ChatService {
             throw e;
         } catch (Exception e) {
             aiResponseFailCounter.increment();
+            log.error("AI 응답 생성 실패", e);
             throw new BaseException(AiErrorCode.AI_RESPONSE_UNAVAILABLE);
         }
     }
