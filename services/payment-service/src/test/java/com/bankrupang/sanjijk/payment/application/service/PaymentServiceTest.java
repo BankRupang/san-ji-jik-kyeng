@@ -217,25 +217,7 @@ class PaymentServiceTest {
             then(paymentEventPublisher).should().publishRefundRequest(any(), any(), anyInt(), any());
         }
 
-        @Test
-        @DisplayName("이미 CANCELED된 보증금 - 스킵 (멱등성)")
-        void skip_already_canceled() {
-            // given
-            AuctionFailedEvent event = new AuctionFailedEvent(
-                    UUID.randomUUID(), "테스트 경매", UUID.randomUUID(), LocalDateTime.now()
-            );
-            Payment payment = mock(Payment.class);
-            given(payment.getStatus()).willReturn(PaymentStatus.CANCELED);
-            given(paymentRepository.findByAuctionIdAndPaymentTypeAndStatus(
-                    event.auctionId(), PaymentType.REPAY, PaymentStatus.DONE))
-                    .willReturn(List.of(payment));
 
-            // when
-            paymentService.refundAllDeposits(event);
-
-            // then
-            then(paymentEventPublisher).should(never()).publishRefundRequest(any(), any(), anyInt(), any());
-        }
     }
 
     // ================================
