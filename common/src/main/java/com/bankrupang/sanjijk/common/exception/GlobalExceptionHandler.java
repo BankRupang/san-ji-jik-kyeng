@@ -53,10 +53,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> handleTypeMismatchException(MethodArgumentTypeMismatchException e) {
-        log.warn("TypeMismatchException: {}", e.getMessage());
+        log.warn("TypeMismatchException: parameter={}, requiredType={}",
+                e.getName(), e.getRequiredType() != null ? e.getRequiredType().getSimpleName() : "unknown");
         return ResponseEntity
                 .status(CommonErrorCode.INVALID_INPUT.getStatus())
                 .body(ErrorResponse.of(CommonErrorCode.INVALID_INPUT.name(),
-                        "잘못된 형식의 값입니다: " + e.getValue()));
+                        "요청 파라미터 [" + e.getName() + "]의 타입이 올바르지 않습니다."));
     }
 }
