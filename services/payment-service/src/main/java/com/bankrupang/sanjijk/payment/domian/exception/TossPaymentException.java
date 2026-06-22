@@ -6,4 +6,8 @@ public class TossPaymentException extends BaseException {
   public TossPaymentException() {
     super(PaymentErrorCode.TOSS_PAYMENT_FAILED);
   }
+
+  public TossPaymentException(String code, String message) {
+    super(PaymentErrorCode.TOSS_PAYMENT_FAILED, code + " : " + message);
+  }
 }

@@ -157,6 +157,7 @@ public class Payment extends BaseEntity {
     }
 
     public void refund(int cancelAmount, String cancelReason) {
+        validateStatus(PaymentStatus.DONE);
         this.cancelAmount = cancelAmount;
         this.cancelReason = cancelReason;
         this.canceledAt = LocalDateTime.now();
