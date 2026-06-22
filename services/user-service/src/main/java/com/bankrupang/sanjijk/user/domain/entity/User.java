@@ -29,7 +29,7 @@ public class User extends BaseEntity {
     @Column(nullable = false, updatable = false, unique = true, length = 100)
     private String email;
 
-    @Column(length = 30)
+    @Column(nullable = false, length = 30)
     private String phone;
 
     // 관리자(MANAGER, MASTER)는 사업자번호가 없을 수 있음

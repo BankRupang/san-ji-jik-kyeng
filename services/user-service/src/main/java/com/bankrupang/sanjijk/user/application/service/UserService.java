@@ -7,6 +7,7 @@ import com.bankrupang.sanjijk.user.domain.UserStatus;
 import com.bankrupang.sanjijk.user.domain.entity.User;
 import com.bankrupang.sanjijk.user.domain.exception.*;
 import com.bankrupang.sanjijk.user.domain.repository.UserRepository;
+import com.bankrupang.sanjijk.user.domain.repository.UserSpecification;
 import com.bankrupang.sanjijk.user.infrastructure.keycloak.KeycloakService;
 import com.bankrupang.sanjijk.user.presentation.dto.request.*;
 import com.bankrupang.sanjijk.user.presentation.dto.response.*;
@@ -15,6 +16,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +30,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final KeycloakService keycloakService;
+    private final StringRedisTemplate redisTemplate;
 
     @Value("${admin.manager-key}")
     private String managerKey;
@@ -141,19 +145,14 @@ public class UserService {
         return UserResponse.from(user);
     }
 
+    @Transactional(readOnly = true)
     public PageResponse<UserListResponse> getUsers(UserRole role, UserStatus status, int page, int size) {
         Pageable pageable = PageableUtils.ofDefault(page, size);
 
-        Page<User> users;
-        if (role != null && status != null) {
-            users = userRepository.findAllByStatusAndRole(status, role, pageable);
-        } else if (role != null) {
-            users = userRepository.findAllByRole(role, pageable);
-        } else if (status != null) {
-            users = userRepository.findAllByStatus(status, pageable);
-        } else {
-            users = userRepository.findAll(pageable);
-        }
+        Specification<User> spec = UserSpecification.hasRole(role)
+                .and(UserSpecification.hasStatus(status));
+
+        Page<User> users = userRepository.findAll(spec, pageable);
 
         return PageResponse.of(users.map(UserListResponse::from));
     }
@@ -170,6 +169,7 @@ public class UserService {
     public void suspendUser(UserSuspendedRequest request) {
         User user = findUserByIdOrElseThrow(request.userId());
         user.suspendUser();
+        redisTemplate.opsForSet().add("suspended:users", request.userId().toString());
     }
 
     // 유저 계정 일시정지 혜지 [마스터 전용]
@@ -177,6 +177,7 @@ public class UserService {
     public void unsuspendUser(UserSuspendedRequest request) {
         User user = findUserByIdOrElseThrow(request.userId());
         user.unsuspendUser();
+        redisTemplate.opsForSet().remove("suspended:users", request.userId().toString());
     }
 
     // 일반 가입 롤 검증 — BUYER, SELLER만 허용

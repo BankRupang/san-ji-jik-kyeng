@@ -6,11 +6,13 @@ import com.bankrupang.sanjijk.user.domain.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface UserRepository extends JpaRepository<User, UUID> {
+public interface UserRepository extends JpaRepository<User, UUID>, JpaSpecificationExecutor<User> {
 
 //    boolean existsByEmail(String email);
     boolean existsByUsername(String username);
@@ -18,7 +20,5 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByUsername(String username);
 
-    Page<User> findAllByStatus(UserStatus status, Pageable pageable);
-    Page<User> findAllByRole(UserRole role, Pageable pageable);
-    Page<User> findAllByStatusAndRole(UserStatus status, UserRole role, Pageable pageable);
+    List<User> findAllByStatus(UserStatus status);
 }
