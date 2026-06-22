@@ -37,15 +37,11 @@ jobs:
             git diff "origin/$BASE_REF"..."origin/$HEAD_REF" > diff.txt
 
           elif [ "$EVENT_ACTION" == "synchronize" ]; then
-            # 커밋 푸시 시: 머지 커밋 여부를 확인
-            PARENT_COUNT=$(git cat-file -p "$COMMIT_AFTER" | grep "^parent " | wc -l)
-
-            if [ "$PARENT_COUNT" -gt 1 ]; then
-              echo "Merge commit detected. Extracting conflict resolution diff..."
-              git show --format="" --cc "$COMMIT_AFTER" > diff.txt
-            else
-              git diff "$COMMIT_BEFORE".."$COMMIT_AFTER" > diff.txt
-            fi
+            echo "Extracting incremental diffs..."
+            git log --no-merges -p "$COMMIT_BEFORE".."$COMMIT_AFTER" > diff.txt
+            git log --merges --format="%H" "$COMMIT_BEFORE".."$COMMIT_AFTER" | while read commit_hash; do
+              git show --format="" --cc "$commit_hash" >> diff.txt
+            done
           fi
 
       - name: Run Gemini Review
