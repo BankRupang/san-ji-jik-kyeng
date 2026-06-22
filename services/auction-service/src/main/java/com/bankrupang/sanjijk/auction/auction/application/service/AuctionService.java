@@ -73,11 +73,7 @@ public class AuctionService {
         );
 
         Auction savedAuction = auctionRepository.save(auction);
-        transactionAfterCommitExecutor.execute(() -> auctionScheduleManager.scheduleStartJob(
-                savedAuction.getId(),
-                savedAuction.getStartAt(),
-                () -> auctionSchedulerJobService.startAuction(savedAuction.getId())
-        ));
+        scheduleStartJobAfterCommit(savedAuction);
 
         return AuctionCreateResponse.from(savedAuction);
     }
@@ -126,6 +122,10 @@ public class AuctionService {
                 request.startAt()
         );
 
+        if (request.startAt() != null) {
+            scheduleStartJobAfterCommit(auction);
+        }
+
         return AuctionUpdateResponse.from(auction);
     }
 
@@ -136,6 +136,7 @@ public class AuctionService {
         auction.validateEditable();
 
         auction.cancel(request.reason());
+        cancelStartJobAfterCommit(auction);
 
         return AuctionCancelResponse.from(auction);
     }
@@ -231,6 +232,22 @@ public class AuctionService {
         if (request.startPrice() == null && request.bidUnit() == null && request.startAt() == null) {
             throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_REQUEST);
         }
+
+        if (request.startAt() != null) {
+            validateStartAt(request.startAt());
+        }
+    }
+
+    private void scheduleStartJobAfterCommit(Auction auction) {
+        transactionAfterCommitExecutor.execute(() -> auctionScheduleManager.scheduleStartJob(
+                auction.getId(),
+                auction.getStartAt(),
+                () -> auctionSchedulerJobService.startAuction(auction.getId())
+        ));
+    }
+
+    private void cancelStartJobAfterCommit(Auction auction) {
+        transactionAfterCommitExecutor.execute(() -> auctionScheduleManager.cancelStartJob(auction.getId()));
     }
 
     private boolean isAlreadyClosed(Auction auction) {
