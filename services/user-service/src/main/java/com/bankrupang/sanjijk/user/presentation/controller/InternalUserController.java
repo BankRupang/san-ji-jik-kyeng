@@ -22,12 +22,12 @@ public class InternalUserController {
     private final UserService userService;
 
     @GetMapping("/{userId}/notify-allow")
-    public ResponseEntity<ApiResponse<UserNotifyResponse>> getUserNotifyAllow(@PathVariable UUID userId) {
-        return ResponseEntity.status(HttpStatus.OK).body(ApiResponse.ok(userService.notificationAllow(userId)));
+    public ResponseEntity<ApiResponse<UserNotifyResponse>> getNotificationAllow(@PathVariable UUID userId) {
+        return ResponseEntity.status(HttpStatus.OK).body(ApiResponse.ok(userService.getNotificationAllow(userId)));
     }
 
     @GetMapping("/{userId}/userInfo")
     public ResponseEntity<ApiResponse<UserInfoResponse>> getUserInfo(@PathVariable UUID userId) {
-        return ResponseEntity.status(HttpStatus.OK).body(ApiResponse.ok(userService.userInfo(userId)));
+        return ResponseEntity.status(HttpStatus.OK).body(ApiResponse.ok(userService.getUserInfo(userId)));
     }
 }

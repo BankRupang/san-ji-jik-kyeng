@@ -162,14 +162,18 @@ public class UserService {
     }
 
     // 알림 허용 여부 검증 [internal]
-    public UserNotifyResponse notificationAllow(UUID userId) {
-        User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
-        return UserNotifyResponse.from(user);
+    @Transactional(readOnly = true)
+    public UserNotifyResponse getNotificationAllow(UUID userId) {
+        return UserNotifyResponse.from(findUserByIdOrElseThrow(userId));
     }
 
     // 사용자 정보 조회 [internal]
-    public UserInfoResponse userInfo(UUID userId) {
-        User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
-        return UserInfoResponse.from(user);
+    @Transactional(readOnly = true)
+    public UserInfoResponse getUserInfo(UUID userId) {
+        return UserInfoResponse.from(findUserByIdOrElseThrow(userId));
+    }
+
+    private User findUserByIdOrElseThrow(UUID userId) {
+        return userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
     }
 }
