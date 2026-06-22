@@ -34,6 +34,15 @@ public class KafkaPaymentEventPublisherTransaction {
         return paymentOutboxJpaRepository.markInProgress(ids);
     }
 
+    // 처리 완료 시 PUBLISHED로 전이 (즉시 커밋 - REFUND_REQUEST 분기용)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markOnePublished(UUID outboxId) {
+        paymentOutboxJpaRepository.findById(outboxId).ifPresent(o -> {
+            o.markPublished();
+            paymentOutboxJpaRepository.save(o);
+        });
+    }
+
     // 처리 실패 시 FAILED로 전이 (즉시 커밋 - IN_PROGRESS 고착 방지)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markOneFailed(UUID outboxId) {

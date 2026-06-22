@@ -46,6 +46,7 @@ public class KafkaPaymentEventPublisher {
             try {
                 if ("REFUND_REQUEST".equals(outbox.getEventType())) {
                     refundRequestHandler.handle(outbox);
+                    kafkaPaymentEventPublisherTransaction.markOnePublished(outbox.getId()); // REQUIRES_NEW: 즉시 커밋
                 } else {
                     kafkaPaymentEventPublisherTransaction.relayOne(outbox);
                 }
