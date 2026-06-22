@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -29,6 +30,9 @@ import com.bankrupang.sanjijk.auction.auction.domain.repository.AuctionRepositor
 import com.bankrupang.sanjijk.auction.auction.domain.type.AuctionStatus;
 import com.bankrupang.sanjijk.auction.auction.exception.AuctionErrorCode;
 import com.bankrupang.sanjijk.auction.auction.exception.AuctionException;
+import com.bankrupang.sanjijk.auction.auction.infrastructure.scheduler.AuctionScheduleManager;
+import com.bankrupang.sanjijk.auction.auction.infrastructure.scheduler.AuctionSchedulerJobService;
+import com.bankrupang.sanjijk.auction.auction.infrastructure.transaction.TransactionAfterCommitExecutor;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCloseRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCreateRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCloseResponse;
@@ -59,6 +63,15 @@ class AuctionServiceTest {
     @Mock
     private AuctionOutboxService auctionOutboxService;
 
+    @Mock
+    private AuctionScheduleManager auctionScheduleManager;
+
+    @Mock
+    private AuctionSchedulerJobService auctionSchedulerJobService;
+
+    @Mock
+    private TransactionAfterCommitExecutor transactionAfterCommitExecutor;
+
     @Nested
     @DisplayName("createAuction()")
     class CreateAuction {
@@ -82,6 +95,11 @@ class AuctionServiceTest {
                 ReflectionTestUtils.setField(auction, "createdAt", createdAt);
                 return auction;
             });
+            doAnswer(invocation -> {
+                Runnable task = invocation.getArgument(0);
+                task.run();
+                return null;
+            }).when(transactionAfterCommitExecutor).execute(any(Runnable.class));
 
             // when
             AuctionCreateResponse result = auctionService.createAuction(sellerId, "SELLER", request);
@@ -104,6 +122,8 @@ class AuctionServiceTest {
             assertThat(savedAuction.getSellerId()).isEqualTo(sellerId);
             assertThat(savedAuction.getStatus()).isEqualTo(AuctionStatus.READY);
             assertThat(savedAuction.getEndAt()).isEqualTo(startAt.plusHours(1));
+            verify(transactionAfterCommitExecutor).execute(any(Runnable.class));
+            verify(auctionScheduleManager).scheduleStartJob(any(UUID.class), any(LocalDateTime.class), any(Runnable.class));
         }
 
         @Test
@@ -126,6 +146,11 @@ class AuctionServiceTest {
                 ReflectionTestUtils.setField(auction, "createdAt", createdAt);
                 return auction;
             });
+            doAnswer(invocation -> {
+                Runnable task = invocation.getArgument(0);
+                task.run();
+                return null;
+            }).when(transactionAfterCommitExecutor).execute(any(Runnable.class));
 
             // when
             AuctionCreateResponse result = auctionService.createAuction(masterId, "MASTER", request);
@@ -136,6 +161,7 @@ class AuctionServiceTest {
             assertThat(result.sellerId()).isEqualTo(sellerId);
             assertThat(result.endAt()).isEqualTo(startAt.plusHours(1));
             verify(auctionRepository).save(any(Auction.class));
+            verify(auctionScheduleManager).scheduleStartJob(any(UUID.class), any(LocalDateTime.class), any(Runnable.class));
         }
 
         @Test
