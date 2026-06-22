@@ -107,13 +107,19 @@ jobs:
           done
 
       # 새 태스크가 헬스체크를 통과하고 롤링이 끝날 때까지 기다립니다.
+      # aws ecs wait services-stable은 최대 10개 제한이 있어, 서비스별로 순차 대기합니다.
       - name: Wait for services to stabilize
         run: |
           set -euo pipefail
-          aws ecs wait services-stable \
-            --cluster "${ECS_CLUSTER}" \
-            --region "${AWS_REGION}" \
-            --services \
-              config-server discovery-server gateway-server \
-              user-service auction-service bid-service \
-              order-service payment-service notification-service ai-service
+          SERVICES=(
+            config-server discovery-server gateway-server
+            user-service auction-service bid-service
+            order-service payment-service notification-service ai-service
+          )
+          for SERVICE in "${SERVICES[@]}"; do
+            echo "Waiting for ${SERVICE}..."
+            aws ecs wait services-stable \
+              --cluster "${ECS_CLUSTER}" \
+              --region "${AWS_REGION}" \
+              --services "${SERVICE}"
+          done
