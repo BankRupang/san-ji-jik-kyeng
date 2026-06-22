@@ -54,7 +54,6 @@ class RefundRequestHandlerTest {
         );
         PaymentOutbox outbox = mock(PaymentOutbox.class);
         given(outbox.getPayload()).willReturn(payload);
-        given(outbox.getId()).willReturn(UUID.randomUUID());
         given(objectMapper.readValue(eq(payload), eq(java.util.Map.class)))
                 .willReturn(java.util.Map.of(
                         "paymentId", paymentId.toString(),
@@ -159,6 +158,7 @@ class RefundRequestHandlerTest {
             UUID paymentId = UUID.randomUUID();
             int amount = 100_000;
             PaymentOutbox outbox = createOutbox(paymentId, amount, "환불");
+            given(outbox.getId()).willReturn(UUID.randomUUID()); // catch 블록 로그에서 사용
 
             Payment payment = mock(Payment.class);
             given(payment.getStatus()).willReturn(PaymentStatus.DONE);
