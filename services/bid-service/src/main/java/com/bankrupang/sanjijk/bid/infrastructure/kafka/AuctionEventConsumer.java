@@ -19,7 +19,7 @@ public class AuctionEventConsumer {
 
     private final StringRedisTemplate redisTemplate;
 
-    @KafkaListener(topics = "AUCTION_START", groupId = "bid-service")
+    @KafkaListener(topics = "auction-start", groupId = "bid-service")
     public void handleAuctionStarted(AuctionStartedEvent event) {
         log.info("경매 시작 이벤트 수신 - auctionId: {}", event.getAuctionId());
 
@@ -33,6 +33,7 @@ public class AuctionEventConsumer {
         auctionInfo.put("productName", event.getProductName());
         auctionInfo.put("currentPrice", String.valueOf(event.getStartPrice()));
         auctionInfo.put("bidUnit", String.valueOf(event.getBidUnit()));
+        auctionInfo.put("startAt", event.getStartAt().toString());
         auctionInfo.put("endAt", endAt.toString());
         auctionInfo.put("status", event.getStatus());
         auctionInfo.put("highestBidderId", "");
