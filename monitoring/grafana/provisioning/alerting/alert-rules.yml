@@ -11,7 +11,7 @@ groups:
     rules:
       - uid: sanji-service-down
         title: ServiceDown
-        condition: B
+        condition: C
         data:
           - refId: A
             relativeTimeRange:
@@ -19,7 +19,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: 'up{job="spring-services"} == 0'
+              expr: 'up{job="spring-services"}'
               instant: true
               intervalMs: 1000
               maxDataPoints: 43200
@@ -30,33 +30,48 @@ groups:
               to: 0
             datasourceUid: "-100"
             model:
-              type: classic_conditions
+              type: reduce
               datasource:
                 type: __expr__
                 uid: "-100"
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "-100"
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: "-100"
+              expression: B
               conditions:
-                - type: query
-                  evaluator:
-                    type: gt
-                    params: [-1]
+                - evaluator:
+                    type: lt
+                    params: [1]
                   operator:
                     type: and
                   query:
-                    params: [A]
+                    params: [C]
                   reducer:
                     type: last
                     params: []
-              refId: B
-        # up == 0 이 반환하는 값은 0. 0 > -1 이면 alert 발동.
-        # 모든 서비스가 정상이면 up == 0 결과가 empty -> noDataState: OK
+                  type: query
+              refId: C
+        # up == 0 시리즈가 없으면 noData → OK
         noDataState: OK
         execErrState: Error
-        for: 1m
+        for: 3m
         labels:
           severity: critical
         annotations:
           summary: "서비스 다운: {{ $labels.application }}"
-          description: "{{ $labels.application }} ({{ $labels.instance }}) 스크레이프 실패 1분 지속"
+          description: "{{ $labels.application }} ({{ $labels.instance }}) 스크레이프 실패 3분 지속"
         isPaused: false
 
   # ============================================================
@@ -69,7 +84,7 @@ groups:
     rules:
       - uid: sanji-jvm-heap
         title: HighJvmHeapUsage
-        condition: B
+        condition: C
         data:
           - refId: A
             relativeTimeRange:
@@ -77,7 +92,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: 'jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"} > 0.8'
+              expr: 'jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"}'
               instant: true
               intervalMs: 1000
               maxDataPoints: 43200
@@ -88,23 +103,39 @@ groups:
               to: 0
             datasourceUid: "-100"
             model:
-              type: classic_conditions
+              type: reduce
               datasource:
                 type: __expr__
                 uid: "-100"
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "-100"
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: "-100"
+              expression: B
               conditions:
-                - type: query
-                  evaluator:
+                - evaluator:
                     type: gt
-                    params: [-1]
+                    params: [0.8]
                   operator:
                     type: and
                   query:
-                    params: [A]
+                    params: [C]
                   reducer:
                     type: last
                     params: []
-              refId: B
+                  type: query
+              refId: C
         noDataState: OK
         execErrState: Error
         for: 5m
@@ -117,7 +148,7 @@ groups:
 
       - uid: sanji-gc-overhead
         title: HighGcOverhead
-        condition: B
+        condition: C
         data:
           - refId: A
             relativeTimeRange:
@@ -125,7 +156,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: "jvm_gc_overhead > 0.3"
+              expr: "jvm_gc_overhead"
               instant: true
               intervalMs: 1000
               maxDataPoints: 43200
@@ -136,23 +167,39 @@ groups:
               to: 0
             datasourceUid: "-100"
             model:
-              type: classic_conditions
+              type: reduce
               datasource:
                 type: __expr__
                 uid: "-100"
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "-100"
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: "-100"
+              expression: B
               conditions:
-                - type: query
-                  evaluator:
+                - evaluator:
                     type: gt
-                    params: [-1]
+                    params: [0.3]
                   operator:
                     type: and
                   query:
-                    params: [A]
+                    params: [C]
                   reducer:
                     type: last
                     params: []
-              refId: B
+                  type: query
+              refId: C
         noDataState: OK
         execErrState: Error
         for: 5m
@@ -165,7 +212,7 @@ groups:
 
       - uid: sanji-thread-count
         title: HighThreadCount
-        condition: B
+        condition: C
         data:
           - refId: A
             relativeTimeRange:
@@ -173,7 +220,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: "jvm_threads_live_threads > 300"
+              expr: "jvm_threads_live_threads"
               instant: true
               intervalMs: 1000
               maxDataPoints: 43200
@@ -184,23 +231,39 @@ groups:
               to: 0
             datasourceUid: "-100"
             model:
-              type: classic_conditions
+              type: reduce
               datasource:
                 type: __expr__
                 uid: "-100"
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "-100"
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: "-100"
+              expression: B
               conditions:
-                - type: query
-                  evaluator:
+                - evaluator:
                     type: gt
-                    params: [-1]
+                    params: [300]
                   operator:
                     type: and
                   query:
-                    params: [A]
+                    params: [C]
                   reducer:
                     type: last
                     params: []
-              refId: B
+                  type: query
+              refId: C
         noDataState: OK
         execErrState: Error
         for: 5m
@@ -221,7 +284,7 @@ groups:
     rules:
       - uid: sanji-5xx-error-rate
         title: High5xxErrorRate
-        condition: B
+        condition: C
         data:
           - refId: A
             relativeTimeRange:
@@ -229,7 +292,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: 'sum by(application) (rate(http_server_requests_seconds_count{outcome="SERVER_ERROR"}[5m])) / sum by(application) (rate(http_server_requests_seconds_count[5m])) > 0.001'
+              expr: 'sum by(application) (rate(http_server_requests_seconds_count{outcome="SERVER_ERROR"}[5m])) / sum by(application) (rate(http_server_requests_seconds_count[5m]))'
               instant: true
               intervalMs: 1000
               maxDataPoints: 43200
@@ -240,23 +303,39 @@ groups:
               to: 0
             datasourceUid: "-100"
             model:
-              type: classic_conditions
+              type: reduce
               datasource:
                 type: __expr__
                 uid: "-100"
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "-100"
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: "-100"
+              expression: B
               conditions:
-                - type: query
-                  evaluator:
+                - evaluator:
                     type: gt
-                    params: [-1]
+                    params: [0.001]
                   operator:
                     type: and
                   query:
-                    params: [A]
+                    params: [C]
                   reducer:
                     type: last
                     params: []
-              refId: B
+                  type: query
+              refId: C
         noDataState: OK
         execErrState: Error
         for: 1m
@@ -269,7 +348,7 @@ groups:
 
       - uid: sanji-response-time
         title: HighResponseTime
-        condition: B
+        condition: C
         data:
           - refId: A
             relativeTimeRange:
@@ -277,7 +356,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: 'http_server_requests_seconds_max{uri!="/actuator/prometheus",uri!="/actuator/health"} > 3'
+              expr: 'http_server_requests_seconds_max{uri!="/actuator/prometheus",uri!="/actuator/health"}'
               instant: true
               intervalMs: 1000
               maxDataPoints: 43200
@@ -288,23 +367,39 @@ groups:
               to: 0
             datasourceUid: "-100"
             model:
-              type: classic_conditions
+              type: reduce
               datasource:
                 type: __expr__
                 uid: "-100"
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "-100"
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: "-100"
+              expression: B
               conditions:
-                - type: query
-                  evaluator:
+                - evaluator:
                     type: gt
-                    params: [-1]
+                    params: [3]
                   operator:
                     type: and
                   query:
-                    params: [A]
+                    params: [C]
                   reducer:
                     type: last
                     params: []
-              refId: B
+                  type: query
+              refId: C
         noDataState: OK
         execErrState: Error
         for: 5m
@@ -325,7 +420,7 @@ groups:
     rules:
       - uid: sanji-process-cpu
         title: HighProcessCpuUsage
-        condition: B
+        condition: C
         data:
           - refId: A
             relativeTimeRange:
@@ -333,7 +428,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: "process_cpu_usage > 0.7"
+              expr: "process_cpu_usage"
               instant: true
               intervalMs: 1000
               maxDataPoints: 43200
@@ -344,23 +439,39 @@ groups:
               to: 0
             datasourceUid: "-100"
             model:
-              type: classic_conditions
+              type: reduce
               datasource:
                 type: __expr__
                 uid: "-100"
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "-100"
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: "-100"
+              expression: B
               conditions:
-                - type: query
-                  evaluator:
+                - evaluator:
                     type: gt
-                    params: [-1]
+                    params: [0.7]
                   operator:
                     type: and
                   query:
-                    params: [A]
+                    params: [C]
                   reducer:
                     type: last
                     params: []
-              refId: B
+                  type: query
+              refId: C
         noDataState: OK
         execErrState: Error
         for: 5m
