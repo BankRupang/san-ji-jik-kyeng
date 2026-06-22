@@ -97,6 +97,17 @@ public class Auction extends BaseEntity {
         }
     }
 
+    public void extendEndAt(LocalDateTime newEndAt) {
+        validateStatus(AuctionStatus.PROGRESS);
+
+        if (newEndAt == null || !newEndAt.isAfter(this.endAt)) {
+            throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_PERIOD);
+        }
+
+        this.endAt = newEndAt;
+        this.extensionCount++;
+    }
+
     private static void validateCreateRequest(
             UUID productId,
             UUID sellerId,
