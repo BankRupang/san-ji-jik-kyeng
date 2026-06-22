@@ -18,7 +18,8 @@ public enum UserErrorCode implements ErrorCode {
     LOGIN_FAILED(HttpStatus.CONFLICT, "USER-007", "로그인에 실패하였습니다"),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER-008", "해당 유저를 찾을 수 없습니다"),
     USER_SUSPENDED(HttpStatus.BAD_REQUEST, "USER-009", "해당 계정은 일시 정지 상태입니다"),
-    USER_DELETED(HttpStatus.BAD_REQUEST,"USER_010", "해당 계정은 탈퇴된 계정입니다");
+    USER_DELETED(HttpStatus.BAD_REQUEST,"USER_010", "해당 계정은 탈퇴된 계정입니다"),
+    USER_NOT_SUSPENDED(HttpStatus.BAD_REQUEST, "USER-011", "정지 상태가 아닌 계정입니다");
 
 
     private final HttpStatus status;

@@ -50,3 +50,6 @@ MEMORY.md
 
 ### Generated at deploy time ###
 monitoring/prometheus/prometheus.prod.yml
+
+### Local test frontend ###
+*.html
