@@ -59,7 +59,7 @@ public class OrderService {
         log.info("보증금 주문 생성 완료 - orderId: {}, userId: {}, auctionId: {}", order.getId(), userId, request.auctionId());
 
         // 3. 결제 요청 이벤트 발행
-        orderEventService.publishDepositCreated(order);
+        orderEventService.publishDepositCreated(order, request.endAt());
 
         return OrderResponse.from(order);
     }
