@@ -40,6 +40,13 @@ out/
 .env
 .env.local
 .env.*.local
+.env.*.prod
 *.env
+
+### ETC ###
+.terraform/
 .notes/
 MEMORY.md
+
+### Generated at deploy time ###
+monitoring/prometheus/prometheus.prod.yml
