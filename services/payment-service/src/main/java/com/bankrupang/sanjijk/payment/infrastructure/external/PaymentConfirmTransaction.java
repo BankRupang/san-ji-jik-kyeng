@@ -55,7 +55,8 @@ public class PaymentConfirmTransaction {
                 payment.getAmount(), null, null, userId
         ));
 
-        log.info("[CONFIRM] READY → IN_PROGRESS - paymentId: {}", payment.getId());
+        log.info("[CONFIRM] READY → IN_PROGRESS - paymentId: {}, orderId: {}, auctionId: {}",
+                payment.getId(), payment.getOrderId(), payment.getAuctionId());
         return payment.getId();
     }
 
@@ -99,6 +100,8 @@ public class PaymentConfirmTransaction {
                 redisTemplate.opsForValue().set(redisKey, "true", Duration.ofSeconds(Math.max(ttlSeconds, 1)));
                 log.info("[CONFIRM] Redis 보증금 키 등록 - key: {}, ttl: {}s", redisKey, ttlSeconds);
             }
+        } else {
+            log.debug("[CONFIRM] NORMAL 결제 - Redis write 스킵 - paymentId: {}", paymentId);
         }
 
         // PAYMENT_COMPLETED Outbox 적재
@@ -114,7 +117,8 @@ public class PaymentConfirmTransaction {
                 LocalDateTime.now()
         ));
 
-        log.info("[CONFIRM] 결제 승인 완료 - paymentId: {}, paymentType: {}", paymentId, payment.getPaymentType());
+        log.info("[CONFIRM] 결제 승인 완료 - paymentId: {}, orderId: {}, auctionId: {}, paymentType: {}",
+                paymentId, payment.getOrderId(), payment.getAuctionId(), payment.getPaymentType());
     }
 
     // 결제 실패 DB 업데이트 + Outbox 적재 (REQUIRES_NEW - 롤백 방지)
