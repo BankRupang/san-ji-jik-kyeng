@@ -21,7 +21,6 @@ import com.bankrupang.sanjijk.auction.global.util.AuctionLogContext;
 public class AuctionScheduleManager {
 
     private final ThreadPoolTaskScheduler taskScheduler;
-    // TODO: 다중 인스턴스 환경에서는 동일 경매 잡이 중복 실행될 수 있으므로 ShedLock 적용 후 분산 락으로 보강한다.
     private final Map<UUID, ScheduledFuture<?>> startJobs = new ConcurrentHashMap<>();
     private final Map<UUID, ScheduledFuture<?>> endCheckJobs = new ConcurrentHashMap<>();
 

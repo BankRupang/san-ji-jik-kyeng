@@ -2,11 +2,13 @@ package com.bankrupang.sanjijk.auction.auction.infrastructure.scheduler;
 
 import java.util.UUID;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 
 import com.bankrupang.sanjijk.auction.auction.domain.entity.Auction;
 import com.bankrupang.sanjijk.auction.auction.domain.repository.AuctionRepository;
@@ -25,13 +27,17 @@ public class AuctionSchedulerJobService {
     private final ProductRepository productRepository;
     private final AuctionOutboxService auctionOutboxService;
     private final AuctionScheduleManager auctionScheduleManager;
+    private final ObjectProvider<AuctionSchedulerJobService> schedulerJobServiceProvider;
 
     @Transactional
+    @SchedulerLock(name = "'auction-start-' + #auctionId", lockAtMostFor = "10m", lockAtLeastFor = "1s")
     public void startAuction(UUID auctionId) {
-        AuctionLogContext.runWithAuctionId(auctionId, () ->
-                auctionRepository.findByIdAndDeletedAtIsNull(auctionId)
-                        .ifPresentOrElse(this::startAuctionIfReady, () ->
-                                log.warn("스케줄러 시작 대상 경매를 찾을 수 없습니다. auctionId: {}", auctionId)));
+        AuctionLogContext.runWithAuctionId(auctionId, () -> {
+            log.info("ShedLock 획득 - jobType: AUCTION_START, auctionId: {}", auctionId);
+            auctionRepository.findByIdAndDeletedAtIsNull(auctionId)
+                    .ifPresentOrElse(this::startAuctionIfReady, () ->
+                            log.warn("스케줄러 시작 대상 경매를 찾을 수 없습니다. auctionId: {}", auctionId));
+        });
     }
 
     private void startAuctionIfReady(Auction auction) {
@@ -55,17 +61,20 @@ public class AuctionSchedulerJobService {
         auctionScheduleManager.scheduleEndCheckJob(
                 auction.getId(),
                 auction.getEndAt(),
-                () -> checkAuctionEnd(auction.getId())
+                () -> schedulerJobServiceProvider.getObject().checkAuctionEnd(auction.getId())
         );
         log.info("스케줄러 경매 시작 완료 - auctionId: {}", auction.getId());
     }
 
     @Transactional(readOnly = true)
+    @SchedulerLock(name = "'auction-end-check-' + #auctionId", lockAtMostFor = "10m", lockAtLeastFor = "1s")
     public void checkAuctionEnd(UUID auctionId) {
-        AuctionLogContext.runWithAuctionId(auctionId, () ->
-                auctionRepository.findByIdAndDeletedAtIsNull(auctionId)
-                        .ifPresentOrElse(this::checkAuctionEndIfProgress, () ->
-                                log.warn("스케줄러 마감 확인 대상 경매를 찾을 수 없습니다. auctionId: {}", auctionId)));
+        AuctionLogContext.runWithAuctionId(auctionId, () -> {
+            log.info("ShedLock 획득 - jobType: AUCTION_END_CHECK, auctionId: {}", auctionId);
+            auctionRepository.findByIdAndDeletedAtIsNull(auctionId)
+                    .ifPresentOrElse(this::checkAuctionEndIfProgress, () ->
+                            log.warn("스케줄러 마감 확인 대상 경매를 찾을 수 없습니다. auctionId: {}", auctionId));
+        });
     }
 
     private void checkAuctionEndIfProgress(Auction auction) {

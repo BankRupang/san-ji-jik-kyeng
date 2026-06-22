@@ -3,6 +3,7 @@ package com.bankrupang.sanjijk.auction.auction.infrastructure.scheduler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -14,9 +15,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.bankrupang.sanjijk.auction.auction.domain.entity.Auction;
@@ -45,6 +48,9 @@ class AuctionSchedulerJobServiceTest {
     @Mock
     private AuctionScheduleManager auctionScheduleManager;
 
+    @Mock
+    private ObjectProvider<AuctionSchedulerJobService> schedulerJobServiceProvider;
+
     @Nested
     @DisplayName("startAuction()")
     class StartAuction {
@@ -69,6 +75,32 @@ class AuctionSchedulerJobServiceTest {
             assertThat(auction.getStatus()).isEqualTo(AuctionStatus.PROGRESS);
             verify(auctionOutboxService).saveAuctionStartEvent(auction, product);
             verify(auctionScheduleManager).scheduleEndCheckJob(any(UUID.class), any(LocalDateTime.class), any(Runnable.class));
+        }
+
+        @Test
+        @DisplayName("성공 - 시작 후 등록한 마감 확인 잡은 프록시를 통해 실행한다")
+        void success_schedule_end_check_job_via_proxy() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            Product product = createProduct(sellerId, productId);
+            AuctionSchedulerJobService proxiedJobService = mock(AuctionSchedulerJobService.class);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            given(schedulerJobServiceProvider.getObject()).willReturn(proxiedJobService);
+
+            // when
+            auctionSchedulerJobService.startAuction(auctionId);
+
+            // then
+            ArgumentCaptor<Runnable> jobCaptor = ArgumentCaptor.forClass(Runnable.class);
+            verify(auctionScheduleManager).scheduleEndCheckJob(any(UUID.class), any(LocalDateTime.class), jobCaptor.capture());
+
+            jobCaptor.getValue().run();
+            verify(proxiedJobService).checkAuctionEnd(auctionId);
         }
 
         @Test
