@@ -32,7 +32,6 @@ public class OrderSchedulerTransaction {
         log.warn("[SCHEDULER] 미결제 낙찰 주문 PENALTY_PENDING 전환 - orderId: {}, userId: {}, orderType: {}, {} → PENALTY_PENDING, paymentDueAt: {}",
                 order.getId(), order.getUserId(), order.getOrderType(), OrderStatus.PENDING, order.getPaymentDueAt());
 
-        saveOutbox(order, "PAYMENT_FAILED");
     }
 
     @Transactional
