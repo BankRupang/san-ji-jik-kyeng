@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import com.bankrupang.sanjijk.auction.auction.application.service.AuctionService;
 import com.bankrupang.sanjijk.auction.auction.infrastructure.messaging.consumer.dto.AuctionEndedEvent;
 import com.bankrupang.sanjijk.auction.auction.infrastructure.messaging.consumer.dto.AuctionExtendedEvent;
 import com.bankrupang.sanjijk.auction.auction.infrastructure.messaging.consumer.dto.DepositForfeitedEvent;
@@ -23,6 +24,7 @@ public class AuctionExternalEventConsumer {
     private static final String AUCTION_SERVICE_GROUP_ID = "auction-service";
 
     private final ObjectMapper objectMapper;
+    private final AuctionService auctionService;
 
     @KafkaListener(topics = "auction-ended", groupId = AUCTION_SERVICE_GROUP_ID)
     public void consumeAuctionEnded(String payload) {
@@ -31,7 +33,12 @@ public class AuctionExternalEventConsumer {
         log.info("[KAFKA][CONSUME] AUCTION_ENDED 수신 - auctionId: {}, hasBid: {}, winnerId: {}, finalPrice: {}, endedAt: {}",
                 event.auctionId(), event.hasBid(), event.winnerId(), event.finalPrice(), event.endedAt());
 
-        // TODO: AUCTION_ENDED 수신 시 PROGRESS -> RESULT_PENDING -> WON/FAIL 상태 전이 및 Outbox 저장을 처리한다.
+        auctionService.closeAuctionByEndedEvent(
+                event.auctionId(),
+                event.hasBid(),
+                event.winnerId(),
+                event.finalPrice()
+        );
     }
 
     @KafkaListener(topics = "auction-extended", groupId = AUCTION_SERVICE_GROUP_ID)

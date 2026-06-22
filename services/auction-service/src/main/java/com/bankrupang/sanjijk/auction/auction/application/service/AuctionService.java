@@ -155,6 +155,21 @@ public class AuctionService {
     @Transactional
     public AuctionCloseResponse closeAuctionManually(UUID auctionId, AuctionCloseRequest request) {
         Auction auction = getExistingAuction(auctionId);
+
+        return closeAuction(auction, request);
+    }
+
+    @Transactional
+    public AuctionCloseResponse closeAuctionByEndedEvent(UUID auctionId, boolean hasBid, UUID winnerId, Long finalPrice) {
+        Auction auction = getExistingAuction(auctionId);
+        AuctionCloseRequest request = hasBid
+                ? new AuctionCloseRequest(winnerId, toFinalPrice(finalPrice))
+                : null;
+
+        return closeAuction(auction, request);
+    }
+
+    private AuctionCloseResponse closeAuction(Auction auction, AuctionCloseRequest request) {
         if (isAlreadyClosed(auction)) {
             return AuctionCloseResponse.from(auction);
         }
@@ -171,6 +186,8 @@ public class AuctionService {
             auction.markFailed();
             auctionOutboxService.saveAuctionFailedEvent(auction, product);
         }
+
+        cancelEndCheckJobAfterCommit(auction);
 
         return AuctionCloseResponse.from(auction);
     }
@@ -248,6 +265,22 @@ public class AuctionService {
 
     private void cancelStartJobAfterCommit(Auction auction) {
         transactionAfterCommitExecutor.execute(() -> auctionScheduleManager.cancelStartJob(auction.getId()));
+    }
+
+    private void cancelEndCheckJobAfterCommit(Auction auction) {
+        transactionAfterCommitExecutor.execute(() -> auctionScheduleManager.cancelEndCheckJob(auction.getId()));
+    }
+
+    private Integer toFinalPrice(Long finalPrice) {
+        if (finalPrice == null) {
+            return null;
+        }
+
+        try {
+            return Math.toIntExact(finalPrice);
+        } catch (ArithmeticException e) {
+            throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_RESULT);
+        }
     }
 
     private boolean isAlreadyClosed(Auction auction) {

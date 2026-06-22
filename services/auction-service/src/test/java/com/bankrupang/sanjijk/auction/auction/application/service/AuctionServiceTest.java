@@ -719,6 +719,141 @@ class AuctionServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("closeAuctionByEndedEvent()")
+    class CloseAuctionByEndedEvent {
+
+        @Test
+        @DisplayName("성공 - 입찰이 있으면 낙찰 처리하고 Outbox에 낙찰 이벤트를 저장한다")
+        void success_won() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            UUID winnerId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            Product product = createProduct(sellerId, productId);
+            auction.start();
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            executeAfterCommitImmediately();
+
+            // when
+            AuctionCloseResponse result = auctionService.closeAuctionByEndedEvent(
+                    auctionId,
+                    true,
+                    winnerId,
+                    15000L
+            );
+
+            // then
+            assertThat(result.auctionId()).isEqualTo(auctionId);
+            assertThat(result.status()).isEqualTo(AuctionStatus.WON);
+            assertThat(result.winnerId()).isEqualTo(winnerId);
+            assertThat(result.finalPrice()).isEqualTo(15000);
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.WON);
+            verify(auctionOutboxService).saveAuctionWonEvent(auction, product);
+            verify(auctionOutboxService, never()).saveAuctionFailedEvent(any(Auction.class), any(Product.class));
+            verify(auctionScheduleManager).cancelEndCheckJob(auctionId);
+        }
+
+        @Test
+        @DisplayName("성공 - 입찰이 없으면 유찰 처리하고 Outbox에 유찰 이벤트를 저장한다")
+        void success_fail() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            Product product = createProduct(sellerId, productId);
+            auction.start();
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            executeAfterCommitImmediately();
+
+            // when
+            AuctionCloseResponse result = auctionService.closeAuctionByEndedEvent(
+                    auctionId,
+                    false,
+                    null,
+                    null
+            );
+
+            // then
+            assertThat(result.auctionId()).isEqualTo(auctionId);
+            assertThat(result.status()).isEqualTo(AuctionStatus.FAIL);
+            assertThat(result.winnerId()).isNull();
+            assertThat(result.finalPrice()).isNull();
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.FAIL);
+            verify(auctionOutboxService).saveAuctionFailedEvent(auction, product);
+            verify(auctionOutboxService, never()).saveAuctionWonEvent(any(Auction.class), any(Product.class));
+            verify(auctionScheduleManager).cancelEndCheckJob(auctionId);
+        }
+
+        @Test
+        @DisplayName("성공 - 이미 낙찰 처리된 경매는 멱등하게 현재 상태만 반환한다")
+        void success_idempotent_won() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            UUID winnerId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start();
+            auction.markResultPending();
+            auction.markWon(winnerId, 15000);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when
+            AuctionCloseResponse result = auctionService.closeAuctionByEndedEvent(
+                    auctionId,
+                    true,
+                    winnerId,
+                    15000L
+            );
+
+            // then
+            assertThat(result.auctionId()).isEqualTo(auctionId);
+            assertThat(result.status()).isEqualTo(AuctionStatus.WON);
+            assertThat(result.winnerId()).isEqualTo(winnerId);
+            assertThat(result.finalPrice()).isEqualTo(15000);
+            verify(auctionOutboxService, never()).saveAuctionWonEvent(any(Auction.class), any(Product.class));
+            verify(auctionOutboxService, never()).saveAuctionFailedEvent(any(Auction.class), any(Product.class));
+            verify(transactionAfterCommitExecutor, never()).execute(any(Runnable.class));
+        }
+
+        @Test
+        @DisplayName("실패 - 입찰이 있다고 왔지만 낙찰 정보가 불완전하면 예외가 발생한다")
+        void fail_incomplete_winning_result() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            UUID winnerId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start();
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when & then
+            assertThatThrownBy(() -> auctionService.closeAuctionByEndedEvent(
+                    auctionId,
+                    true,
+                    winnerId,
+                    null
+            ))
+                    .isInstanceOf(AuctionException.class)
+                    .hasMessage(AuctionErrorCode.INVALID_AUCTION_RESULT.getMessage());
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.PROGRESS);
+            verify(auctionOutboxService, never()).saveAuctionWonEvent(any(Auction.class), any(Product.class));
+            verify(auctionOutboxService, never()).saveAuctionFailedEvent(any(Auction.class), any(Product.class));
+            verify(transactionAfterCommitExecutor, never()).execute(any(Runnable.class));
+        }
+    }
+
     private AuctionCreateRequest createRequest(UUID productId, LocalDateTime startAt) {
         return new AuctionCreateRequest(
                 productId,
@@ -751,6 +886,14 @@ class AuctionServiceTest {
         );
         ReflectionTestUtils.setField(auction, "id", auctionId);
         return auction;
+    }
+
+    private void executeAfterCommitImmediately() {
+        doAnswer(invocation -> {
+            Runnable task = invocation.getArgument(0);
+            task.run();
+            return null;
+        }).when(transactionAfterCommitExecutor).execute(any(Runnable.class));
     }
 
 }
