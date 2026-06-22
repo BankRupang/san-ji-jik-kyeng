@@ -46,6 +46,11 @@ public class RefundRequestHandler {
                     paymentId, cancelAmount);
 
             // Toss cancel API 호출 (트랜잭션 밖 - DB 커넥션 점유 방지)
+            // TODO: mvp는 아니라고 생각해 일단 ToDO 처리
+            //   - Toss 취소 성공 + completeRefund 실패 시 데이터 불일치 가능성 있음
+            //   - Toss는 CANCELED, DB는 DONE 상태로 남는 경우 발생 가능
+            //   - 재시도 시 Toss가 "이미 취소된 결제" 에러 반환 → retryCount 초과 시 FAILED 고착
+            //   - 해결: TossPaymentException 에러 코드 확인 후 이미 취소된 경우 completeRefund만 호출하도록 수정 필요
             Integer tossCancel = (cancelAmount == payment.getAmount()) ? null : cancelAmount;
             tossPaymentsClient.cancel(payment.getPaymentKey(), new TossCancelRequest(cancelReason, tossCancel));
 
