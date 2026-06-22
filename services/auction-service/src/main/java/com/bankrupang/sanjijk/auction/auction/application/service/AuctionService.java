@@ -195,6 +195,19 @@ public class AuctionService {
         scheduleEndCheckJobAfterCommit(auction);
     }
 
+    @Transactional
+    public void completeAuctionPayment(UUID auctionId) {
+        Auction auction = getExistingAuction(auctionId);
+
+        if (auction.getStatus() == AuctionStatus.SUCCESS || auction.getStatus() == AuctionStatus.FAIL) {
+            log.info("결제 완료 이벤트 처리 생략 - 이미 최종 상태입니다. auctionId: {}, status: {}",
+                    auctionId, auction.getStatus());
+            return;
+        }
+
+        auction.markSuccess();
+    }
+
     private AuctionCloseResponse closeAuction(Auction auction, AuctionCloseRequest request) {
         if (isAlreadyClosed(auction)) {
             return AuctionCloseResponse.from(auction);

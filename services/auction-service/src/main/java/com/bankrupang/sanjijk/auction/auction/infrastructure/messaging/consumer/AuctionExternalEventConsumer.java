@@ -58,7 +58,7 @@ public class AuctionExternalEventConsumer {
         log.info("[KAFKA][CONSUME] PAYMENT_COMPLETED 수신 - orderId: {}, auctionId: {}, winnerId: {}, paidAmount: {}, occurredAt: {}",
                 event.orderId(), event.auctionId(), event.winnerId(), event.paidAmount(), event.occurredAt());
 
-        // TODO: PAYMENT_COMPLETED 수신 시 WON -> SUCCESS 상태 전이를 처리한다.
+        auctionService.completeAuctionPayment(event.auctionId());
     }
 
     @KafkaListener(topics = "payment-failed", groupId = AUCTION_SERVICE_GROUP_ID)
