@@ -166,7 +166,7 @@ class NotificationServiceTest {
         NotificationLog log = NotificationLog.create(
                 userId, NotificationType.AUCTION_WON,
                 "낙찰 확정!", "메시지 내용",
-                UUID.randomUUID(), "AUCTION"
+                UUID.randomUUID(), "AUCTION", "U_TEST_SLACK"
         );
         ReflectionTestUtils.setField(log, "id", notificationId);
         return log;
