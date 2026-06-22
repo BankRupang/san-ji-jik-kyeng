@@ -55,7 +55,8 @@ public class PaymentService {
             Payment payment = Payment.create(
                     event.orderId(), event.userId(), null,
                     event.auctionId(), event.auctionTitle(), event.orderId().toString(),
-                    PaymentType.REPAY, event.depositAmount(), null
+                    PaymentType.REPAY, event.depositAmount(), null,
+                    event.endAt()  // 경매 종료 시각 - Redis TTL 계산용
             );
             paymentRepository.save(payment);
 
@@ -90,7 +91,8 @@ public class PaymentService {
             Payment payment = Payment.create(
                     event.orderId(), event.userId(), event.sellerId(),
                     event.auctionId(), event.auctionTitle(), event.orderId().toString(),
-                    PaymentType.NORMAL, event.remainingAmount(), event.finalPrice()
+                    PaymentType.NORMAL, event.remainingAmount(), event.finalPrice(),
+                    null  // NORMAL은 endAt 불필요
             );
             paymentRepository.save(payment);
 
@@ -150,38 +152,28 @@ public class PaymentService {
 
     // ================================
     // POST /api/v1/payments/confirm → 결제 승인
+    // 트랜잭션 없음 - Toss HTTP 호출 후 completeConfirm/failConfirm 각각 트랜잭션
     // ================================
 
-    @Transactional
-    public PaymentResponse confirmPayment(PaymentConfirmRequest request, UUID userId, LocalDateTime endAt) {
+    public PaymentResponse confirmPayment(PaymentConfirmRequest request, UUID userId) {
         MDC.put("traceId", UUID.randomUUID().toString());
         log.info("[CONFIRM] 결제 승인 요청 - tossOrderId: {}, amount: {}", request.tossOrderId(), request.amount());
         try {
-            Payment payment = paymentRepository.findByTossOrderId(request.tossOrderId())
-                    .orElseThrow(PaymentNotFoundException::new);
+            // Payment 조회 + 상태 검증 + IN_PROGRESS 전이 (별도 트랜잭션)
+            UUID paymentId = prepareConfirm(request, userId);
 
-            if (payment.getAmount() != request.amount()) {
-                log.warn("[CONFIRM] 금액 불일치 - expected: {}, actual: {}", payment.getAmount(), request.amount());
-                throw new PaymentAmountMismatchException();
-            }
-
-            // READY → IN_PROGRESS
-            payment.inProgress();
-            paymentHistoryRepository.save(PaymentHistory.of(
-                    payment.getId(), payment.getOrderId(), payment.getPaymentType(),
-                    PaymentStatus.READY, PaymentStatus.IN_PROGRESS, "결제 승인 요청",
-                    payment.getAmount(), null, null, userId
-            ));
-
-            UUID paymentId = payment.getId();
-
+            // Toss confirm API 호출 (트랜잭션 밖)
             try {
                 TossPaymentResponse tossResponse = paymentConfirmTransaction.callTossConfirm(
                         request.paymentKey(), request.tossOrderId(), request.amount());
-                paymentConfirmTransaction.completeConfirm(paymentId, tossResponse, request.auctionId(), userId, endAt);
+
+                // 성공: DONE + Redis + Outbox (트랜잭션)
+                paymentConfirmTransaction.completeConfirm(paymentId, tossResponse, userId);
                 log.info("[CONFIRM] 결제 승인 완료 - paymentId: {}", paymentId);
+
             } catch (Exception e) {
-                String failureCode = "UNKNOWN";
+                // 실패: ABORTED + Outbox (REQUIRES_NEW 트랜잭션)
+                String failureCode = extractFailureCode(e);
                 String failureMessage = e.getMessage();
                 paymentConfirmTransaction.failConfirm(paymentId, userId, failureCode, failureMessage);
                 throw e;
@@ -194,6 +186,27 @@ public class PaymentService {
         }
     }
 
+    @Transactional
+    public UUID prepareConfirm(PaymentConfirmRequest request, UUID userId) {
+        Payment payment = paymentRepository.findByTossOrderId(request.tossOrderId())
+                .orElseThrow(PaymentNotFoundException::new);
+
+        if (payment.getAmount() != request.amount()) {
+            log.warn("[CONFIRM] 금액 불일치 - expected: {}, actual: {}", payment.getAmount(), request.amount());
+            throw new PaymentAmountMismatchException();
+        }
+
+        payment.inProgress();
+        paymentHistoryRepository.save(PaymentHistory.of(
+                payment.getId(), payment.getOrderId(), payment.getPaymentType(),
+                PaymentStatus.READY, PaymentStatus.IN_PROGRESS, "결제 승인 요청",
+                payment.getAmount(), null, null, userId
+        ));
+
+        log.info("[CONFIRM] READY → IN_PROGRESS - paymentId: {}", payment.getId());
+        return payment.getId();
+    }
+
     // ================================
     // GET /api/v1/payments/{paymentId} → 단건 조회
     // ================================
@@ -202,6 +215,14 @@ public class PaymentService {
     public PaymentResponse getPayment(UUID paymentId, UUID userId) {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(PaymentNotFoundException::new);
+
+        // 권한 검증 - 본인 결제만 조회 가능
+        if (!payment.getUserId().equals(userId)) {
+            log.warn("[PAYMENT] 권한 없음 - paymentId: {}, requestUserId: {}, ownerUserId: {}",
+                    paymentId, userId, payment.getUserId());
+            throw new PaymentNotFoundException(); // 존재 여부 노출 방지
+        }
+
         log.info("[PAYMENT] 단건 조회 - paymentId: {}, userId: {}", paymentId, userId);
         return PaymentResponse.from(payment);
     }
@@ -215,12 +236,10 @@ public class PaymentService {
         MDC.put("traceId", UUID.randomUUID().toString());
         log.info("[REPAY] 잔금 재결제 요청 - orderId: {}, userId: {}", orderId, userId);
         try {
-            // 기존 ABORTED Payment 조회
             Payment abortedPayment = paymentRepository
                     .findByOrderIdAndPaymentTypeAndStatus(orderId, PaymentType.NORMAL, PaymentStatus.ABORTED)
                     .orElseThrow(PaymentNotFoundException::new);
 
-            // 새 tossOrderId로 새 Payment 생성
             String newTossOrderId = UUID.randomUUID().toString();
             Payment newPayment = Payment.create(
                     abortedPayment.getOrderId(),
@@ -231,7 +250,8 @@ public class PaymentService {
                     newTossOrderId,
                     PaymentType.NORMAL,
                     abortedPayment.getAmount(),
-                    abortedPayment.getOriginalAmount()
+                    abortedPayment.getOriginalAmount(),
+                    null  // NORMAL은 endAt 불필요
             );
             paymentRepository.save(newPayment);
 
@@ -277,5 +297,17 @@ public class PaymentService {
                 prevStatus, nextStatus, reason, payment.getAmount(),
                 payment.getFailureCode(), payment.getFailureMessage(), null
         ));
+    }
+
+    // ================================
+    // Toss 예외에서 failureCode 추출
+    // ================================
+
+    private String extractFailureCode(Exception e) {
+        // TossPaymentException이 있으면 code 추출, 없으면 UNKNOWN
+        if (e.getCause() != null && e.getCause().getMessage() != null) {
+            return e.getCause().getMessage();
+        }
+        return "UNKNOWN";
     }
 }
