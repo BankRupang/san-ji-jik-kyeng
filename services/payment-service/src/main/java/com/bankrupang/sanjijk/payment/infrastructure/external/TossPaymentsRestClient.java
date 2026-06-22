@@ -19,7 +19,7 @@ import org.springframework.web.client.RestClient;
 // 내 서버가 TossPayments 서버 호출하는 URL
 public class TossPaymentsRestClient implements TossPaymentsClient{
 
-    private final RestClient tossPaymentsRestClient;
+    private final RestClient tossPaymentsHttpClient;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -27,7 +27,7 @@ public class TossPaymentsRestClient implements TossPaymentsClient{
         // 주문명(겸매방 이름)은 TossPayments 요청 스펙에 해당이 되지 않아 추가 불가
         // 프론트에서 처리
         log.info("[TossPayments] 결제 승인 요청 - orderId: {}, amount: {}", request.orderId(), request.amount());
-        TossPaymentResponse response = tossPaymentsRestClient.post()
+        TossPaymentResponse response = tossPaymentsHttpClient.post()
                 .uri("/v1/payments/confirm")
                 .body(request)
                 .retrieve()
@@ -47,7 +47,7 @@ public class TossPaymentsRestClient implements TossPaymentsClient{
         // paymentKey로 환불 API 호출하기에 마스킹 처리 필수
         log.info("[TossPayments] 환불 요청 - paymentKey: {}..., cancelAmount: {}",
                 paymentKey.substring(0, 8), request.cancelAmount());
-        TossPaymentResponse response = tossPaymentsRestClient.post()
+        TossPaymentResponse response = tossPaymentsHttpClient.post()
                 .uri("/v1/payments/{paymentKey}/cancel", paymentKey)
                 .body(request)
                 .retrieve()
