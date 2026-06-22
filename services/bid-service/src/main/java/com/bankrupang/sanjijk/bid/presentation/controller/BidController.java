@@ -6,7 +6,6 @@ import com.bankrupang.sanjijk.bid.presentation.dto.BidRequestDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
-import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -27,10 +26,10 @@ public class BidController {
     @MessageMapping("/auction/{auctionId}/bid")
     public void bid(
             @DestinationVariable UUID auctionId,
-            @Header("X-User-Id") UUID userId,
             @Payload BidRequestDto request,
             Principal principal
     ) {
+        UUID userId = UUID.fromString(principal.getName());
         log.info("입찰 요청 - auctionId: {}, userId: {}, bidPrice: {}", auctionId, userId, request.getBidPrice());
         try {
             bidService.bid(auctionId, userId, request);
