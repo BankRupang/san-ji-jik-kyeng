@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import com.bankrupang.sanjijk.auction.auction.domain.entity.Auction;
 import com.bankrupang.sanjijk.auction.auction.domain.repository.AuctionRepository;
 import com.bankrupang.sanjijk.auction.auction.domain.type.AuctionStatus;
+import com.bankrupang.sanjijk.auction.global.util.AuctionLogContext;
 import com.bankrupang.sanjijk.auction.outbox.application.service.AuctionOutboxService;
 import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepository;
@@ -27,9 +28,10 @@ public class AuctionSchedulerJobService {
 
     @Transactional
     public void startAuction(UUID auctionId) {
-        auctionRepository.findByIdAndDeletedAtIsNull(auctionId)
-                .ifPresentOrElse(this::startAuctionIfReady, () ->
-                        log.warn("스케줄러 시작 대상 경매를 찾을 수 없습니다. auctionId: {}", auctionId));
+        AuctionLogContext.runWithAuctionId(auctionId, () ->
+                auctionRepository.findByIdAndDeletedAtIsNull(auctionId)
+                        .ifPresentOrElse(this::startAuctionIfReady, () ->
+                                log.warn("스케줄러 시작 대상 경매를 찾을 수 없습니다. auctionId: {}", auctionId)));
     }
 
     private void startAuctionIfReady(Auction auction) {
@@ -60,9 +62,10 @@ public class AuctionSchedulerJobService {
 
     @Transactional(readOnly = true)
     public void checkAuctionEnd(UUID auctionId) {
-        auctionRepository.findByIdAndDeletedAtIsNull(auctionId)
-                .ifPresentOrElse(this::checkAuctionEndIfProgress, () ->
-                        log.warn("스케줄러 마감 확인 대상 경매를 찾을 수 없습니다. auctionId: {}", auctionId));
+        AuctionLogContext.runWithAuctionId(auctionId, () ->
+                auctionRepository.findByIdAndDeletedAtIsNull(auctionId)
+                        .ifPresentOrElse(this::checkAuctionEndIfProgress, () ->
+                                log.warn("스케줄러 마감 확인 대상 경매를 찾을 수 없습니다. auctionId: {}", auctionId)));
     }
 
     private void checkAuctionEndIfProgress(Auction auction) {
