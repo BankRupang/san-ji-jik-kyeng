@@ -7,6 +7,7 @@
 | Kafka-UI | http://localhost:8080 | - |
 | Prometheus | http://localhost:9090| - |
 | Grafana | http://localhost:3000 | admin / admin |
+| Langfuse | http://localhost:3001 | 최초 접속 시 회원가입 |
 
 ---
 
@@ -34,6 +35,11 @@
 | `SLACK_WEBHOOK_URL` | Slack Webhook URL |
 | `SLACK_BOT_TOKEN` | Slack Bot Token |
 | `GEMINI_API_KEY` | Google Gemini API 키 |
+| `LANGFUSE_NEXTAUTH_SECRET` | Langfuse 세션 암호화 키 (`openssl rand -base64 32`) |
+| `LANGFUSE_SALT` | Langfuse 해시 솔트 (`openssl rand -base64 32`) |
+| `LANGFUSE_AUTH_HEADER` | Langfuse OTLP 인증 헤더 |
+
+- `LANGFUSE_AUTH_HEADER`: Langfuse UI에서 프로젝트 생성 후 발급된 키를 주입해야 합니다. (`echo -n "pk-lf-xxx:sk-lf-xxx" \| base64`)
 
 **2. JAR 빌드**
 
@@ -73,6 +79,7 @@ docker compose ps
 | config-server | 8888 |
 | discovery-server (Eureka) | 8761 |
 | keycloak | 18080 |
+| langfuse | 3001 |
 | postgres | 5432 |
 | redis | 6379 |
 | kafka | 9092 |

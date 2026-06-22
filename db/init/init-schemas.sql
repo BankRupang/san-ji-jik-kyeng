@@ -6,3 +6,4 @@ CREATE SCHEMA IF NOT EXISTS payment_schema;
 CREATE SCHEMA IF NOT EXISTS notification_schema;
 CREATE SCHEMA IF NOT EXISTS ai_schema;
 CREATE SCHEMA IF NOT EXISTS keycloak_schema;
+CREATE SCHEMA IF NOT EXISTS langfuse_schema;

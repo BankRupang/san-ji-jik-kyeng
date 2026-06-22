@@ -36,6 +36,7 @@ import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionC
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionDetailResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionListResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionStartResponse;
+import com.bankrupang.sanjijk.auction.outbox.application.service.AuctionOutboxService;
 import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepository;
 import com.bankrupang.sanjijk.auction.product.exception.ProductErrorCode;
@@ -54,6 +55,9 @@ class AuctionServiceTest {
 
     @Mock
     private ProductRepository productRepository;
+
+    @Mock
+    private AuctionOutboxService auctionOutboxService;
 
     @Nested
     @DisplayName("createAuction()")
@@ -376,8 +380,10 @@ class AuctionServiceTest {
             UUID productId = UUID.randomUUID();
             UUID auctionId = UUID.randomUUID();
             Auction auction = createAuction(sellerId, productId, auctionId);
+            Product product = createProduct(sellerId, productId);
 
             given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
 
             // when
             AuctionStartResponse result = auctionService.startAuctionManually(auctionId);
@@ -386,6 +392,7 @@ class AuctionServiceTest {
             assertThat(result.auctionId()).isEqualTo(auctionId);
             assertThat(result.status()).isEqualTo(AuctionStatus.PROGRESS);
             assertThat(auction.getStatus()).isEqualTo(AuctionStatus.PROGRESS);
+            verify(auctionOutboxService).saveAuctionStartEvent(auction, product);
         }
 
         @Test
@@ -407,6 +414,7 @@ class AuctionServiceTest {
             assertThatThrownBy(() -> auctionService.startAuctionManually(auctionId))
                     .isInstanceOf(AuctionException.class)
                     .hasMessage(AuctionErrorCode.INVALID_STATE_TRANSITION.getMessage());
+            verify(auctionOutboxService, never()).saveAuctionStartEvent(any(Auction.class), any(Product.class));
         }
     }
 
@@ -423,10 +431,12 @@ class AuctionServiceTest {
             UUID auctionId = UUID.randomUUID();
             UUID winnerId = UUID.randomUUID();
             Auction auction = createAuction(sellerId, productId, auctionId);
+            Product product = createProduct(sellerId, productId);
             auction.start();
             AuctionCloseRequest request = new AuctionCloseRequest(winnerId, 15000);
 
             given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
 
             // when
             AuctionCloseResponse result = auctionService.closeAuctionManually(auctionId, request);
@@ -437,6 +447,8 @@ class AuctionServiceTest {
             assertThat(result.winnerId()).isEqualTo(winnerId);
             assertThat(result.finalPrice()).isEqualTo(15000);
             assertThat(auction.getStatus()).isEqualTo(AuctionStatus.WON);
+            verify(auctionOutboxService).saveAuctionWonEvent(auction, product);
+            verify(auctionOutboxService, never()).saveAuctionFailedEvent(any(Auction.class), any(Product.class));
         }
 
         @Test
@@ -447,9 +459,11 @@ class AuctionServiceTest {
             UUID productId = UUID.randomUUID();
             UUID auctionId = UUID.randomUUID();
             Auction auction = createAuction(sellerId, productId, auctionId);
+            Product product = createProduct(sellerId, productId);
             auction.start();
 
             given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
 
             // when
             AuctionCloseResponse result = auctionService.closeAuctionManually(auctionId, null);
@@ -460,6 +474,8 @@ class AuctionServiceTest {
             assertThat(result.winnerId()).isNull();
             assertThat(result.finalPrice()).isNull();
             assertThat(auction.getStatus()).isEqualTo(AuctionStatus.FAIL);
+            verify(auctionOutboxService).saveAuctionFailedEvent(auction, product);
+            verify(auctionOutboxService, never()).saveAuctionWonEvent(any(Auction.class), any(Product.class));
         }
 
         @Test
@@ -488,6 +504,8 @@ class AuctionServiceTest {
             assertThat(result.status()).isEqualTo(AuctionStatus.WON);
             assertThat(result.winnerId()).isEqualTo(winnerId);
             assertThat(result.finalPrice()).isEqualTo(15000);
+            verify(auctionOutboxService, never()).saveAuctionWonEvent(any(Auction.class), any(Product.class));
+            verify(auctionOutboxService, never()).saveAuctionFailedEvent(any(Auction.class), any(Product.class));
         }
 
         @Test
@@ -512,6 +530,8 @@ class AuctionServiceTest {
             assertThat(result.status()).isEqualTo(AuctionStatus.FAIL);
             assertThat(result.winnerId()).isNull();
             assertThat(result.finalPrice()).isNull();
+            verify(auctionOutboxService, never()).saveAuctionWonEvent(any(Auction.class), any(Product.class));
+            verify(auctionOutboxService, never()).saveAuctionFailedEvent(any(Auction.class), any(Product.class));
         }
 
         @Test
@@ -529,6 +549,8 @@ class AuctionServiceTest {
             assertThatThrownBy(() -> auctionService.closeAuctionManually(auctionId, null))
                     .isInstanceOf(AuctionException.class)
                     .hasMessage(AuctionErrorCode.INVALID_STATE_TRANSITION.getMessage());
+            verify(auctionOutboxService, never()).saveAuctionWonEvent(any(Auction.class), any(Product.class));
+            verify(auctionOutboxService, never()).saveAuctionFailedEvent(any(Auction.class), any(Product.class));
         }
 
         @Test
@@ -550,6 +572,8 @@ class AuctionServiceTest {
                     .isInstanceOf(AuctionException.class)
                     .hasMessage(AuctionErrorCode.INVALID_AUCTION_RESULT.getMessage());
             assertThat(auction.getStatus()).isEqualTo(AuctionStatus.PROGRESS);
+            verify(auctionOutboxService, never()).saveAuctionWonEvent(any(Auction.class), any(Product.class));
+            verify(auctionOutboxService, never()).saveAuctionFailedEvent(any(Auction.class), any(Product.class));
         }
 
         @Test
@@ -571,6 +595,8 @@ class AuctionServiceTest {
                     .isInstanceOf(AuctionException.class)
                     .hasMessage(AuctionErrorCode.INVALID_AUCTION_RESULT.getMessage());
             assertThat(auction.getStatus()).isEqualTo(AuctionStatus.PROGRESS);
+            verify(auctionOutboxService, never()).saveAuctionWonEvent(any(Auction.class), any(Product.class));
+            verify(auctionOutboxService, never()).saveAuctionFailedEvent(any(Auction.class), any(Product.class));
         }
     }
 
