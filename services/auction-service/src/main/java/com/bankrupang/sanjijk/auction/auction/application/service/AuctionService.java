@@ -32,6 +32,7 @@ import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionD
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionListResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionStartResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionUpdateResponse;
+import com.bankrupang.sanjijk.auction.outbox.application.service.AuctionOutboxService;
 import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepository;
 import com.bankrupang.sanjijk.auction.product.exception.ProductErrorCode;
@@ -46,6 +47,7 @@ public class AuctionService {
 
     private final AuctionRepository auctionRepository;
     private final ProductRepository productRepository;
+    private final AuctionOutboxService auctionOutboxService;
 
     @Transactional
     public AuctionCreateResponse createAuction(UUID userId, String userRole, AuctionCreateRequest request) {
@@ -132,6 +134,8 @@ public class AuctionService {
         Auction auction = getExistingAuction(auctionId);
 
         auction.start();
+        Product product = getExistingProduct(auction.getProductId());
+        auctionOutboxService.saveAuctionStartEvent(auction, product);
 
         return AuctionStartResponse.from(auction);
     }
@@ -146,11 +150,14 @@ public class AuctionService {
         validateCloseRequest(auction, request);
 
         auction.markResultPending();
+        Product product = getExistingProduct(auction.getProductId());
 
         if (hasWinningResult(request)) {
             auction.markWon(request.winnerId(), request.finalPrice());
+            auctionOutboxService.saveAuctionWonEvent(auction, product);
         } else {
             auction.markFailed();
+            auctionOutboxService.saveAuctionFailedEvent(auction, product);
         }
 
         return AuctionCloseResponse.from(auction);
