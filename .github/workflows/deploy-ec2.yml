@@ -46,7 +46,8 @@ jobs:
           set -e
           REPO_DIR=/home/ec2-user/sanji-jk
           if [ -d "${REPO_DIR}/.git" ]; then
-            git -C "${REPO_DIR}" pull origin main
+            git -C "${REPO_DIR}" fetch origin main
+            git -C "${REPO_DIR}" reset --hard origin/main
           else
             git clone https://github.com/BankRupang/san-ji-jik-kyeng.git "${REPO_DIR}"
           fi
@@ -67,7 +68,8 @@ jobs:
           set -e
           REPO_DIR=/home/ec2-user/sanji-jk
           if [ -d "${REPO_DIR}/.git" ]; then
-            git -C "${REPO_DIR}" pull origin main
+            git -C "${REPO_DIR}" fetch origin main
+            git -C "${REPO_DIR}" reset --hard origin/main
           else
             git clone https://github.com/BankRupang/san-ji-jik-kyeng.git "${REPO_DIR}"
           fi
@@ -79,7 +81,7 @@ jobs:
           GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
           EOF
           chmod 600 .env
-          envsubst < monitoring/prometheus/prometheus.prod.yml.template > monitoring/prometheus/prometheus.prod.yml
+          envsubst '$KAFKA_PRIVATE_IP' < monitoring/prometheus/prometheus.prod.yml.template > monitoring/prometheus/prometheus.prod.yml
           docker compose -f docker-compose.monitoring.yml pull
           docker compose -f docker-compose.monitoring.yml up -d
           EOS
@@ -97,6 +99,7 @@ jobs:
               --document-name "AWS-RunShellScript" \
               --targets "Key=tag:Role,Values=${role}" \
               --parameters "file:///tmp/ssm-params.json" \
+              --timeout-seconds 600 \
               --region "${AWS_REGION}" \
               --query "Command.CommandId" --output text)
             echo "CommandId: ${command_id}"

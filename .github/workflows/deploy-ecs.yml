@@ -88,7 +88,10 @@ jobs:
           done
 
       # task definition은 그대로 두고, 같은 :latest 를 다시 pull 하도록 강제 재배포합니다.
-      - name: Deploy to ECS (rolling)
+      # 배포 후 새 태스크가 헬스체크를 통과하고 롤링이 끝날 때까지 기다립니다.
+      # aws ecs wait services-stable은 최대 10개 제한이 있어 서비스를 1개씩 넘깁니다.
+      # 백그라운드(&)로 동시에 띄우고 wait으로 전부 끝날 때까지 기다려 O(N) 지연을 방지합니다.
+      - name: Deploy and wait for ECS services
         run: |
           set -euo pipefail
           SERVICES=(
@@ -96,6 +99,7 @@ jobs:
             user-service auction-service bid-service
             order-service payment-service notification-service ai-service
           )
+
           for SERVICE in "${SERVICES[@]}"; do
             echo "force-new-deployment: ${SERVICE}"
             aws ecs update-service \
@@ -106,22 +110,16 @@ jobs:
               --no-cli-pager > /dev/null
           done
 
-      # 새 태스크가 헬스체크를 통과하고 롤링이 끝날 때까지 기다립니다.
-      # aws ecs wait services-stable은 최대 10개 제한이 있어 서비스를 1개씩 넘깁니다.
-      # 백그라운드(&)로 동시에 띄우고 wait으로 전부 끝날 때까지 기다려 O(N) 지연을 방지합니다.
-      - name: Wait for services to stabilize
-        run: |
-          set -euo pipefail
-          SERVICES=(
-            config-server discovery-server gateway-server
-            user-service auction-service bid-service
-            order-service payment-service notification-service ai-service
-          )
+          pids=()
           for SERVICE in "${SERVICES[@]}"; do
             echo "Waiting for ${SERVICE}..."
             aws ecs wait services-stable \
               --cluster "${ECS_CLUSTER}" \
               --region "${AWS_REGION}" \
               --services "${SERVICE}" &
+            pids+=($!)
           done
-          wait
+
+          for pid in "${pids[@]}"; do
+            wait "$pid"
+          done
