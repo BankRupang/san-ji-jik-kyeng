@@ -107,7 +107,8 @@ jobs:
           done
 
       # 새 태스크가 헬스체크를 통과하고 롤링이 끝날 때까지 기다립니다.
-      # aws ecs wait services-stable은 최대 10개 제한이 있어, 서비스별로 순차 대기합니다.
+      # aws ecs wait services-stable은 최대 10개 제한이 있어 서비스를 1개씩 넘깁니다.
+      # 백그라운드(&)로 동시에 띄우고 wait으로 전부 끝날 때까지 기다려 O(N) 지연을 방지합니다.
       - name: Wait for services to stabilize
         run: |
           set -euo pipefail
@@ -121,5 +122,6 @@ jobs:
             aws ecs wait services-stable \
               --cluster "${ECS_CLUSTER}" \
               --region "${AWS_REGION}" \
-              --services "${SERVICE}"
+              --services "${SERVICE}" &
           done
+          wait
