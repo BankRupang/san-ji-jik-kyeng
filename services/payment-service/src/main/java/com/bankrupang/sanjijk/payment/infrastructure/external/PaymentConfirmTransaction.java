@@ -144,7 +144,8 @@ public class PaymentConfirmTransaction {
                 LocalDateTime.now()
         ));
 
-        log.error("[CONFIRM] 결제 승인 실패 - paymentId: {}, failureCode: {}, failureMessage: {}",
-                paymentId, failureCode, failureMessage);
+        log.error("[CONFIRM] 결제 승인 실패 - paymentId: {}, orderId: {}, userId: {}, auctionId: {}, paymentType: {}, failureCode: {}, failureMessage: {}",
+                payment.getId(), payment.getOrderId(), payment.getUserId(), payment.getAuctionId(),
+                payment.getPaymentType(), failureCode, failureMessage);
     }
 }
