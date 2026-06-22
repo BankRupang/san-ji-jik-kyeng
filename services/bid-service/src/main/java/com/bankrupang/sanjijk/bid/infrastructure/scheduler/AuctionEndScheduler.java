@@ -1,12 +1,12 @@
 package com.bankrupang.sanjijk.bid.infrastructure.scheduler;
 
 import com.bankrupang.sanjijk.bid.domain.event.AuctionEndedEvent;
+import com.bankrupang.sanjijk.bid.infrastructure.kafka.BidEventProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -15,7 +15,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
@@ -25,7 +24,7 @@ public class AuctionEndScheduler {
     private final StringRedisTemplate redisTemplate;
     private final RedissonClient redissonClient;
     private final SimpMessagingTemplate messagingTemplate;
-    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final BidEventProducer bidEventProducer;
 
     @Scheduled(fixedDelay = 10000)
     public void checkAuctionEndings() {
@@ -64,8 +63,7 @@ public class AuctionEndScheduler {
                             LocalDateTime.now()
                     );
                     try {
-                        kafkaTemplate.send("auction-ended", auctionId, endedEvent)
-                                .get(3, TimeUnit.SECONDS);
+                        bidEventProducer.sendAuctionEnded(endedEvent);
                         redisTemplate.opsForZSet().remove("auction:endings", auctionId);
                         log.info("경매 종료 완료 - auctionId: {}", auctionId);
                     } catch (Exception e) {
