@@ -4,12 +4,12 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 public record DepositForfeitedEvent(
-        UUID paymentId,
         UUID orderId,
-        UUID userId,
         UUID auctionId,
         String auctionTitle,
-        int amount,
+        UUID winnerId,
+        UUID sellerId,
+        Integer forfeitedAmount,
         LocalDateTime occurredAt
 ) {
 }
