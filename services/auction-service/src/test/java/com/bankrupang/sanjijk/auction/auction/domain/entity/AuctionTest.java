@@ -497,6 +497,48 @@ class AuctionTest {
     }
 
     @Nested
+    @DisplayName("extendEndAt()")
+    class ExtendEndAt {
+
+        @Test
+        @DisplayName("성공 - PROGRESS 상태 경매의 종료 시각을 연장한다")
+        void success() {
+            // given
+            Auction auction = createAuction(AuctionStatus.PROGRESS);
+            LocalDateTime newEndAt = auction.getEndAt().plusMinutes(5);
+
+            // when
+            auction.extendEndAt(newEndAt);
+
+            // then
+            assertThat(auction.getEndAt()).isEqualTo(newEndAt);
+            assertThat(auction.getExtensionCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("실패 - PROGRESS 상태가 아니면 연장할 수 없다")
+        void fail_invalid_state() {
+            // given
+            Auction auction = createAuction(AuctionStatus.WON);
+            LocalDateTime newEndAt = auction.getEndAt().plusMinutes(5);
+
+            // when & then
+            assertInvalidStateTransition(() -> auction.extendEndAt(newEndAt));
+        }
+
+        @Test
+        @DisplayName("실패 - 새 종료 시각이 기존 종료 시각 이후가 아니면 연장할 수 없다")
+        void fail_invalid_period() {
+            // given
+            Auction auction = createAuction(AuctionStatus.PROGRESS);
+            LocalDateTime newEndAt = auction.getEndAt();
+
+            // when & then
+            assertInvalidAuctionPeriod(() -> auction.extendEndAt(newEndAt));
+        }
+    }
+
+    @Nested
     @DisplayName("validateEditable()")
     class ValidateEditable {
 
