@@ -25,6 +25,7 @@ public class KafkaPaymentEventPublisherTransaction {
     private static final String PAYMENT_COMPLETED_TOPIC = "payment-completed";
     private static final String PAYMENT_FAILED_TOPIC = "payment-failed";
     private static final String REFUND_COMPLETED_TOPIC = "refund-completed";
+    private static final String DEPOSIT_FORFEITED_TOPIC = "deposit-forfeited";
 
     @Transactional
     public void relayOne(PaymentOutbox outbox) {
@@ -64,6 +65,7 @@ public class KafkaPaymentEventPublisherTransaction {
             case "PAYMENT_COMPLETED" -> PAYMENT_COMPLETED_TOPIC;
             case "PAYMENT_FAILED" -> PAYMENT_FAILED_TOPIC;
             case "REFUND_COMPLETED" -> REFUND_COMPLETED_TOPIC;
+            case "DEPOSIT_FORFEITED" -> DEPOSIT_FORFEITED_TOPIC;
             default -> throw new IllegalArgumentException("알 수 없는 이벤트 타입: " + eventType);
         };
     }
