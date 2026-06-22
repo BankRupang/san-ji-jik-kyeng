@@ -1,12 +1,12 @@
 package com.bankrupang.sanjijk.bid.infrastructure.scheduler;
 
 import com.bankrupang.sanjijk.bid.domain.event.AuctionEndedEvent;
-import com.bankrupang.sanjijk.bid.infrastructure.kafka.BidEventProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
@@ -24,7 +25,7 @@ public class AuctionEndScheduler {
     private final StringRedisTemplate redisTemplate;
     private final RedissonClient redissonClient;
     private final SimpMessagingTemplate messagingTemplate;
-    private final BidEventProducer bidEventProducer;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     @Scheduled(fixedDelay = 10000)
     public void checkAuctionEndings() {
@@ -43,7 +44,6 @@ public class AuctionEndScheduler {
                 try {
                     log.info("경매 종료 처리 - auctionId: {}", auctionId);
 
-                    // WebSocket으로 종료 메시지 전송
                     messagingTemplate.convertAndSend(
                             "/topic/auction/" + auctionId,
                             "{\"type\":\"AUCTION_ENDED\"}"
@@ -63,11 +63,14 @@ public class AuctionEndScheduler {
                             hasBid ? Long.parseLong(currentPrice) : null,
                             LocalDateTime.now()
                     );
-                    bidEventProducer.sendAuctionEnded(endedEvent);
-
-                    redisTemplate.opsForZSet().remove("auction:endings", auctionId);
-
-                    log.info("경매 종료 완료 - auctionId: {}", auctionId);
+                    try {
+                        kafkaTemplate.send("auction-ended", auctionId, endedEvent)
+                                .get(3, TimeUnit.SECONDS);
+                        redisTemplate.opsForZSet().remove("auction:endings", auctionId);
+                        log.info("경매 종료 완료 - auctionId: {}", auctionId);
+                    } catch (Exception e) {
+                        log.error("AUCTION_ENDED 발행 실패, 재시도 예정. auctionId={}", auctionId, e);
+                    }
                 } finally {
                     lock.unlock();
                 }
