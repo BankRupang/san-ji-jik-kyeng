@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -29,13 +30,20 @@ import com.bankrupang.sanjijk.auction.auction.domain.repository.AuctionRepositor
 import com.bankrupang.sanjijk.auction.auction.domain.type.AuctionStatus;
 import com.bankrupang.sanjijk.auction.auction.exception.AuctionErrorCode;
 import com.bankrupang.sanjijk.auction.auction.exception.AuctionException;
+import com.bankrupang.sanjijk.auction.auction.infrastructure.scheduler.AuctionScheduleManager;
+import com.bankrupang.sanjijk.auction.auction.infrastructure.scheduler.AuctionSchedulerJobService;
+import com.bankrupang.sanjijk.auction.auction.infrastructure.transaction.TransactionAfterCommitExecutor;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCancelRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCloseRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCreateRequest;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionUpdateRequest;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCancelResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCloseResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCreateResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionDetailResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionListResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionStartResponse;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionUpdateResponse;
 import com.bankrupang.sanjijk.auction.outbox.application.service.AuctionOutboxService;
 import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepository;
@@ -58,6 +66,15 @@ class AuctionServiceTest {
 
     @Mock
     private AuctionOutboxService auctionOutboxService;
+
+    @Mock
+    private AuctionScheduleManager auctionScheduleManager;
+
+    @Mock
+    private AuctionSchedulerJobService auctionSchedulerJobService;
+
+    @Mock
+    private TransactionAfterCommitExecutor transactionAfterCommitExecutor;
 
     @Nested
     @DisplayName("createAuction()")
@@ -82,6 +99,11 @@ class AuctionServiceTest {
                 ReflectionTestUtils.setField(auction, "createdAt", createdAt);
                 return auction;
             });
+            doAnswer(invocation -> {
+                Runnable task = invocation.getArgument(0);
+                task.run();
+                return null;
+            }).when(transactionAfterCommitExecutor).execute(any(Runnable.class));
 
             // when
             AuctionCreateResponse result = auctionService.createAuction(sellerId, "SELLER", request);
@@ -104,6 +126,8 @@ class AuctionServiceTest {
             assertThat(savedAuction.getSellerId()).isEqualTo(sellerId);
             assertThat(savedAuction.getStatus()).isEqualTo(AuctionStatus.READY);
             assertThat(savedAuction.getEndAt()).isEqualTo(startAt.plusHours(1));
+            verify(transactionAfterCommitExecutor).execute(any(Runnable.class));
+            verify(auctionScheduleManager).scheduleStartJob(any(UUID.class), any(LocalDateTime.class), any(Runnable.class));
         }
 
         @Test
@@ -126,6 +150,11 @@ class AuctionServiceTest {
                 ReflectionTestUtils.setField(auction, "createdAt", createdAt);
                 return auction;
             });
+            doAnswer(invocation -> {
+                Runnable task = invocation.getArgument(0);
+                task.run();
+                return null;
+            }).when(transactionAfterCommitExecutor).execute(any(Runnable.class));
 
             // when
             AuctionCreateResponse result = auctionService.createAuction(masterId, "MASTER", request);
@@ -136,6 +165,7 @@ class AuctionServiceTest {
             assertThat(result.sellerId()).isEqualTo(sellerId);
             assertThat(result.endAt()).isEqualTo(startAt.plusHours(1));
             verify(auctionRepository).save(any(Auction.class));
+            verify(auctionScheduleManager).scheduleStartJob(any(UUID.class), any(LocalDateTime.class), any(Runnable.class));
         }
 
         @Test
@@ -415,6 +445,95 @@ class AuctionServiceTest {
                     .isInstanceOf(AuctionException.class)
                     .hasMessage(AuctionErrorCode.INVALID_STATE_TRANSITION.getMessage());
             verify(auctionOutboxService, never()).saveAuctionStartEvent(any(Auction.class), any(Product.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("updateAuction()")
+    class UpdateAuction {
+
+        @Test
+        @DisplayName("성공 - 시작 시각을 수정하면 시작 잡을 재등록한다")
+        void success_reschedule_start_job() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            LocalDateTime newStartAt = LocalDateTime.now().plusDays(2);
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            AuctionUpdateRequest request = new AuctionUpdateRequest(null, null, newStartAt);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            doAnswer(invocation -> {
+                Runnable task = invocation.getArgument(0);
+                task.run();
+                return null;
+            }).when(transactionAfterCommitExecutor).execute(any(Runnable.class));
+
+            // when
+            AuctionUpdateResponse result = auctionService.updateAuction(sellerId, "SELLER", auctionId, request);
+
+            // then
+            assertThat(result.auctionId()).isEqualTo(auctionId);
+            assertThat(result.startAt()).isEqualTo(newStartAt);
+            assertThat(result.endAt()).isEqualTo(newStartAt.plusHours(1));
+            verify(transactionAfterCommitExecutor).execute(any(Runnable.class));
+            verify(auctionScheduleManager).scheduleStartJob(any(UUID.class), any(LocalDateTime.class), any(Runnable.class));
+        }
+
+        @Test
+        @DisplayName("성공 - 시작 시각을 수정하지 않으면 시작 잡을 재등록하지 않는다")
+        void success_not_reschedule_without_start_at() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            AuctionUpdateRequest request = new AuctionUpdateRequest(20000, 2000, null);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when
+            AuctionUpdateResponse result = auctionService.updateAuction(sellerId, "SELLER", auctionId, request);
+
+            // then
+            assertThat(result.startPrice()).isEqualTo(20000);
+            assertThat(result.bidUnit()).isEqualTo(2000);
+            verify(transactionAfterCommitExecutor, never()).execute(any(Runnable.class));
+            verify(auctionScheduleManager, never()).scheduleStartJob(any(UUID.class), any(LocalDateTime.class), any(Runnable.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("cancelAuction()")
+    class CancelAuction {
+
+        @Test
+        @DisplayName("성공 - 경매를 취소하면 시작 잡을 취소한다")
+        void success_cancel_start_job() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            AuctionCancelRequest request = new AuctionCancelRequest("판매자 요청 취소");
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            doAnswer(invocation -> {
+                Runnable task = invocation.getArgument(0);
+                task.run();
+                return null;
+            }).when(transactionAfterCommitExecutor).execute(any(Runnable.class));
+
+            // when
+            AuctionCancelResponse result = auctionService.cancelAuction(sellerId, "SELLER", auctionId, request);
+
+            // then
+            assertThat(result.auctionId()).isEqualTo(auctionId);
+            assertThat(result.status()).isEqualTo(AuctionStatus.CANCELLED);
+            assertThat(result.reason()).isEqualTo(request.reason());
+            verify(transactionAfterCommitExecutor).execute(any(Runnable.class));
+            verify(auctionScheduleManager).cancelStartJob(auctionId);
         }
     }
 
