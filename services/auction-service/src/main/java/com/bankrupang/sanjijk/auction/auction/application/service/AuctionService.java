@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import com.bankrupang.sanjijk.auction.auction.domain.entity.Auction;
 import com.bankrupang.sanjijk.auction.auction.domain.repository.AuctionRepository;
@@ -45,6 +46,7 @@ import com.bankrupang.sanjijk.common.util.PageableUtils;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional(readOnly = true)
 public class AuctionService {
 
@@ -155,6 +157,71 @@ public class AuctionService {
     @Transactional
     public AuctionCloseResponse closeAuctionManually(UUID auctionId, AuctionCloseRequest request) {
         Auction auction = getExistingAuction(auctionId);
+
+        return closeAuction(auction, request);
+    }
+
+    @Transactional
+    public AuctionCloseResponse closeAuctionByEndedEvent(UUID auctionId, boolean hasBid, UUID winnerId, Long finalPrice) {
+        Auction auction = getExistingAuction(auctionId);
+        AuctionCloseRequest request = hasBid
+                ? new AuctionCloseRequest(winnerId, toFinalPrice(finalPrice))
+                : null;
+
+        return closeAuction(auction, request);
+    }
+
+    @Transactional
+    public void extendAuctionByExtendedEvent(UUID auctionId, LocalDateTime newEndAt) {
+        Auction auction = getExistingAuction(auctionId);
+
+        if (auction.getStatus() != AuctionStatus.PROGRESS) {
+            log.info("경매 연장 이벤트 처리 생략 - PROGRESS 상태가 아닙니다. auctionId: {}, status: {}",
+                    auctionId, auction.getStatus());
+            return;
+        }
+
+        if (newEndAt == null) {
+            throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_PERIOD);
+        }
+
+        if (!newEndAt.isAfter(auction.getEndAt())) {
+            log.info("경매 연장 이벤트 처리 생략 - 기존 종료 시각 이후가 아닙니다. auctionId: {}, currentEndAt: {}, newEndAt: {}",
+                    auctionId, auction.getEndAt(), newEndAt);
+            return;
+        }
+
+        auction.extendEndAt(newEndAt);
+        scheduleEndCheckJobAfterCommit(auction);
+    }
+
+    @Transactional
+    public void completeAuctionPayment(UUID auctionId) {
+        Auction auction = getExistingAuction(auctionId);
+
+        if (auction.getStatus() == AuctionStatus.SUCCESS || auction.getStatus() == AuctionStatus.FAIL) {
+            log.info("결제 완료 이벤트 처리 생략 - 이미 최종 상태입니다. auctionId: {}, status: {}",
+                    auctionId, auction.getStatus());
+            return;
+        }
+
+        auction.markSuccess();
+    }
+
+    @Transactional
+    public void failAuctionPayment(UUID auctionId) {
+        Auction auction = getExistingAuction(auctionId);
+
+        if (auction.getStatus() == AuctionStatus.SUCCESS || auction.getStatus() == AuctionStatus.FAIL) {
+            log.info("결제 실패 이벤트 처리 생략 - 이미 최종 상태입니다. auctionId: {}, status: {}",
+                    auctionId, auction.getStatus());
+            return;
+        }
+
+        auction.markFailed();
+    }
+
+    private AuctionCloseResponse closeAuction(Auction auction, AuctionCloseRequest request) {
         if (isAlreadyClosed(auction)) {
             return AuctionCloseResponse.from(auction);
         }
@@ -171,6 +238,8 @@ public class AuctionService {
             auction.markFailed();
             auctionOutboxService.saveAuctionFailedEvent(auction, product);
         }
+
+        cancelEndCheckJobAfterCommit(auction);
 
         return AuctionCloseResponse.from(auction);
     }
@@ -248,6 +317,30 @@ public class AuctionService {
 
     private void cancelStartJobAfterCommit(Auction auction) {
         transactionAfterCommitExecutor.execute(() -> auctionScheduleManager.cancelStartJob(auction.getId()));
+    }
+
+    private void cancelEndCheckJobAfterCommit(Auction auction) {
+        transactionAfterCommitExecutor.execute(() -> auctionScheduleManager.cancelEndCheckJob(auction.getId()));
+    }
+
+    private void scheduleEndCheckJobAfterCommit(Auction auction) {
+        transactionAfterCommitExecutor.execute(() -> auctionScheduleManager.scheduleEndCheckJob(
+                auction.getId(),
+                auction.getEndAt(),
+                () -> auctionSchedulerJobService.checkAuctionEnd(auction.getId())
+        ));
+    }
+
+    private Integer toFinalPrice(Long finalPrice) {
+        if (finalPrice == null) {
+            return null;
+        }
+
+        try {
+            return Math.toIntExact(finalPrice);
+        } catch (ArithmeticException e) {
+            throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_RESULT);
+        }
     }
 
     private boolean isAlreadyClosed(Auction auction) {
