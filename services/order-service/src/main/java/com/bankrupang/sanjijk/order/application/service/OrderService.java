@@ -13,10 +13,11 @@ import com.bankrupang.sanjijk.order.presentation.dto.response.OrderResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -61,7 +62,19 @@ public class OrderService {
         orderEventService.publishDepositCreated(order);
 
         return OrderResponse.from(order);
-    };
+    }
+
+    // 내 보증금 주문 목록 조회
+    public Page<OrderResponse> getMyDepositOrders(UUID userId, Pageable pageable) {
+        return orderRepository.findAllByUserIdAndOrderType(userId, OrderType.DEPOSIT, pageable)
+                .map(OrderResponse::from);
+    }
+
+    // 내 낙찰 주문 목록 조회
+    public Page<OrderResponse> getMyWinningOrders(UUID userId, Pageable pageable) {
+        return orderRepository.findAllByUserIdAndOrderType(userId, OrderType.WINNING, pageable)
+                .map(OrderResponse::from);
+    }
 
     // 멱등성 체크
     public boolean existsWinningOrder(UUID auctionId, UUID winnerId) {
