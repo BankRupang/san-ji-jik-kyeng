@@ -105,6 +105,7 @@ public class PaymentService {
             log.info("[PAYMENT] 낙찰 잔금 Payment 생성 완료 - paymentId: {}, orderId: {}, remainingAmount: {}",
                     payment.getId(), event.orderId(), event.remainingAmount());
 
+            // 낙찰 실패자 환불 - DONE 상태(완납)된 보증금만 환불 대상
             List<Payment> loserPayments = paymentRepository
                     .findByAuctionIdAndPaymentTypeAndStatusAndUserIdNot(
                             event.auctionId(), PaymentType.REPAY, PaymentStatus.DONE, event.userId());
@@ -139,6 +140,11 @@ public class PaymentService {
             log.info("[PAYMENT] 유찰 환불 대상: {}명 - auctionId: {}", depositPayments.size(), event.auctionId());
 
             for (Payment depositPayment : depositPayments) {
+                // ⑤ 서비스 레벨 멱등성 - 이미 CANCELED면 스킵
+                if (depositPayment.getStatus() == PaymentStatus.CANCELED) {
+                    log.warn("[PAYMENT] 이미 취소된 보증금 스킵 - paymentId: {}", depositPayment.getId());
+                    continue;
+                }
                 paymentEventPublisher.publishRefundRequest(
                         depositPayment.getOrderId(), depositPayment.getId(),
                         depositPayment.getAmount(), "유찰로 인한 보증금 환불");
@@ -162,17 +168,15 @@ public class PaymentService {
             // READY → IN_PROGRESS (PaymentConfirmTransaction 프록시 통해 호출)
             UUID paymentId = paymentConfirmTransaction.prepareConfirm(request, userId);
 
-            // Toss confirm API 호출 (트랜잭션 밖)
             try {
                 TossPaymentResponse tossResponse = paymentConfirmTransaction.callTossConfirm(
                         request.paymentKey(), request.tossOrderId(), request.amount());
 
-                // 성공: DONE + Redis + Outbox
                 paymentConfirmTransaction.completeConfirm(paymentId, tossResponse, userId);
                 log.info("[CONFIRM] 결제 승인 완료 - paymentId: {}", paymentId);
 
             } catch (Exception e) {
-                // 실패: ABORTED + Outbox (REQUIRES_NEW)
+                // ③ TossPaymentException에서 정확한 코드 추출
                 String failureCode = extractFailureCode(e);
                 paymentConfirmTransaction.failConfirm(paymentId, userId, failureCode, e.getMessage());
                 throw e;
@@ -194,11 +198,10 @@ public class PaymentService {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(PaymentNotFoundException::new);
 
-        // 권한 검증 - 본인 결제만 조회 가능
         if (!payment.getUserId().equals(userId)) {
             log.warn("[PAYMENT] 권한 없음 - paymentId: {}, requestUserId: {}, ownerUserId: {}",
                     paymentId, userId, payment.getUserId());
-            throw new PaymentNotFoundException(); // 존재 여부 노출 방지
+            throw new PaymentNotFoundException();
         }
 
         log.info("[PAYMENT] 단건 조회 - paymentId: {}, userId: {}", paymentId, userId);
@@ -207,6 +210,7 @@ public class PaymentService {
 
     // ================================
     // POST /api/v1/payments/repay/{orderId} → 잔금 재결제
+    // ⑦ 15분 제한 체크 추가
     // ================================
 
     @Transactional
@@ -217,6 +221,14 @@ public class PaymentService {
             Payment abortedPayment = paymentRepository
                     .findByOrderIdAndPaymentTypeAndStatus(orderId, PaymentType.NORMAL, PaymentStatus.ABORTED)
                     .orElseThrow(PaymentNotFoundException::new);
+
+            // 15분 제한 체크 - updatedAt 기준
+            if (abortedPayment.getUpdatedAt() != null &&
+                    abortedPayment.getUpdatedAt().isBefore(LocalDateTime.now().minusMinutes(15))) {
+                log.warn("[REPAY] 재결제 15분 초과 - orderId: {}, abortedAt: {}",
+                        orderId, abortedPayment.getUpdatedAt());
+                throw new PaymentNotFoundException(); // TODO: RepayExpiredException 추가
+            }
 
             String newTossOrderId = UUID.randomUUID().toString();
             Payment newPayment = Payment.create(
@@ -275,8 +287,8 @@ public class PaymentService {
     // ================================
 
     private String extractFailureCode(Exception e) {
-        if (e instanceof TossPaymentException tossEx) {
-            return tossEx.getCode() != null ? tossEx.getCode() : "UNKNOWN";
+        if (e instanceof TossPaymentException tossEx && tossEx.getCode() != null) {
+            return tossEx.getCode();
         }
         return "UNKNOWN";
     }

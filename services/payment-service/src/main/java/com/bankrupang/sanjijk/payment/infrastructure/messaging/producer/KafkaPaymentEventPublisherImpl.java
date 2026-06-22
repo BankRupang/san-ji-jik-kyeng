@@ -2,6 +2,7 @@ package com.bankrupang.sanjijk.payment.infrastructure.messaging.producer;
 
 import com.bankrupang.sanjijk.payment.application.port.PaymentEventPublisher;
 import com.bankrupang.sanjijk.payment.domian.entity.PaymentOutbox;
+import com.bankrupang.sanjijk.payment.domian.exception.PaymentEventPublishFailedException;
 import com.bankrupang.sanjijk.payment.infrastructure.messaging.producer.dto.DepositForfeitedEvent;
 import com.bankrupang.sanjijk.payment.infrastructure.messaging.producer.dto.PaymentCompletedEvent;
 import com.bankrupang.sanjijk.payment.infrastructure.messaging.producer.dto.PaymentFailedEvent;
@@ -46,8 +47,6 @@ public class KafkaPaymentEventPublisherImpl implements PaymentEventPublisher {
 
     @Override
     public void publishRefundRequest(UUID orderId, UUID paymentId, int cancelAmount, String cancelReason) {
-        // REFUND_REQUEST는 Kafka 발행이 아닌 Toss cancel API 호출용
-        // payload에 필요한 정보를 담아 Outbox 적재
         Map<String, Object> payload = Map.of(
                 "paymentId", paymentId.toString(),
                 "cancelAmount", cancelAmount,
@@ -64,7 +63,7 @@ public class KafkaPaymentEventPublisherImpl implements PaymentEventPublisher {
             log.info("[OUTBOX] 이벤트 적재 완료 - eventType: {}, aggregateId: {}", eventType, aggregateId);
         } catch (JsonProcessingException e) {
             log.error("[OUTBOX] 이벤트 직렬화 실패 - eventType: {}, aggregateId: {}", eventType, aggregateId, e);
-            throw new RuntimeException("Outbox 이벤트 직렬화 실패", e);
+            throw new PaymentEventPublishFailedException(); // ⑥ 도메인 예외로 교체
         }
     }
 }
