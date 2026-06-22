@@ -23,7 +23,7 @@ public class TossPaymentsConfig {
      * secretKey + ":" 를 Base64 인코딩 → Basic {encoded} 헤더로 전송
      */
     @Bean
-    public RestClient tossPaymentsRestClient() {
+    public RestClient tossPaymentsHttpClient() {
         String encoded = Base64.getEncoder()
                 .encodeToString((secretKey + ":").getBytes());
 

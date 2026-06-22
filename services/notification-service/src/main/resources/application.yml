@@ -1,5 +1,5 @@
 ﻿server:
-  port: 19095
+  port: 19096
 
 spring:
   application:
@@ -7,16 +7,17 @@ spring:
   config:
     import: "optional:configserver:"
   datasource:
-    url: jdbc:postgresql://localhost:5432/notification_db
+    url: jdbc:postgresql://localhost:5432/postgres?currentSchema=notification_schema
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: create
     properties:
       hibernate:
+        default_schema: notification_schema
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
     show-sql: true
@@ -30,11 +31,12 @@ spring:
     bootstrap-servers: localhost:9092
     consumer:
       group-id: notification-service
-      auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "*"
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
 
 eureka:
   client:
@@ -42,10 +44,11 @@ eureka:
       defaultZone: http://localhost:8761/eureka/
 
 slack:
-  webhook:
-    url: ${SLACK_WEBHOOK_URL:https://hooks.slack.com/services/dummy}
+  bot:
+    token: ${SLACK_BOT_TOKEN}
 
 notification:
   scheduler:
     fixed-delay-ms: 60000
-    pending-timeout-minutes: 60
+  cache:
+    notification-enabled-ttl-minutes: 5
