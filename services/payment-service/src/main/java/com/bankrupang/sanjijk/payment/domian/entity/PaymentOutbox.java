@@ -19,7 +19,7 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PaymentOutbox {
 
-    private static final int MAX_RETRY_COUNT = 3;
+    public static final int MAX_RETRY_COUNT = 3;
 
     @Id
     @UuidGenerator(style = UuidGenerator.Style.TIME)

@@ -13,7 +13,7 @@ import java.util.Base64;
 public class TossPaymentsConfig {
 
     @Value("${toss.payments.base-url}")
-    private String BASE_URL;
+    private String baseUrl;
 
     @Value("${toss.payments.secret-key}")
     private String secretKey;
@@ -28,7 +28,7 @@ public class TossPaymentsConfig {
                 .encodeToString((secretKey + ":").getBytes());
 
         return RestClient.builder()
-                .baseUrl(BASE_URL)
+                .baseUrl(baseUrl)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Basic " + encoded)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();

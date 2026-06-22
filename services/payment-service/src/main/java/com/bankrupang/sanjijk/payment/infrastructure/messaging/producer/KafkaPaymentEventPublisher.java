@@ -25,7 +25,7 @@ public class KafkaPaymentEventPublisher {
     @Scheduled(fixedDelay = 5000)
     public void relay() {
         List<PaymentOutbox> outboxList = paymentOutboxJpaRepository
-                .findRetryableOutboxes(PageRequest.of(0, 100));
+                .findRetryableOutboxes(PageRequest.of(0, 100), PaymentOutbox.MAX_RETRY_COUNT);
 
         for (PaymentOutbox outbox : outboxList) {
             try {
