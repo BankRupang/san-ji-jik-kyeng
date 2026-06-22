@@ -208,6 +208,19 @@ public class AuctionService {
         auction.markSuccess();
     }
 
+    @Transactional
+    public void failAuctionPayment(UUID auctionId) {
+        Auction auction = getExistingAuction(auctionId);
+
+        if (auction.getStatus() == AuctionStatus.SUCCESS || auction.getStatus() == AuctionStatus.FAIL) {
+            log.info("결제 실패 이벤트 처리 생략 - 이미 최종 상태입니다. auctionId: {}, status: {}",
+                    auctionId, auction.getStatus());
+            return;
+        }
+
+        auction.markFailed();
+    }
+
     private AuctionCloseResponse closeAuction(Auction auction, AuctionCloseRequest request) {
         if (isAlreadyClosed(auction)) {
             return AuctionCloseResponse.from(auction);

@@ -68,7 +68,7 @@ public class AuctionExternalEventConsumer {
         log.warn("[KAFKA][CONSUME] PAYMENT_FAILED 수신 - orderId: {}, auctionId: {}, winnerId: {}, failureMessage: {}, occurredAt: {}",
                 event.orderId(), event.auctionId(), event.winnerId(), event.failureMessage(), event.occurredAt());
 
-        // TODO: PAYMENT_FAILED 수신 시 WON -> FAIL 상태 전이를 처리한다.
+        auctionService.failAuctionPayment(event.auctionId());
     }
 
     @KafkaListener(topics = "deposit-forfeited", groupId = AUCTION_SERVICE_GROUP_ID)
@@ -78,7 +78,7 @@ public class AuctionExternalEventConsumer {
         log.warn("[KAFKA][CONSUME] DEPOSIT_FORFEITED 수신 - orderId: {}, auctionId: {}, winnerId: {}, forfeitedAmount: {}, occurredAt: {}",
                 event.orderId(), event.auctionId(), event.winnerId(), event.forfeitedAmount(), event.occurredAt());
 
-        // TODO: DEPOSIT_FORFEITED 수신 시 WON -> FAIL 상태 전이를 처리한다.
+        auctionService.failAuctionPayment(event.auctionId());
     }
 
     private <T> T readEvent(String payload, Class<T> eventType, String eventName) {

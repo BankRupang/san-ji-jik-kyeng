@@ -1038,6 +1038,91 @@ class AuctionServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("failAuctionPayment()")
+    class FailAuctionPayment {
+
+        @Test
+        @DisplayName("성공 - WON 상태 경매를 FAIL 상태로 변경한다")
+        void success() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            UUID winnerId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start();
+            auction.markResultPending();
+            auction.markWon(winnerId, 15000);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when
+            auctionService.failAuctionPayment(auctionId);
+
+            // then
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.FAIL);
+        }
+
+        @Test
+        @DisplayName("성공 - 이미 FAIL 상태이면 멱등하게 처리한다")
+        void success_idempotent_fail() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start();
+            auction.markResultPending();
+            auction.markFailed();
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when
+            auctionService.failAuctionPayment(auctionId);
+
+            // then
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.FAIL);
+        }
+
+        @Test
+        @DisplayName("성공 - 이미 SUCCESS 상태이면 멱등하게 처리한다")
+        void success_idempotent_success() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            ReflectionTestUtils.setField(auction, "status", AuctionStatus.SUCCESS);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when
+            auctionService.failAuctionPayment(auctionId);
+
+            // then
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.SUCCESS);
+        }
+
+        @Test
+        @DisplayName("실패 - WON 상태가 아니면 결제 실패 처리할 수 없다")
+        void fail_invalid_state() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when & then
+            assertThatThrownBy(() -> auctionService.failAuctionPayment(auctionId))
+                    .isInstanceOf(AuctionException.class)
+                    .hasMessage(AuctionErrorCode.INVALID_STATE_TRANSITION.getMessage());
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.READY);
+        }
+    }
+
     private AuctionCreateRequest createRequest(UUID productId, LocalDateTime startAt) {
         return new AuctionCreateRequest(
                 productId,
