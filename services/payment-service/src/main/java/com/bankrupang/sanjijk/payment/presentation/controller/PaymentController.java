@@ -41,5 +41,13 @@ public class PaymentController {
         return ResponseEntity.ok(paymentService.getPayment(paymentId, userId));
     }
 
-    // TODO: POST /repay/{orderId} - 잔금 재결제
+    // 잔금 재결제 (결제 실패 후 15분 내 다른 카드로 재결제)
+    @PostMapping("/repay/{orderId}")
+    public ResponseEntity<PaymentResponse> repayPayment(
+            @PathVariable UUID orderId,
+            @RequestHeader("X-User-Id") UUID userId
+    ) {
+        log.info("[API] POST /repay/{} - userId: {}", orderId, userId);
+        return ResponseEntity.ok(paymentService.repayPayment(orderId, userId));
+    }
 }

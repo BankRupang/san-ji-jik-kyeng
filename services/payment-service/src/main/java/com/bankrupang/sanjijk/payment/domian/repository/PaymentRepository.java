@@ -16,12 +16,13 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
 
     // 낙찰 실패자 환불용
     List<Payment> findByAuctionIdAndPaymentTypeAndStatusAndUserIdNot(
-            UUID auctionId, PaymentType paymentType, PaymentStatus status, UUID winnerId
-    );
+            UUID auctionId, PaymentType paymentType, PaymentStatus status, UUID winnerId);
 
     // 유찰(입찰 0건) 환불용
     List<Payment> findByAuctionIdAndPaymentTypeAndStatus(
-      UUID auctionId, PaymentType paymentType, PaymentStatus status
-    );
+            UUID auctionId, PaymentType paymentType, PaymentStatus status);
 
+    // 잔금 재결제용 - ABORTED 상태 NORMAL Payment 조회
+    Optional<Payment> findByOrderIdAndPaymentTypeAndStatus(
+            UUID orderId, PaymentType paymentType, PaymentStatus status);
 }

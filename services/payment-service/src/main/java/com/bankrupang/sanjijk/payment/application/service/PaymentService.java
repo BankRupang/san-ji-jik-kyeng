@@ -53,15 +53,9 @@ public class PaymentService {
             }
 
             Payment payment = Payment.create(
-                    event.orderId(),
-                    event.userId(),
-                    null,
-                    event.auctionId(),
-                    event.auctionTitle(),
-                    event.orderId().toString(),
-                    PaymentType.REPAY,
-                    event.depositAmount(),
-                    null
+                    event.orderId(), event.userId(), null,
+                    event.auctionId(), event.auctionTitle(), event.orderId().toString(),
+                    PaymentType.REPAY, event.depositAmount(), null
             );
             paymentRepository.save(payment);
 
@@ -163,11 +157,9 @@ public class PaymentService {
         MDC.put("traceId", UUID.randomUUID().toString());
         log.info("[CONFIRM] 결제 승인 요청 - tossOrderId: {}, amount: {}", request.tossOrderId(), request.amount());
         try {
-            // Payment 조회
             Payment payment = paymentRepository.findByTossOrderId(request.tossOrderId())
                     .orElseThrow(PaymentNotFoundException::new);
 
-            // 금액 검증
             if (payment.getAmount() != request.amount()) {
                 log.warn("[CONFIRM] 금액 불일치 - expected: {}, actual: {}", payment.getAmount(), request.amount());
                 throw new PaymentAmountMismatchException();
@@ -183,17 +175,12 @@ public class PaymentService {
 
             UUID paymentId = payment.getId();
 
-            // Toss confirm API 호출 (트랜잭션 밖에서 실행되도록 별도 메서드)
             try {
                 TossPaymentResponse tossResponse = paymentConfirmTransaction.callTossConfirm(
                         request.paymentKey(), request.tossOrderId(), request.amount());
-
-                // 성공: DONE + Redis + Outbox
                 paymentConfirmTransaction.completeConfirm(paymentId, tossResponse, request.auctionId(), userId, endAt);
-
                 log.info("[CONFIRM] 결제 승인 완료 - paymentId: {}", paymentId);
             } catch (Exception e) {
-                // 실패: ABORTED + Outbox
                 String failureCode = "UNKNOWN";
                 String failureMessage = e.getMessage();
                 paymentConfirmTransaction.failConfirm(paymentId, userId, failureCode, failureMessage);
@@ -217,6 +204,50 @@ public class PaymentService {
                 .orElseThrow(PaymentNotFoundException::new);
         log.info("[PAYMENT] 단건 조회 - paymentId: {}, userId: {}", paymentId, userId);
         return PaymentResponse.from(payment);
+    }
+
+    // ================================
+    // POST /api/v1/payments/repay/{orderId} → 잔금 재결제
+    // ================================
+
+    @Transactional
+    public PaymentResponse repayPayment(UUID orderId, UUID userId) {
+        MDC.put("traceId", UUID.randomUUID().toString());
+        log.info("[REPAY] 잔금 재결제 요청 - orderId: {}, userId: {}", orderId, userId);
+        try {
+            // 기존 ABORTED Payment 조회
+            Payment abortedPayment = paymentRepository
+                    .findByOrderIdAndPaymentTypeAndStatus(orderId, PaymentType.NORMAL, PaymentStatus.ABORTED)
+                    .orElseThrow(PaymentNotFoundException::new);
+
+            // 새 tossOrderId로 새 Payment 생성
+            String newTossOrderId = UUID.randomUUID().toString();
+            Payment newPayment = Payment.create(
+                    abortedPayment.getOrderId(),
+                    abortedPayment.getUserId(),
+                    abortedPayment.getSellerId(),
+                    abortedPayment.getAuctionId(),
+                    abortedPayment.getAuctionTitle(),
+                    newTossOrderId,
+                    PaymentType.NORMAL,
+                    abortedPayment.getAmount(),
+                    abortedPayment.getOriginalAmount()
+            );
+            paymentRepository.save(newPayment);
+
+            paymentHistoryRepository.save(PaymentHistory.of(
+                    newPayment.getId(), newPayment.getOrderId(), newPayment.getPaymentType(),
+                    null, PaymentStatus.READY, "잔금 재결제 Payment 생성",
+                    newPayment.getAmount(), null, null, userId
+            ));
+
+            log.info("[REPAY] 재결제 Payment 생성 완료 - newPaymentId: {}, orderId: {}, amount: {}",
+                    newPayment.getId(), orderId, newPayment.getAmount());
+
+            return PaymentResponse.from(newPayment);
+        } finally {
+            MDC.clear();
+        }
     }
 
     // ================================
@@ -247,8 +278,4 @@ public class PaymentService {
                 payment.getFailureCode(), payment.getFailureMessage(), null
         ));
     }
-
-    // ================================
-    // TODO: repayPayment - 잔금 재결제
-    // ================================
 }
