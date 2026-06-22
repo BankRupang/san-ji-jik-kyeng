@@ -201,7 +201,6 @@ class PaymentServiceTest {
                     UUID.randomUUID(), "테스트 경매", UUID.randomUUID(), LocalDateTime.now()
             );
             Payment payment = mock(Payment.class);
-            given(payment.getStatus()).willReturn(PaymentStatus.DONE);
             given(payment.getOrderId()).willReturn(UUID.randomUUID());
             given(payment.getId()).willReturn(UUID.randomUUID());
             given(payment.getAmount()).willReturn(100_000);
