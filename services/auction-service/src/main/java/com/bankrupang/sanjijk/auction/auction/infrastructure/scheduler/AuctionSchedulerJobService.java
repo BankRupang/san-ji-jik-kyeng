@@ -23,6 +23,7 @@ public class AuctionSchedulerJobService {
     private final AuctionRepository auctionRepository;
     private final ProductRepository productRepository;
     private final AuctionOutboxService auctionOutboxService;
+    private final AuctionScheduleManager auctionScheduleManager;
 
     @Transactional
     public void startAuction(UUID auctionId) {
@@ -49,6 +50,29 @@ public class AuctionSchedulerJobService {
 
         auction.start();
         auctionOutboxService.saveAuctionStartEvent(auction, product);
+        auctionScheduleManager.scheduleEndCheckJob(
+                auction.getId(),
+                auction.getEndAt(),
+                () -> checkAuctionEnd(auction.getId())
+        );
         log.info("스케줄러 경매 시작 완료 - auctionId: {}", auction.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public void checkAuctionEnd(UUID auctionId) {
+        auctionRepository.findByIdAndDeletedAtIsNull(auctionId)
+                .ifPresentOrElse(this::checkAuctionEndIfProgress, () ->
+                        log.warn("스케줄러 마감 확인 대상 경매를 찾을 수 없습니다. auctionId: {}", auctionId));
+    }
+
+    private void checkAuctionEndIfProgress(Auction auction) {
+        if (auction.getStatus() != AuctionStatus.PROGRESS) {
+            log.info("스케줄러 마감 확인 생략 - PROGRESS 상태가 아닙니다. auctionId: {}, status: {}",
+                    auction.getId(), auction.getStatus());
+            return;
+        }
+
+        log.info("스케줄러 마감 확인 완료 - bid-service의 AUCTION_ENDED 이벤트를 대기합니다. auctionId: {}",
+                auction.getId());
     }
 }

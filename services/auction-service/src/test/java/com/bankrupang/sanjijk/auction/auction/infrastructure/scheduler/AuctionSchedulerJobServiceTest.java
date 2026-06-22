@@ -42,6 +42,9 @@ class AuctionSchedulerJobServiceTest {
     @Mock
     private AuctionOutboxService auctionOutboxService;
 
+    @Mock
+    private AuctionScheduleManager auctionScheduleManager;
+
     @Nested
     @DisplayName("startAuction()")
     class StartAuction {
@@ -65,6 +68,7 @@ class AuctionSchedulerJobServiceTest {
             // then
             assertThat(auction.getStatus()).isEqualTo(AuctionStatus.PROGRESS);
             verify(auctionOutboxService).saveAuctionStartEvent(auction, product);
+            verify(auctionScheduleManager).scheduleEndCheckJob(any(UUID.class), any(LocalDateTime.class), any(Runnable.class));
         }
 
         @Test
@@ -86,6 +90,7 @@ class AuctionSchedulerJobServiceTest {
             assertThat(auction.getStatus()).isEqualTo(AuctionStatus.CANCELLED);
             verify(productRepository, never()).findByIdAndDeletedAtIsNull(any(UUID.class));
             verify(auctionOutboxService, never()).saveAuctionStartEvent(any(Auction.class), any(Product.class));
+            verify(auctionScheduleManager, never()).scheduleEndCheckJob(any(UUID.class), any(LocalDateTime.class), any(Runnable.class));
         }
 
         @Test
@@ -106,6 +111,53 @@ class AuctionSchedulerJobServiceTest {
             // then
             assertThat(auction.getStatus()).isEqualTo(AuctionStatus.READY);
             verify(auctionOutboxService, never()).saveAuctionStartEvent(any(Auction.class), any(Product.class));
+            verify(auctionScheduleManager, never()).scheduleEndCheckJob(any(UUID.class), any(LocalDateTime.class), any(Runnable.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("checkAuctionEnd()")
+    class CheckAuctionEnd {
+
+        @Test
+        @DisplayName("성공 - PROGRESS 경매의 마감 시각 도달 여부를 확인한다")
+        void success_progress() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start();
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when
+            auctionSchedulerJobService.checkAuctionEnd(auctionId);
+
+            // then
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.PROGRESS);
+            verify(auctionOutboxService, never()).saveAuctionFailedEvent(any(Auction.class), any(Product.class));
+            verify(auctionOutboxService, never()).saveAuctionWonEvent(any(Auction.class), any(Product.class));
+        }
+
+        @Test
+        @DisplayName("성공 - PROGRESS 상태가 아니면 마감 확인만 생략한다")
+        void success_skip_not_progress() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+
+            // when
+            auctionSchedulerJobService.checkAuctionEnd(auctionId);
+
+            // then
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.READY);
+            verify(auctionOutboxService, never()).saveAuctionFailedEvent(any(Auction.class), any(Product.class));
+            verify(auctionOutboxService, never()).saveAuctionWonEvent(any(Auction.class), any(Product.class));
         }
     }
 
