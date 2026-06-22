@@ -26,8 +26,8 @@ public record UserAdminSignupRequest(
                 message = "password는 8~15자, 대소문자, 숫자, 특수문자를 포함해야 합니다")
         String password,
 
-        @NotNull
-        UUID slackId,
+        @NotBlank
+        String slackId,
 
         boolean notificationAllow,
 

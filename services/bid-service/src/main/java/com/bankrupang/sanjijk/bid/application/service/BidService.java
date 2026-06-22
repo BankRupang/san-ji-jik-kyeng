@@ -1,7 +1,10 @@
 package com.bankrupang.sanjijk.bid.application.service;
 
+import com.bankrupang.sanjijk.bid.domain.event.AuctionExtendedEvent;
+import com.bankrupang.sanjijk.bid.domain.event.BidOvertakenEvent;
 import com.bankrupang.sanjijk.bid.domain.exception.BidErrorCode;
 import com.bankrupang.sanjijk.bid.domain.exception.BidException;
+import com.bankrupang.sanjijk.bid.infrastructure.kafka.BidEventProducer;
 import com.bankrupang.sanjijk.bid.presentation.dto.BidBroadcastDto;
 import com.bankrupang.sanjijk.bid.presentation.dto.BidRequestDto;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -28,6 +31,7 @@ public class BidService {
     private final RedissonClient redissonClient;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final BidEventProducer bidEventProducer;
 
     public void bid(UUID auctionId, UUID userId, BidRequestDto request) {
         String lockKey = "auction:" + auctionId + ":lock";
@@ -82,6 +86,7 @@ public class BidService {
                 redisTemplate.expire(hashKey, Duration.ofSeconds(newTtl));
                 redisTemplate.opsForZSet().add("auction:endings", auctionId.toString(), newEndAt.toEpochSecond(ZoneOffset.UTC));
                 log.info("안티스나이핑 발동 - auctionId: {}, newEndAt: {}", auctionId, newEndAt);
+                bidEventProducer.sendAuctionExtended(new AuctionExtendedEvent(auctionId.toString(), newEndAt));
             }
 
             redisTemplate.opsForHash().put(hashKey, "currentPrice", String.valueOf(request.getBidPrice()));
@@ -105,7 +110,18 @@ public class BidService {
                 log.error("브로드캐스트 직렬화 실패 - auctionId: {}", auctionId, e);
             }
 
-            // TODO: Kafka BID_OVERTAKEN 이벤트 발행
+            String productName = (String) info.get("productName");
+            String previousBidderId = (highestBidderId == null || highestBidderId.isBlank() || highestBidderId.equals("none"))
+                    ? "" : highestBidderId;
+            BidOvertakenEvent overtakenEvent = new BidOvertakenEvent(
+                    auctionId.toString(),
+                    productName,
+                    previousBidderId,
+                    request.getBidPrice(),
+                    request.getBidPrice() + bidUnit,
+                    LocalDateTime.now()
+            );
+            bidEventProducer.sendBidOvertaken(overtakenEvent);
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

@@ -1,5 +1,7 @@
 package com.bankrupang.sanjijk.auction.auction.domain.repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -19,4 +21,6 @@ public interface AuctionRepository extends JpaRepository<Auction, UUID> {
     Page<Auction> findAllByDeletedAtIsNull(Pageable pageable);
 
     Page<Auction> findAllByStatusAndDeletedAtIsNull(AuctionStatus status, Pageable pageable);
+
+    List<Auction> findAllByStatusInAndDeletedAtIsNull(Collection<AuctionStatus> statuses);
 }
