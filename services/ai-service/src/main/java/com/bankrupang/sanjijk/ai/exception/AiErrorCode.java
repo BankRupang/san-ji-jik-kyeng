@@ -15,7 +15,8 @@ public enum AiErrorCode implements ErrorCode {
     AI_RESPONSE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI-004", "AI 응답을 생성할 수 없습니다."),
     DOCUMENT_INGESTION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "AI-005", "문서 적재에 실패했습니다."),
     DOCUMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "AI-006", "문서를 찾을 수 없습니다."),
-    DOCUMENT_EMPTY(HttpStatus.BAD_REQUEST, "AI-007", "빈 파일은 등록할 수 없습니다.");
+    DOCUMENT_EMPTY(HttpStatus.BAD_REQUEST, "AI-007", "빈 파일은 등록할 수 없습니다."),
+    DOCUMENT_CONTENT_EMPTY(HttpStatus.BAD_REQUEST, "AI-008", "파일에서 텍스트 내용을 추출할 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;

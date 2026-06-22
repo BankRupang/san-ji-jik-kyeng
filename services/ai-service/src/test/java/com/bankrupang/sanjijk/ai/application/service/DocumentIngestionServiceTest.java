@@ -4,12 +4,13 @@ import com.bankrupang.sanjijk.ai.exception.AiErrorCode;
 import com.bankrupang.sanjijk.ai.infrastructure.persistence.VectorStoreRepository;
 import com.bankrupang.sanjijk.ai.presentation.dto.response.DocumentInfoResponse;
 import com.bankrupang.sanjijk.common.exception.BaseException;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.tika.Tika;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.document.Document;
@@ -45,15 +46,20 @@ class DocumentIngestionServiceTest {
     @Mock
     private TokenTextSplitter tokenTextSplitter;
 
-    @InjectMocks
     private DocumentIngestionService documentIngestionService;
+
+    @BeforeEach
+    void setUp() {
+        documentIngestionService = new DocumentIngestionService(vectorStore, vectorStoreRepository,
+                tika, tokenTextSplitter, new SimpleMeterRegistry());
+    }
 
     @Nested
     @DisplayName("문서 등록")
     class Ingest {
 
         @Test
-        @DisplayName("성공")
+        @DisplayName("성공 - 새 버전 적재 후 구 버전 삭제")
         void success() throws Exception {
             // given
             MockMultipartFile file = new MockMultipartFile(
@@ -61,12 +67,14 @@ class DocumentIngestionServiceTest {
                     "경매 규정 내용입니다.".getBytes());
             given(tika.parseToString(any(InputStream.class))).willReturn("경매 규정 내용입니다.");
             given(tokenTextSplitter.apply(anyList())).willReturn(List.of(new Document("청크 내용")));
+            given(vectorStoreRepository.deleteBySourceExcludingVersion(anyString(), anyString())).willReturn(0);
 
             // when
             documentIngestionService.ingest(file, "auction-rules");
 
             // then
             verify(vectorStore).add(anyList());
+            verify(vectorStoreRepository).deleteBySourceExcludingVersion(eq("auction-rules"), anyString());
         }
 
         @Test
@@ -97,7 +105,7 @@ class DocumentIngestionServiceTest {
         }
 
         @Test
-        @DisplayName("VectorStore 저장 실패 시 DOCUMENT_INGESTION_FAILED 예외 발생")
+        @DisplayName("VectorStore 저장 실패 시 DOCUMENT_INGESTION_FAILED 예외 발생, 구 버전 삭제 미호출")
         void vectorStoreFailed() throws Exception {
             // given
             MockMultipartFile file = new MockMultipartFile(
@@ -110,6 +118,7 @@ class DocumentIngestionServiceTest {
             assertThatThrownBy(() -> documentIngestionService.ingest(file, "auction-rules"))
                     .isInstanceOf(BaseException.class)
                     .hasMessage(AiErrorCode.DOCUMENT_INGESTION_FAILED.getMessage());
+            verify(vectorStoreRepository, never()).deleteBySourceExcludingVersion(anyString(), anyString());
         }
     }
 

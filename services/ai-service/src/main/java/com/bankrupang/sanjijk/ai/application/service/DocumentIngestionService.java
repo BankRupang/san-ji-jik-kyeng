@@ -65,12 +65,11 @@ public class DocumentIngestionService {
         }
         String title = extractTitle(file.getOriginalFilename());
         String version = UUID.randomUUID().toString();
+        List<Document> chunks;
         try {
-            List<Document> chunks = parseAndSplit(file, title, source, version);
+            chunks = parseAndSplit(file, title, source, version);
             vectorStore.add(chunks);
-            ingestSuccessCounter.increment();
-            chunkDistribution.record(chunks.size());
-            log.info("문서 적재 완료 - source: {}, title: {}, 청크 수: {}", source, title, chunks.size());
+            vectorStoreRepository.deleteBySourceExcludingVersion(source, version);
         } catch (BaseException e) {
             ingestFailCounter.increment();
             throw e;
@@ -79,6 +78,9 @@ public class DocumentIngestionService {
             log.error("벡터 스토어 저장 실패 - source: {}", source, e);
             throw new BaseException(AiErrorCode.DOCUMENT_INGESTION_FAILED);
         }
+        ingestSuccessCounter.increment();
+        chunkDistribution.record(chunks.size());
+        log.info("문서 적재 완료 - source: {}, title: {}, 청크 수: {}", source, title, chunks.size());
     }
 
     public void reingest(MultipartFile file, String source) {
@@ -125,8 +127,14 @@ public class DocumentIngestionService {
     private List<Document> parseAndSplit(MultipartFile file, String title, String source, String version) {
         try (InputStream inputStream = file.getInputStream()) {
             String text = tika.parseToString(inputStream);
+            if (text == null || text.isBlank()) {
+                log.error("파일 내용 없음 - source: {}", source);
+                throw new BaseException(AiErrorCode.DOCUMENT_CONTENT_EMPTY);
+            }
             List<Document> documents = splitBySections(text, title, source, version);
             return tokenTextSplitter.apply(documents);
+        } catch (BaseException e) {
+            throw e;
         } catch (TikaException e) {
             log.error("Tika 파싱 실패 - source: {}", source, e);
             throw new BaseException(AiErrorCode.DOCUMENT_INGESTION_FAILED);
