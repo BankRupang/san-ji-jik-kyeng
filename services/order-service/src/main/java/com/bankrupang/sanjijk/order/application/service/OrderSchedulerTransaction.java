@@ -1,19 +1,13 @@
 package com.bankrupang.sanjijk.order.application.service;
 
 import com.bankrupang.sanjijk.order.domain.entity.Order;
-import com.bankrupang.sanjijk.order.domain.entity.OrderOutbox;
 import com.bankrupang.sanjijk.order.domain.enums.OrderStatus;
 import com.bankrupang.sanjijk.order.domain.enums.OrderType;
 import com.bankrupang.sanjijk.order.domain.repository.OrderRepository;
-import com.bankrupang.sanjijk.order.infrastructure.outbox.OrderOutboxJpaRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Map;
 
 @Slf4j
 @Component
@@ -21,8 +15,6 @@ import java.util.Map;
 public class OrderSchedulerTransaction {
 
     private final OrderRepository orderRepository;
-    private final OrderOutboxJpaRepository orderOutboxJpaRepository;
-    private final ObjectMapper objectMapper;
 
     @Transactional
     public void expireUnpaidOne(Order order) {
@@ -53,26 +45,6 @@ public class OrderSchedulerTransaction {
                     log.warn("[SCHEDULER] 예치금 몰수 처리 - orderId: {}, userId: {}, orderType: {}, PAYMENT_SUCCESS → FORFEITED",
                             depositOrder.getId(), depositOrder.getUserId(), depositOrder.getOrderType());
                 });
-
-        saveOutbox(order, "DEPOSIT_FORFEITED");
     }
 
-    private void saveOutbox(Order order, String eventType) {
-        try {
-            String payload = objectMapper.writeValueAsString(Map.of(
-                    "orderId", order.getId().toString(),
-                    "userId", order.getUserId().toString(),
-                    "auctionId", order.getAuctionId().toString()
-            ));
-            OrderOutbox outbox = OrderOutbox.builder()
-                    .aggregateType("Order")
-                    .aggregateId(order.getId())
-                    .eventType(eventType)
-                    .payload(payload)
-                    .build();
-            orderOutboxJpaRepository.save(outbox);
-        } catch (JsonProcessingException e) {
-            log.error("[SCHEDULER] Outbox 저장 실패 - orderId: {}, eventType: {}", order.getId(), eventType, e);
-        }
-    }
 }
