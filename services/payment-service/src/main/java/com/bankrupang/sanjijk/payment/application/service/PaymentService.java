@@ -5,8 +5,8 @@ import com.bankrupang.sanjijk.payment.domian.entity.Payment;
 import com.bankrupang.sanjijk.payment.domian.entity.PaymentHistory;
 import com.bankrupang.sanjijk.payment.domian.enums.PaymentStatus;
 import com.bankrupang.sanjijk.payment.domian.enums.PaymentType;
-import com.bankrupang.sanjijk.payment.domian.exception.PaymentAmountMismatchException;
 import com.bankrupang.sanjijk.payment.domian.exception.PaymentNotFoundException;
+import com.bankrupang.sanjijk.payment.domian.exception.TossPaymentException;
 import com.bankrupang.sanjijk.payment.domian.repository.PaymentHistoryRepository;
 import com.bankrupang.sanjijk.payment.domian.repository.PaymentRepository;
 import com.bankrupang.sanjijk.payment.infrastructure.external.PaymentConfirmTransaction;
@@ -56,7 +56,7 @@ public class PaymentService {
                     event.orderId(), event.userId(), null,
                     event.auctionId(), event.auctionTitle(), event.orderId().toString(),
                     PaymentType.REPAY, event.depositAmount(), null,
-                    event.endAt()  // 경매 종료 시각 - Redis TTL 계산용
+                    event.endAt()
             );
             paymentRepository.save(payment);
 
@@ -92,7 +92,7 @@ public class PaymentService {
                     event.orderId(), event.userId(), event.sellerId(),
                     event.auctionId(), event.auctionTitle(), event.orderId().toString(),
                     PaymentType.NORMAL, event.remainingAmount(), event.finalPrice(),
-                    null  // NORMAL은 endAt 불필요
+                    null
             );
             paymentRepository.save(payment);
 
@@ -152,30 +152,29 @@ public class PaymentService {
 
     // ================================
     // POST /api/v1/payments/confirm → 결제 승인
-    // 트랜잭션 없음 - Toss HTTP 호출 후 completeConfirm/failConfirm 각각 트랜잭션
+    // 트랜잭션 없음 - 각 단계별 별도 트랜잭션
     // ================================
 
     public PaymentResponse confirmPayment(PaymentConfirmRequest request, UUID userId) {
         MDC.put("traceId", UUID.randomUUID().toString());
         log.info("[CONFIRM] 결제 승인 요청 - tossOrderId: {}, amount: {}", request.tossOrderId(), request.amount());
         try {
-            // Payment 조회 + 상태 검증 + IN_PROGRESS 전이 (별도 트랜잭션)
-            UUID paymentId = prepareConfirm(request, userId);
+            // READY → IN_PROGRESS (PaymentConfirmTransaction 프록시 통해 호출)
+            UUID paymentId = paymentConfirmTransaction.prepareConfirm(request, userId);
 
             // Toss confirm API 호출 (트랜잭션 밖)
             try {
                 TossPaymentResponse tossResponse = paymentConfirmTransaction.callTossConfirm(
                         request.paymentKey(), request.tossOrderId(), request.amount());
 
-                // 성공: DONE + Redis + Outbox (트랜잭션)
+                // 성공: DONE + Redis + Outbox
                 paymentConfirmTransaction.completeConfirm(paymentId, tossResponse, userId);
                 log.info("[CONFIRM] 결제 승인 완료 - paymentId: {}", paymentId);
 
             } catch (Exception e) {
-                // 실패: ABORTED + Outbox (REQUIRES_NEW 트랜잭션)
+                // 실패: ABORTED + Outbox (REQUIRES_NEW)
                 String failureCode = extractFailureCode(e);
-                String failureMessage = e.getMessage();
-                paymentConfirmTransaction.failConfirm(paymentId, userId, failureCode, failureMessage);
+                paymentConfirmTransaction.failConfirm(paymentId, userId, failureCode, e.getMessage());
                 throw e;
             }
 
@@ -184,27 +183,6 @@ public class PaymentService {
         } finally {
             MDC.clear();
         }
-    }
-
-    @Transactional
-    public UUID prepareConfirm(PaymentConfirmRequest request, UUID userId) {
-        Payment payment = paymentRepository.findByTossOrderId(request.tossOrderId())
-                .orElseThrow(PaymentNotFoundException::new);
-
-        if (payment.getAmount() != request.amount()) {
-            log.warn("[CONFIRM] 금액 불일치 - expected: {}, actual: {}", payment.getAmount(), request.amount());
-            throw new PaymentAmountMismatchException();
-        }
-
-        payment.inProgress();
-        paymentHistoryRepository.save(PaymentHistory.of(
-                payment.getId(), payment.getOrderId(), payment.getPaymentType(),
-                PaymentStatus.READY, PaymentStatus.IN_PROGRESS, "결제 승인 요청",
-                payment.getAmount(), null, null, userId
-        ));
-
-        log.info("[CONFIRM] READY → IN_PROGRESS - paymentId: {}", payment.getId());
-        return payment.getId();
     }
 
     // ================================
@@ -242,16 +220,9 @@ public class PaymentService {
 
             String newTossOrderId = UUID.randomUUID().toString();
             Payment newPayment = Payment.create(
-                    abortedPayment.getOrderId(),
-                    abortedPayment.getUserId(),
-                    abortedPayment.getSellerId(),
-                    abortedPayment.getAuctionId(),
-                    abortedPayment.getAuctionTitle(),
-                    newTossOrderId,
-                    PaymentType.NORMAL,
-                    abortedPayment.getAmount(),
-                    abortedPayment.getOriginalAmount(),
-                    null  // NORMAL은 endAt 불필요
+                    abortedPayment.getOrderId(), abortedPayment.getUserId(), abortedPayment.getSellerId(),
+                    abortedPayment.getAuctionId(), abortedPayment.getAuctionTitle(), newTossOrderId,
+                    PaymentType.NORMAL, abortedPayment.getAmount(), abortedPayment.getOriginalAmount(), null
             );
             paymentRepository.save(newPayment);
 
@@ -300,13 +271,12 @@ public class PaymentService {
     }
 
     // ================================
-    // Toss 예외에서 failureCode 추출
+    // Toss 응답에서 failureCode 추출
     // ================================
 
     private String extractFailureCode(Exception e) {
-        // TossPaymentException이 있으면 code 추출, 없으면 UNKNOWN
-        if (e.getCause() != null && e.getCause().getMessage() != null) {
-            return e.getCause().getMessage();
+        if (e instanceof TossPaymentException tossEx) {
+            return tossEx.getCode() != null ? tossEx.getCode() : "UNKNOWN";
         }
         return "UNKNOWN";
     }
