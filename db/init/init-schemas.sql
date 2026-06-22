@@ -7,3 +7,11 @@ CREATE SCHEMA IF NOT EXISTS notification_schema;
 CREATE SCHEMA IF NOT EXISTS ai_schema;
 CREATE SCHEMA IF NOT EXISTS keycloak_schema;
 CREATE SCHEMA IF NOT EXISTS langfuse_schema;
+
+CREATE TABLE IF NOT EXISTS auction_schema.shedlock (
+    name VARCHAR(64) NOT NULL,
+    lock_until TIMESTAMP NOT NULL,
+    locked_at TIMESTAMP NOT NULL,
+    locked_by VARCHAR(255) NOT NULL,
+    PRIMARY KEY (name)
+);
