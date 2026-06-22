@@ -20,9 +20,10 @@ public class KafkaOrderEventPublisherTransaction {
     private final ObjectMapper objectMapper;
     private final OrderOutboxJpaRepository orderOutboxJpaRepository;
 
-    //payment-service가 order-events 토픽을 수신할 때 DEPOSIT_CREATED인지 WINNING_CREATED인지 구분
     private static final String DEPOSIT_CREATED_TOPIC = "deposit-created";
     private static final String WINNING_CREATED_TOPIC = "winning-created";
+    private static final String PAYMENT_FAILED_TOPIC = "payment-failed";
+    private static final String DEPOSIT_FORFEITED_TOPIC = "deposit-forfeited";
 
     @Transactional
     public void relayOne(OrderOutbox outbox) {
@@ -48,6 +49,8 @@ public class KafkaOrderEventPublisherTransaction {
         return switch (eventType) {
             case "DEPOSIT_CREATED" -> DEPOSIT_CREATED_TOPIC;
             case "WINNING_CREATED" -> WINNING_CREATED_TOPIC;
+            case "PAYMENT_FAILED" -> PAYMENT_FAILED_TOPIC;
+            case "DEPOSIT_FORFEITED" -> DEPOSIT_FORFEITED_TOPIC;
             default -> throw new IllegalArgumentException("알 수 없는 이벤트 타입: " + eventType);
         };
     }

@@ -27,7 +27,11 @@ public class OrderScheduler {
                 OrderType.WINNING, OrderStatus.PENDING, LocalDateTime.now());
 
         for (Order order : unpaidOrders) {
-            orderSchedulerTransaction.expireUnpaidOne(order);
+            try {
+                orderSchedulerTransaction.expireUnpaidOne(order);
+            } catch (Exception e) {
+                log.error("[SCHEDULER] 미결제 주문 처리 실패 - orderId: {}", order.getId(), e);
+            }
         }
     }
 
@@ -37,7 +41,11 @@ public class OrderScheduler {
                 OrderType.WINNING, OrderStatus.PENALTY_PENDING, LocalDateTime.now());
 
         for (Order order : penaltyOrders) {
-            orderSchedulerTransaction.expirePenaltyOne(order);
+            try {
+                orderSchedulerTransaction.expirePenaltyOne(order);
+            } catch (Exception e) {
+                log.error("[SCHEDULER] 패널티 만료 주문 처리 실패 - orderId: {}", order.getId(), e);
+            }
         }
     }
 
