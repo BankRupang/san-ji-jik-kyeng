@@ -26,7 +26,7 @@ public class InternalUserController {
         return ResponseEntity.status(HttpStatus.OK).body(ApiResponse.ok(userService.getNotificationAllow(userId)));
     }
 
-    @GetMapping("/{userId}/userInfo")
+    @GetMapping("/{userId}/user-info")
     public ResponseEntity<ApiResponse<UserInfoResponse>> getUserInfo(@PathVariable UUID userId) {
         return ResponseEntity.status(HttpStatus.OK).body(ApiResponse.ok(userService.getUserInfo(userId)));
     }
