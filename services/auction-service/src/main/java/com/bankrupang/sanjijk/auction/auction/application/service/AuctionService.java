@@ -36,6 +36,7 @@ import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionD
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionListResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionStartResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionUpdateResponse;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionDepositInfoResponse;
 import com.bankrupang.sanjijk.auction.global.util.AuctionLogContext;
 import com.bankrupang.sanjijk.auction.outbox.application.service.AuctionOutboxService;
 import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
@@ -434,4 +435,15 @@ public class AuctionService {
         return "MANAGER".equalsIgnoreCase(userRole) || "ROLE_MANAGER".equalsIgnoreCase(userRole);
     }
 
+    @Transactional(readOnly = true)
+    public AuctionDepositInfoResponse getAuctionDepositInfo(UUID auctionId) {
+        Auction auction = getExistingAuction(auctionId);
+        Product product = getExistingProduct(auction.getProductId());
+
+        return new AuctionDepositInfoResponse(
+                auction.getStartPrice(),
+                product.getName(),
+                auction.getEndAt()
+        );
+    }
 }
