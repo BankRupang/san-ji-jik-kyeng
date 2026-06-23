@@ -30,9 +30,12 @@ spring:
     openai:
       api-key: ${GEMINI_API_KEY}
       base-url: https://generativelanguage.googleapis.com/v1beta/openai
+      connect-timeout: 5s
+      read-timeout: 60s
       chat:
         options:
           model: gemini-2.5-flash
+          reasoning-effort: low
       embedding:
         options:
           model: gemini-embedding-2
@@ -53,9 +56,20 @@ eureka:
 ai:
   chat:
     session-expire-hours: 24
+    max-history: 10
     similarity-threshold: 0.7
     top-k: 3
   document:
     chunk-size: 500
     chunk-overlap: 50
     tika-max-string-length: 500000
+
+langfuse:
+  host: ${LANGFUSE_HOST:http://localhost:3001}
+  auth-header: ${LANGFUSE_AUTH_HEADER:}
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+
