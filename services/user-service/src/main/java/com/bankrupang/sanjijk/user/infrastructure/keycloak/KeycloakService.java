@@ -65,18 +65,17 @@ public class KeycloakService {
             String keycloakUserId = path.substring(path.lastIndexOf("/") + 1);
 
             try {
-                // 1. 유저 생성이 성공한 직후, 역할을 부여합니다.
+                // 유저 생성이 성공한 직후, 역할을 부여합니다.
                 assignRoleToUser(keycloakUserId, role.name());
                 return UUID.fromString(keycloakUserId);
             } catch (Exception e) {
-                // 2. 💥 역할 부여 중 에러(403 등)가 발생하면 방금 만든 Keycloak 유저를 즉시 삭제(롤백)합니다.
+                // 역할 부여 중 에러(403 등)가 발생시 만든 Keycloak 유저를 즉시 삭제(롤백)합니다.
                 log.error("Keycloak 유저 생성 후 역할 부여 실패. 생성된 유저 롤백 삭제 진행: userId={}", keycloakUserId, e);
                 try {
                     usersResource.get(keycloakUserId).remove();
                 } catch (Exception rollbackEx) {
                     log.error("Keycloak 롤백 삭제마저 실패. 수동 확인 필요: userId={}", keycloakUserId, rollbackEx);
                 }
-                // 기존에 UserService가 캐치할 수 있도록 예외를 던져줍니다.
                 throw new UserKeycloakCreationFailedException();
             }
         } else {
