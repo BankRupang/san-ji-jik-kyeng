@@ -4,16 +4,15 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Getter
 @NoArgsConstructor
 public class BidOvertakenEvent {
 
-    private UUID auctionId;
+    private String auctionId;
     private String auctionTitle;
-    private UUID previousBidderId;
-    private int newPrice;
-    private int nextMinPrice;
+    private String previousBidderId;
+    private Long newPrice;
+    private Long nextMinPrice;
     private LocalDateTime occurredAt;
 }
