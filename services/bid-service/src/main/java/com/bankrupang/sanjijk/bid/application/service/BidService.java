@@ -7,6 +7,7 @@ import com.bankrupang.sanjijk.bid.domain.exception.BidException;
 import com.bankrupang.sanjijk.bid.infrastructure.kafka.BidEventProducer;
 import com.bankrupang.sanjijk.bid.presentation.dto.BidBroadcastDto;
 import com.bankrupang.sanjijk.bid.presentation.dto.BidRequestDto;
+import com.bankrupang.sanjijk.bid.presentation.dto.HighestBidResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -64,7 +65,7 @@ public class BidService {
                 throw new BidException(BidErrorCode.AUCTION_ENDED);
             }
 
-            Long currentPrice = Long.parseLong((String) info.get("currentPrice"));
+            Integer currentPrice = Integer.parseInt((String) info.get("currentPrice"));
 
             if (!request.getClientSeenPrice().equals(currentPrice)) {
                 throw new BidException(BidErrorCode.BID_PRICE_OUTDATED);
@@ -93,7 +94,7 @@ public class BidService {
             redisTemplate.opsForHash().put(hashKey, "highestBidderId", userId.toString());
             log.info("현재가 갱신 - auctionId: {}, newPrice: {}, highestBidder: {}", auctionId, request.getBidPrice(), userId);
 
-            Long bidUnit = Long.parseLong((String) info.get("bidUnit"));
+            Integer bidUnit = Integer.parseInt((String) info.get("bidUnit"));
             BidBroadcastDto broadcast = new BidBroadcastDto(
                     "BID_UPDATED",
                     auctionId.toString(),
@@ -132,5 +133,31 @@ public class BidService {
                 log.info("분산 락 해제 - auctionId: {}", auctionId);
             }
         }
+    }
+
+    public HighestBidResponse getHighestBid(UUID auctionId) {
+        log.info("최고가 조회 요청 (폴백) - auctionId: {}", auctionId);
+
+        Map<Object, Object> info = redisTemplate.opsForHash()
+                .entries("auction:" + auctionId + ":info");
+
+        if (info.isEmpty()) {
+            throw new BidException(BidErrorCode.AUCTION_NOT_FOUND);
+        }
+
+        String highestBidderId = (String) info.get("highestBidderId");
+        String currentPrice = (String) info.get("currentPrice");
+
+        boolean hasBid = highestBidderId != null
+                && !highestBidderId.isBlank()
+                && !highestBidderId.equals("none");
+
+        if (!hasBid) {
+            log.info("입찰자 없음 - auctionId: {}", auctionId);
+            return null;
+        }
+
+        log.info("최고가 조회 완료 - auctionId: {}, winnerId: {}, finalPrice: {}", auctionId, highestBidderId, currentPrice);
+        return new HighestBidResponse(UUID.fromString(highestBidderId), Integer.parseInt(currentPrice));
     }
 }

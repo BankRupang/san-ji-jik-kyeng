@@ -7,9 +7,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class BidRequestDto {
 
-    private Long bidPrice;
+    private Integer bidPrice;
 
-    private Long clientSeenPrice;
+    private Integer clientSeenPrice;
 
     private ActionType actionType = ActionType.BID;
 

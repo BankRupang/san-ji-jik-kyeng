@@ -59,7 +59,7 @@ public class AuctionEndScheduler {
                             auctionId,
                             hasBid,
                             hasBid ? highestBidderId : null,
-                            hasBid ? Long.parseLong(currentPrice) : null,
+                            hasBid ? Integer.parseInt(currentPrice) : null,
                             LocalDateTime.now()
                     );
                     try {
