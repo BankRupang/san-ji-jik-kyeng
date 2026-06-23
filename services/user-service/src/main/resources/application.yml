@@ -10,10 +10,11 @@ spring:
       host: ${REDIS_HOST}
       port: 6379
 
-  # 컨피그 서버 오류로 실행이 안되어 비활성화
+  config:
+    import: "optional:configserver:http://localhost:8888"
   cloud:
     config:
-      enabled: false
+      enabled: true
 
 
   jpa:
@@ -28,7 +29,7 @@ spring:
   # 로컬 DB 연결
   datasource:
     url: ${POSTGRES_DB_URL}
-    username: ${POSTGRES_USERNAME}
+    username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
