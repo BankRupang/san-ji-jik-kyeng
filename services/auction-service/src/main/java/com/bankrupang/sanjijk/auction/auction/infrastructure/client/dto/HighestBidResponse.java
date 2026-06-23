@@ -2,8 +2,8 @@ package com.bankrupang.sanjijk.auction.auction.infrastructure.client.dto;
 
 import java.util.UUID;
 
-public record BidHighestBidResponse(
+public record HighestBidResponse(
         UUID winnerId,
-        Long finalPrice
+        Integer finalPrice
 ) {
 }

@@ -42,6 +42,8 @@ import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepository;
 import com.bankrupang.sanjijk.auction.product.exception.ProductErrorCode;
 import com.bankrupang.sanjijk.auction.product.exception.ProductException;
+import com.bankrupang.sanjijk.auction.auction.infrastructure.client.BidClient;
+import com.bankrupang.sanjijk.auction.auction.infrastructure.client.dto.HighestBidResponse;
 import com.bankrupang.sanjijk.common.response.PageResponse;
 import com.bankrupang.sanjijk.common.util.PageableUtils;
 
@@ -57,6 +59,7 @@ public class AuctionService {
     private final AuctionScheduleManager auctionScheduleManager;
     private final AuctionSchedulerJobService auctionSchedulerJobService;
     private final TransactionAfterCommitExecutor transactionAfterCommitExecutor;
+    private final BidClient bidClient;
 
     @Transactional
     public AuctionCreateResponse createAuction(UUID userId, String userRole, AuctionCreateRequest request) {
@@ -85,6 +88,17 @@ public class AuctionService {
     public AuctionDetailResponse getAuction(UUID auctionId) {
         Auction auction = getExistingAuction(auctionId);
         Product product = getExistingProduct(auction.getProductId());
+
+        if (auction.getStatus() == AuctionStatus.PROGRESS) {
+            try {
+                HighestBidResponse highestBid = bidClient.getHighestBid(auctionId);
+                if (highestBid != null) {
+                    return AuctionDetailResponse.of(auction, product, highestBid.winnerId(), highestBid.finalPrice());
+                }
+            } catch (Exception e) {
+                log.warn("경매 상세 조회 중 bid-service 최고가 조회 실패 - auctionId: {}, error: {}", auctionId, e.getMessage());
+            }
+        }
 
         return AuctionDetailResponse.of(auction, product);
     }
