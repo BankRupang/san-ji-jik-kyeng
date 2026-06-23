@@ -822,7 +822,7 @@ class AuctionServiceTest {
                     auctionId,
                     true,
                     winnerId,
-                    15000L
+                    15000
             );
 
             // then
@@ -890,7 +890,7 @@ class AuctionServiceTest {
                     auctionId,
                     true,
                     winnerId,
-                    15000L
+                    15000
             );
 
             // then

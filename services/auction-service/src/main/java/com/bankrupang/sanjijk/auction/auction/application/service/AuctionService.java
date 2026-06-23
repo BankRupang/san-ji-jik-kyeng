@@ -180,11 +180,11 @@ public class AuctionService {
     }
 
     @Transactional
-    public AuctionCloseResponse closeAuctionByEndedEvent(UUID auctionId, boolean hasBid, UUID winnerId, Long finalPrice) {
+    public AuctionCloseResponse closeAuctionByEndedEvent(UUID auctionId, boolean hasBid, UUID winnerId, Integer finalPrice) {
         return AuctionLogContext.callWithAuctionId(auctionId, () -> {
             Auction auction = getExistingAuction(auctionId);
             AuctionCloseRequest request = hasBid
-                    ? new AuctionCloseRequest(winnerId, toFinalPrice(finalPrice))
+                    ? new AuctionCloseRequest(winnerId, finalPrice)
                     : null;
 
             return closeAuction(auction, request, "AUCTION_ENDED");
@@ -387,17 +387,7 @@ public class AuctionService {
         ));
     }
 
-    private Integer toFinalPrice(Long finalPrice) {
-        if (finalPrice == null) {
-            return null;
-        }
 
-        try {
-            return Math.toIntExact(finalPrice);
-        } catch (ArithmeticException e) {
-            throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_RESULT);
-        }
-    }
 
     private boolean isAlreadyClosed(Auction auction) {
         return auction.getStatus() == AuctionStatus.WON || auction.getStatus() == AuctionStatus.FAIL;

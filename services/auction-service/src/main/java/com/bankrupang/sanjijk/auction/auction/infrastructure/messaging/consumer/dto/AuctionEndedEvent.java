@@ -7,7 +7,7 @@ public record AuctionEndedEvent(
         UUID auctionId,
         boolean hasBid,
         UUID winnerId,
-        Long finalPrice,
+        Integer finalPrice,
         LocalDateTime endedAt
 ) {
 }

@@ -94,7 +94,7 @@ public class AuctionSchedulerJobService {
 
             boolean hasBid = response != null && response.winnerId() != null && response.finalPrice() != null;
             UUID winnerId = hasBid ? response.winnerId() : null;
-            Long finalPrice = hasBid ? response.finalPrice().longValue() : null;
+            Integer finalPrice = hasBid ? response.finalPrice() : null;
 
             auctionServiceProvider.getObject().closeAuctionByEndedEvent(
                     auction.getId(), hasBid, winnerId, finalPrice

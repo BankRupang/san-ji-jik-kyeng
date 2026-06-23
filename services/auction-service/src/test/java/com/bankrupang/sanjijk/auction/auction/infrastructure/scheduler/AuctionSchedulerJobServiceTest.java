@@ -196,7 +196,7 @@ class AuctionSchedulerJobServiceTest {
             auctionSchedulerJobService.checkAuctionEnd(auctionId);
 
             // then
-            verify(proxiedAuctionService).closeAuctionByEndedEvent(auctionId, true, winnerId, 12000L);
+            verify(proxiedAuctionService).closeAuctionByEndedEvent(auctionId, true, winnerId, 12000);
         }
 
         @Test
