@@ -78,10 +78,22 @@ jobs:
           export KAFKA_PRIVATE_IP
           GRAFANA_ADMIN_PASSWORD=$(aws ssm get-parameter --name /sanji/prod/monitoring/grafana-admin-password --with-decryption --query Parameter.Value --output text --region ap-northeast-2)
           SLACK_WEBHOOK_URL=$(aws ssm get-parameter --name /sanji/prod/monitoring/slack-webhook-url --with-decryption --query Parameter.Value --output text --region ap-northeast-2)
+          LANGFUSE_NEXTAUTH_SECRET=$(aws ssm get-parameter --name /sanji/prod/langfuse/nextauth-secret --with-decryption --query Parameter.Value --output text --region ap-northeast-2)
+          LANGFUSE_SALT=$(aws ssm get-parameter --name /sanji/prod/langfuse/salt --with-decryption --query Parameter.Value --output text --region ap-northeast-2)
+          DB_PASSWORD=$(aws ssm get-parameter --name /sanji/prod/db/password --with-decryption --query Parameter.Value --output text --region ap-northeast-2)
+          RDS_HOST=$(aws rds describe-db-instances --query "DBInstances[?DBInstanceIdentifier=='sanji-prod-postgres'].Endpoint.Address" --output text --region ap-northeast-2)
+          IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+          MONITORING_PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: ${IMDS_TOKEN}" http://169.254.169.254/latest/meta-data/public-ipv4)
+          LANGFUSE_DATABASE_URL="postgresql://sanji:${DB_PASSWORD}@${RDS_HOST}:5432/sanji?schema=langfuse_schema"
+          LANGFUSE_URL="http://${MONITORING_PUBLIC_IP}:3001"
           cat > .env <<EOF
           KAFKA_PRIVATE_IP=${KAFKA_PRIVATE_IP}
           GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
           SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+          LANGFUSE_DATABASE_URL=${LANGFUSE_DATABASE_URL}
+          LANGFUSE_NEXTAUTH_SECRET=${LANGFUSE_NEXTAUTH_SECRET}
+          LANGFUSE_NEXTAUTH_URL=${LANGFUSE_URL}
+          LANGFUSE_SALT=${LANGFUSE_SALT}
           EOF
           chmod 600 .env
           envsubst '$KAFKA_PRIVATE_IP' < monitoring/prometheus/prometheus.prod.yml.template > monitoring/prometheus/prometheus.prod.yml
