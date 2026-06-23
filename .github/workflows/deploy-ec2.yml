@@ -84,8 +84,9 @@ jobs:
           EOF
           chmod 600 .env
           envsubst '$KAFKA_PRIVATE_IP' < monitoring/prometheus/prometheus.prod.yml.template > monitoring/prometheus/prometheus.prod.yml
-          # ecs-targets.json이 없으면 빈 파일 생성 (Prometheus 컨테이너가 마운트 실패 방지)
-          [ -f monitoring/prometheus/ecs-targets.json ] || echo "[]" > monitoring/prometheus/ecs-targets.json
+          # ecs-targets.json이 없으면 빈 파일 생성 (ec2-user 소유여야 cron 스크립트가 덮어쓸 수 있음)
+          [ -f monitoring/prometheus/ecs-targets.json ] || sudo -u ec2-user sh -c 'echo "[]" > monitoring/prometheus/ecs-targets.json'
+          chown ec2-user:ec2-user monitoring/prometheus/ecs-targets.json
           # ecs-discovery.sh 실행 권한 부여
           chmod +x monitoring/prometheus/ecs-discovery.sh
           # /etc/cron.d 에 등록해서 ec2-user 권한으로 5분마다 실행
