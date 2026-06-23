@@ -1,4 +1,6 @@
 spring:
+  profiles:
+    include: native
   cloud:
     config:
       server:
