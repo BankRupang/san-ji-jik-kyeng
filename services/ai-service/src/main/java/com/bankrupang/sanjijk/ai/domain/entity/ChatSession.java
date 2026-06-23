@@ -38,7 +38,19 @@ public class ChatSession extends BaseEntity {
         return status == SessionStatus.EXPIRED || LocalDateTime.now().isAfter(expiredAt);
     }
 
+    public boolean isProcessing() {
+        return this.status == SessionStatus.PROCESSING;
+    }
+
     public void expire() {
         this.status = SessionStatus.EXPIRED;
+    }
+
+    public void markProcessing() {
+        this.status = SessionStatus.PROCESSING;
+    }
+
+    public void markActive() {
+        this.status = SessionStatus.ACTIVE;
     }
 }

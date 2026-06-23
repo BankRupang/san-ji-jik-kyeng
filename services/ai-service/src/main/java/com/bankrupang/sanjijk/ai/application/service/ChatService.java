@@ -79,29 +79,39 @@ public class ChatService {
     public String chat(UUID sessionId, UUID userId, String userMessage) {
         validateSession(sessionId, userId);
 
-        return Observation.createNotStarted("chat.pipeline", observationRegistry)
-                .highCardinalityKeyValue("user.id", userId.toString())
-                .observe(() -> {
-                    List<ChatMessage> history = messageRepository
-                            .findBySessionIdOrderByIdDesc(sessionId, PageRequest.of(0, maxHistory))
-                            .reversed();
+        try {
+            return Observation.createNotStarted("chat.pipeline", observationRegistry)
+                    .highCardinalityKeyValue("user.id", userId.toString())
+                    .observe(() -> {
+                        List<ChatMessage> history = messageRepository
+                                .findBySessionIdOrderByIdDesc(sessionId, PageRequest.of(0, maxHistory))
+                                .reversed();
 
-                    // 2단계: Query Reformulation - 대화 기록 기반 쿼리 재작성
-                    String searchQuery = reformulateQuery(userMessage, history);
+                        // 2단계: Query Reformulation - 대화 기록 기반 쿼리 재작성
+                        String searchQuery = reformulateQuery(userMessage, history);
 
-                    // 3단계: Hybrid Search - RRF 융합 검색
-                    List<String> documents = hybridSearchService.search(searchQuery);
+                        // 3단계: Hybrid Search - RRF 융합 검색
+                        List<String> documents = hybridSearchService.search(searchQuery);
 
-                    // 4단계: Context Condensing + 응답 생성 (시스템 프롬프트에 가드레일 포함)
-                    String response = generateResponse(userMessage, history, documents);
+                        // 4단계: Context Condensing + 응답 생성 (시스템 프롬프트에 가드레일 포함)
+                        String response = generateResponse(userMessage, history, documents);
 
-                    transactionTemplate.executeWithoutResult(status -> {
-                        messageRepository.save(ChatMessage.of(sessionId, ChatRole.USER, userMessage));
-                        messageRepository.save(ChatMessage.of(sessionId, ChatRole.ASSISTANT, response));
+                        transactionTemplate.executeWithoutResult(status -> {
+                            messageRepository.save(ChatMessage.of(sessionId, ChatRole.USER, userMessage));
+                            messageRepository.save(ChatMessage.of(sessionId, ChatRole.ASSISTANT, response));
+                        });
+
+                        return response;
                     });
-
-                    return response;
-                });
+        } finally {
+            transactionTemplate.executeWithoutResult(status ->
+                    sessionRepository.findByIdAndDeletedAtIsNull(sessionId)
+                            .ifPresent(session -> {
+                                session.markActive();
+                                sessionRepository.save(session);
+                            })
+            );
+        }
     }
 
     @Transactional(readOnly = true)
@@ -136,11 +146,16 @@ public class ChatService {
             if (!session.getUserId().equals(userId)) {
                 throw new BaseException(AiErrorCode.CHAT_SESSION_ACCESS_DENIED);
             }
+            if (session.isProcessing()) {
+                throw new BaseException(AiErrorCode.CHAT_SESSION_ALREADY_PROCESSING);
+            }
             if (session.isExpired()) {
                 session.expire();
                 sessionRepository.save(session);
                 return true;
             }
+            session.markProcessing();
+            sessionRepository.save(session);
             return false;
         }));
         if (expired) {
