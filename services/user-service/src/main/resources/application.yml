@@ -1,5 +1,60 @@
-﻿spring:
+﻿server:
+  port: 19091
+
+spring:
   application:
     name: user-service
-  config:
-    import: "optional:configserver:http://localhost:8888"
+
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: 6379
+
+  # 컨피그 서버 오류로 실행이 안되어 비활성화
+  cloud:
+    config:
+      enabled: false
+
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        show_sql: true
+        format_sql: true
+
+
+  # 로컬 DB 연결
+  datasource:
+    url: ${POSTGRES_DB_URL}
+    username: ${POSTGRES_USERNAME}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+# 키클락 설정
+keycloak:
+  server-url: ${KEYCLOAK_SERVER_URL}
+  realm: sanjijk
+  client-id: user-service
+  client-secret: ${KEYCLOAK_CLIENT_SECRET}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+admin :
+  manager-key : ${MANAGER_KEY}
+  master-key : ${MASTER_KEY}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  endpoint:
+    health:
+      show-details: always

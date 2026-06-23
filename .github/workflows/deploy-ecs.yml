@@ -1,0 +1,125 @@
+name: Deploy ECS
+
+# main에 코드가 합쳐지면 운영 ECS(App + Bid)로 자동 배포합니다.
+# 흐름: JAR 빌드 -> Docker 이미지 빌드 -> ECR push -> ECS 롤링 배포 -> 안정화 대기
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:   # 필요할 때 수동으로 다시 배포하는 버튼
+
+# OIDC로 AWS에 키 없이 로그인하려면 id-token 쓰기 권한이 반드시 필요합니다.
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECS_CLUSTER: sanji-prod-cluster
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('**/*.gradle', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-
+
+      - name: Grant execute permission
+        run: chmod +x gradlew
+
+      - name: Build JARs
+        run: ./gradlew bootJar -x test --parallel
+
+      # OIDC 역할로 AWS 로그인
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 서비스 10개 이미지를 빌드해서 :latest 태그로 push 합니다.
+      # 모든 Dockerfile은 빌드 컨텍스트가 레포 루트라, 경로(SERVICES 표)만 바꿔주면 됩니다.
+      - name: Build and push images
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+
+          # "서비스이름:Dockerfile경로" 매핑 (config/discovery/gateway는 루트, 나머지는 services/)
+          SERVICES=(
+            "config-server:config-server/Dockerfile"
+            "discovery-server:discovery-server/Dockerfile"
+            "gateway-server:gateway-server/Dockerfile"
+            "user-service:services/user-service/Dockerfile"
+            "auction-service:services/auction-service/Dockerfile"
+            "bid-service:services/bid-service/Dockerfile"
+            "order-service:services/order-service/Dockerfile"
+            "payment-service:services/payment-service/Dockerfile"
+            "notification-service:services/notification-service/Dockerfile"
+            "ai-service:services/ai-service/Dockerfile"
+          )
+
+          for entry in "${SERVICES[@]}"; do
+            SERVICE="${entry%%:*}"
+            DOCKERFILE="${entry#*:}"
+            IMAGE="${ECR_REGISTRY}/sanji/${SERVICE}"
+            echo "::group::build ${SERVICE}"
+            docker build -f "${DOCKERFILE}" -t "${IMAGE}:latest" .
+            docker push "${IMAGE}:latest"
+            echo "::endgroup::"
+          done
+
+      # task definition은 그대로 두고, 같은 :latest 를 다시 pull 하도록 강제 재배포합니다.
+      # 배포 후 새 태스크가 헬스체크를 통과하고 롤링이 끝날 때까지 기다립니다.
+      # aws ecs wait services-stable은 최대 10개 제한이 있어 서비스를 1개씩 넘깁니다.
+      # 백그라운드(&)로 동시에 띄우고 wait으로 전부 끝날 때까지 기다려 O(N) 지연을 방지합니다.
+      - name: Deploy and wait for ECS services
+        run: |
+          set -euo pipefail
+          SERVICES=(
+            config-server discovery-server gateway-server
+            user-service auction-service bid-service
+            order-service payment-service notification-service ai-service
+          )
+
+          for SERVICE in "${SERVICES[@]}"; do
+            echo "force-new-deployment: ${SERVICE}"
+            aws ecs update-service \
+              --cluster "${ECS_CLUSTER}" \
+              --service "${SERVICE}" \
+              --force-new-deployment \
+              --region "${AWS_REGION}" \
+              --no-cli-pager > /dev/null
+          done
+
+          pids=()
+          for SERVICE in "${SERVICES[@]}"; do
+            echo "Waiting for ${SERVICE}..."
+            aws ecs wait services-stable \
+              --cluster "${ECS_CLUSTER}" \
+              --region "${AWS_REGION}" \
+              --services "${SERVICE}" &
+            pids+=($!)
+          done
+
+          for pid in "${pids[@]}"; do
+            wait "$pid"
+          done
