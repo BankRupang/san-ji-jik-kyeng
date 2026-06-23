@@ -10,9 +10,12 @@ import java.util.UUID;
 @NoArgsConstructor
 public class RefundCompletedEvent {
 
+    private UUID paymentId;
+    private UUID orderId;
     private UUID auctionId;
     private String auctionTitle;
     private UUID userId;
     private int cancelAmount;
+    private String cancelReason;
     private LocalDateTime occurredAt;
 }

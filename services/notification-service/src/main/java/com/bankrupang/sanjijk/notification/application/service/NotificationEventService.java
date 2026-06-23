@@ -105,6 +105,10 @@ public class NotificationEventService {
             log.info("이전 최고 입찰자 없음 (첫 입찰), BID_OVERTAKEN 알림 스킵");
             return;
         }
+        if (event.getNewPrice() == null || event.getNextMinPrice() == null) {
+            log.warn("BID_OVERTAKEN 가격 정보 누락, 알림 스킵 - auctionId={}", event.getAuctionId());
+            return;
+        }
         processAndPublish(UUID.fromString(event.getPreviousBidderId()), NotificationType.BID_OVERTAKEN,
                 "입찰 추월 알림",
                 String.format("입찰 추월 알림 / %s / 현재가: %,d원 / 다음 최소 입찰가: %,d원",
@@ -140,6 +144,10 @@ public class NotificationEventService {
 
     private void processAndPublish(UUID userId, NotificationType type,
                                    String title, String message, UUID referenceId) {
+        if (userId == null) {
+            log.warn("userId is null, 알림 스킵 - type={}", type);
+            return;
+        }
         UserNotificationResponse response = userNotificationCacheService.getNotificationEnabled(userId);
 
         if (!response.isNotificationAllow()) {

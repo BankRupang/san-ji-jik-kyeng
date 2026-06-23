@@ -12,7 +12,7 @@ public class BidOvertakenEvent {
     private String auctionId;
     private String auctionTitle;
     private String previousBidderId;
-    private Long newPrice;
-    private Long nextMinPrice;
+    private Integer newPrice;
+    private Integer nextMinPrice;
     private LocalDateTime occurredAt;
 }

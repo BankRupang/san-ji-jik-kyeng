@@ -10,6 +10,7 @@ import java.util.UUID;
 @NoArgsConstructor
 public class PaymentCompletedEvent {
 
+    private UUID orderId;
     private UUID auctionId;
     private String auctionTitle;
     private UUID winnerId;
