@@ -7,4 +7,5 @@ public enum PaymentStatus {
     ABORTED, // 결제 승인 실패
     EXPIRED, // 유효시간 초과
     CANCELED, // 환불 완료
+    EXPIRE_FAILED, // 만료 처리 중 오류 발생 - 수동 확인 필요
 }

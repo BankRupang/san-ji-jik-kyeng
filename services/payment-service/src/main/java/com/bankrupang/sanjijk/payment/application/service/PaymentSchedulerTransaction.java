@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -19,6 +21,16 @@ public class PaymentSchedulerTransaction {
 
     private final PaymentRepository paymentRepository;
     private final PaymentHistoryRepository paymentHistoryRepository;
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markExpireFailed(UUID paymentId) {
+        paymentRepository.findById(paymentId).ifPresent(payment -> {
+            if (payment.getStatus() == PaymentStatus.READY) {
+                payment.markExpireFailed();
+                log.warn("[EXPIRE] Payment 만료 처리 실패 상태 기록 - paymentId: {}", paymentId);
+            }
+        });
+    }
 
     // 개별 Payment 만료 처리 (REQUIRES_NEW - 한 건 실패가 다른 건에 영향 없도록)
     @Transactional(propagation = Propagation.REQUIRES_NEW)

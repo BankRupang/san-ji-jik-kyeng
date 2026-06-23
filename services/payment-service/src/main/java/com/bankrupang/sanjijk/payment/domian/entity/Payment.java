@@ -162,6 +162,11 @@ public class Payment extends BaseEntity {
         this.status = PaymentStatus.EXPIRED;
     }
 
+    public void markExpireFailed() {
+        validateStatus(PaymentStatus.READY);
+        this.status = PaymentStatus.EXPIRE_FAILED;
+    }
+
     public void refund(int cancelAmount, String cancelReason) {
         validateStatus(PaymentStatus.DONE);
         this.cancelAmount = cancelAmount;
