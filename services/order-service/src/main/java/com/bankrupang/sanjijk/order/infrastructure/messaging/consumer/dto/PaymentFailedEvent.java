@@ -9,7 +9,7 @@ public record PaymentFailedEvent(
         String auctionTitle,
         UUID winnerId,
         UUID sellerId,
-        int finalPrice,
+        Integer finalPrice,
         String failureMessage,
         LocalDateTime occurredAt
 ) {

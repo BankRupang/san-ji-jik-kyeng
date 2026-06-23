@@ -9,7 +9,7 @@ public record DepositForfeitedEvent(
         String auctionTitle,
         UUID winnerId,
         UUID sellerId,
-        int forfeitedAmount,
+        Integer forfeitedAmount,
         LocalDateTime occurredAt
 ) {
 }
