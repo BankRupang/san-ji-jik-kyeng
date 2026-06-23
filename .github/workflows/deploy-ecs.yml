@@ -89,37 +89,54 @@ jobs:
 
       # task definition은 그대로 두고, 같은 :latest 를 다시 pull 하도록 강제 재배포합니다.
       # 배포 후 새 태스크가 헬스체크를 통과하고 롤링이 끝날 때까지 기다립니다.
-      # aws ecs wait services-stable은 최대 10개 제한이 있어 서비스를 1개씩 넘깁니다.
-      # 백그라운드(&)로 동시에 띄우고 wait으로 전부 끝날 때까지 기다려 O(N) 지연을 방지합니다.
+      #
+      # [wave 배포 이유]
+      # 계정 Fargate On-Demand vCPU 한도가 30이고, 정상 운영 시 19.5 vCPU를 씁니다.
+      # 10개 서비스를 동시에 롤링하면 old + new 태스크가 겹쳐 ~39 vCPU가 필요해 한도 초과됩니다.
+      # wave로 나눠 배포하면 한 wave 안에서만 겹치므로 최대 27.5 vCPU로 유지됩니다.
+      #
+      # [wave 구성 및 피크 vCPU]
+      #   wave 1 (인프라): config-server(0.5) discovery-server(0.5) gateway-server(0.5)  → 최대 21   vCPU
+      #   wave 2 (앱 1)  : user(2) auction(2) order(2) payment(2)                        → 최대 27.5 vCPU
+      #   wave 3 (앱 2)  : bid(4, 2태스크) notification(2) ai(2)                         → 최대 27.5 vCPU
+      #
+      # [waiter 타임아웃]
+      # AWS_MAX_ATTEMPTS=80 → 80 × 15초 = 20분. 기본값(40 × 15초 = 10분)의 두 배.
       - name: Deploy and wait for ECS services
         run: |
           set -euo pipefail
-          SERVICES=(
-            config-server discovery-server gateway-server
-            user-service auction-service bid-service
-            order-service payment-service notification-service ai-service
-          )
+          export AWS_MAX_ATTEMPTS=80
 
-          for SERVICE in "${SERVICES[@]}"; do
-            echo "force-new-deployment: ${SERVICE}"
-            aws ecs update-service \
-              --cluster "${ECS_CLUSTER}" \
-              --service "${SERVICE}" \
-              --force-new-deployment \
-              --region "${AWS_REGION}" \
-              --no-cli-pager > /dev/null
-          done
+          deploy_wave() {
+            local services=("$@")
+            for SERVICE in "${services[@]}"; do
+              echo "  force-new-deployment: ${SERVICE}"
+              aws ecs update-service \
+                --cluster "${ECS_CLUSTER}" \
+                --service "${SERVICE}" \
+                --force-new-deployment \
+                --region "${AWS_REGION}" \
+                --no-cli-pager > /dev/null
+            done
 
-          pids=()
-          for SERVICE in "${SERVICES[@]}"; do
-            echo "Waiting for ${SERVICE}..."
-            aws ecs wait services-stable \
-              --cluster "${ECS_CLUSTER}" \
-              --region "${AWS_REGION}" \
-              --services "${SERVICE}" &
-            pids+=($!)
-          done
+            local pids=()
+            for SERVICE in "${services[@]}"; do
+              aws ecs wait services-stable \
+                --cluster "${ECS_CLUSTER}" \
+                --region "${AWS_REGION}" \
+                --services "${SERVICE}" &
+              pids+=($!)
+            done
+            for pid in "${pids[@]}"; do
+              wait "$pid"
+            done
+          }
 
-          for pid in "${pids[@]}"; do
-            wait "$pid"
-          done
+          echo "=== Wave 1: 인프라 서비스 ==="
+          deploy_wave config-server discovery-server gateway-server
+
+          echo "=== Wave 2: 앱 서비스 (1) ==="
+          deploy_wave user-service auction-service order-service payment-service
+
+          echo "=== Wave 3: 앱 서비스 (2) ==="
+          deploy_wave bid-service notification-service ai-service
