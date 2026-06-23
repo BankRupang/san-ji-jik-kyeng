@@ -189,8 +189,8 @@ class NotificationEventServiceTest {
             ReflectionTestUtils.setField(event, "auctionId", UUID.randomUUID().toString());
             ReflectionTestUtils.setField(event, "auctionTitle", "테스트 경매");
             ReflectionTestUtils.setField(event, "previousBidderId", null);
-            ReflectionTestUtils.setField(event, "newPrice", 1_100_000L);
-            ReflectionTestUtils.setField(event, "nextMinPrice", 1_200_000L);
+            ReflectionTestUtils.setField(event, "newPrice", 1_100_000);
+            ReflectionTestUtils.setField(event, "nextMinPrice", 1_200_000);
 
             // when
             notificationEventService.handleBidOvertaken(event);
@@ -208,8 +208,8 @@ class NotificationEventServiceTest {
             ReflectionTestUtils.setField(event, "auctionId", UUID.randomUUID().toString());
             ReflectionTestUtils.setField(event, "auctionTitle", "테스트 경매");
             ReflectionTestUtils.setField(event, "previousBidderId", "");
-            ReflectionTestUtils.setField(event, "newPrice", 1_100_000L);
-            ReflectionTestUtils.setField(event, "nextMinPrice", 1_200_000L);
+            ReflectionTestUtils.setField(event, "newPrice", 1_100_000);
+            ReflectionTestUtils.setField(event, "nextMinPrice", 1_200_000);
 
             // when
             notificationEventService.handleBidOvertaken(event);
@@ -409,8 +409,8 @@ class NotificationEventServiceTest {
             ReflectionTestUtils.setField(event, "auctionId", UUID.randomUUID().toString());
             ReflectionTestUtils.setField(event, "auctionTitle", "테스트 경매");
             ReflectionTestUtils.setField(event, "previousBidderId", UUID.randomUUID().toString());
-            ReflectionTestUtils.setField(event, "newPrice", 1_100_000L);
-            ReflectionTestUtils.setField(event, "nextMinPrice", 1_200_000L);
+            ReflectionTestUtils.setField(event, "newPrice", 1_100_000);
+            ReflectionTestUtils.setField(event, "nextMinPrice", 1_200_000);
             given(userNotificationCacheService.getNotificationEnabled(any()))
                     .willReturn(new UserNotificationResponse(UUID.randomUUID(), "U_SLACK", true));
 
@@ -543,8 +543,8 @@ class NotificationEventServiceTest {
         ReflectionTestUtils.setField(event, "auctionId", UUID.randomUUID().toString());
         ReflectionTestUtils.setField(event, "auctionTitle", "테스트 경매");
         ReflectionTestUtils.setField(event, "previousBidderId", UUID.randomUUID().toString());
-        ReflectionTestUtils.setField(event, "newPrice", 1_100_000L);
-        ReflectionTestUtils.setField(event, "nextMinPrice", 1_200_000L);
+        ReflectionTestUtils.setField(event, "newPrice", 1_100_000);
+        ReflectionTestUtils.setField(event, "nextMinPrice", 1_200_000);
         return event;
     }
 
