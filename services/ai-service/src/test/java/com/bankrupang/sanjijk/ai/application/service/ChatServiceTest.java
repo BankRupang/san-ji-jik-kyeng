@@ -8,12 +8,13 @@ import com.bankrupang.sanjijk.ai.domain.repository.ChatSessionRepository;
 import com.bankrupang.sanjijk.ai.exception.AiErrorCode;
 import com.bankrupang.sanjijk.ai.infrastructure.ai.HybridSearchService;
 import com.bankrupang.sanjijk.common.exception.BaseException;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.client.ChatClient;
@@ -23,25 +24,23 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
-
-import java.util.function.Consumer;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ChatServiceTest {
@@ -61,21 +60,29 @@ class ChatServiceTest {
     @Mock
     private TransactionTemplate transactionTemplate;
 
-    @InjectMocks
     private ChatService chatService;
 
     @BeforeEach
     @SuppressWarnings("unchecked")
     void setUp() {
+        chatService = new ChatService(chatClient, sessionRepository, messageRepository,
+                hybridSearchService, transactionTemplate,
+                ObservationRegistry.NOOP, new SimpleMeterRegistry());
         ReflectionTestUtils.setField(chatService, "sessionExpireHours", 24);
+        ReflectionTestUtils.setField(chatService, "maxHistory", 10);
+
         lenient().doAnswer(invocation -> {
             Consumer<TransactionStatus> action = invocation.getArgument(0);
             action.accept(null);
             return null;
         }).when(transactionTemplate).executeWithoutResult(any());
+
+        lenient().doAnswer(invocation -> {
+            TransactionCallback<?> action = invocation.getArgument(0);
+            return action.doInTransaction(null);
+        }).when(transactionTemplate).execute(any());
     }
 
-    // ChatClient 플루언트 체인 공통 모킹
     private void mockChatClientResponse(String response) {
         ChatClient.ChatClientRequestSpec requestSpec = mock(ChatClient.ChatClientRequestSpec.class);
         ChatClient.CallResponseSpec callSpec = mock(ChatClient.CallResponseSpec.class);
@@ -138,7 +145,8 @@ class ChatServiceTest {
             UUID sessionId = UUID.randomUUID();
             ChatSession session = createSession(userId);
             given(sessionRepository.findByIdAndDeletedAtIsNull(sessionId)).willReturn(Optional.of(session));
-            given(messageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId)).willReturn(Collections.emptyList());
+            given(messageRepository.findBySessionIdOrderByIdDesc(eq(sessionId), any(Pageable.class)))
+                    .willReturn(Collections.emptyList());
             given(hybridSearchService.search(anyString())).willReturn(List.of("경매 규정 내용"));
             mockChatClientResponse("안녕하세요! 무엇을 도와드릴까요?");
 
@@ -208,7 +216,8 @@ class ChatServiceTest {
                     createMessage(sessionId, ChatRole.ASSISTANT, "경매는 입찰 방식입니다.")
             );
             given(sessionRepository.findByIdAndDeletedAtIsNull(sessionId)).willReturn(Optional.of(session));
-            given(messageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId)).willReturn(history);
+            given(messageRepository.findBySessionIdOrderByIdDesc(eq(sessionId), any(Pageable.class)))
+                    .willReturn(history);
             given(hybridSearchService.search(anyString())).willReturn(List.of("입찰 규정 내용"));
             mockChatClientResponse("재작성된 쿼리 또는 답변");
 
@@ -228,7 +237,8 @@ class ChatServiceTest {
             UUID sessionId = UUID.randomUUID();
             ChatSession session = createSession(userId);
             given(sessionRepository.findByIdAndDeletedAtIsNull(sessionId)).willReturn(Optional.of(session));
-            given(messageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId)).willReturn(Collections.emptyList());
+            given(messageRepository.findBySessionIdOrderByIdDesc(eq(sessionId), any(Pageable.class)))
+                    .willReturn(Collections.emptyList());
             given(hybridSearchService.search(anyString())).willReturn(Collections.emptyList());
             mockChatClientResponse(null);
 
@@ -246,7 +256,8 @@ class ChatServiceTest {
             UUID sessionId = UUID.randomUUID();
             ChatSession session = createSession(userId);
             given(sessionRepository.findByIdAndDeletedAtIsNull(sessionId)).willReturn(Optional.of(session));
-            given(messageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId)).willReturn(Collections.emptyList());
+            given(messageRepository.findBySessionIdOrderByIdDesc(eq(sessionId), any(Pageable.class)))
+                    .willReturn(Collections.emptyList());
             given(hybridSearchService.search(anyString())).willReturn(Collections.emptyList());
             mockChatClientResponse("해당 내용은 현재 제공된 정보에서 찾을 수 없습니다.");
 
@@ -269,10 +280,10 @@ class ChatServiceTest {
                     createMessage(sessionId, ChatRole.ASSISTANT, "경매는 입찰 방식입니다.")
             );
             given(sessionRepository.findByIdAndDeletedAtIsNull(sessionId)).willReturn(Optional.of(session));
-            given(messageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId)).willReturn(history);
+            given(messageRepository.findBySessionIdOrderByIdDesc(eq(sessionId), any(Pageable.class)))
+                    .willReturn(history);
             given(hybridSearchService.search(anyString())).willReturn(List.of("입찰 규정"));
 
-            // 첫 번째 호출(쿼리 재작성)은 실패, 두 번째 호출(응답 생성)은 성공
             ChatClient.ChatClientRequestSpec requestSpec = mock(ChatClient.ChatClientRequestSpec.class);
             ChatClient.CallResponseSpec callSpec = mock(ChatClient.CallResponseSpec.class);
             given(chatClient.prompt()).willReturn(requestSpec);
@@ -289,6 +300,73 @@ class ChatServiceTest {
 
             // then
             assertThat(response).isEqualTo("fallback 기반 AI 답변");
+        }
+    }
+
+    @Nested
+    @DisplayName("중복 요청 방지")
+    class ConcurrentRequest {
+
+        @Test
+        @DisplayName("이미 처리 중인 세션에 요청 시 409 반환")
+        void alreadyProcessing_throwsConflict() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            ChatSession session = createSession(userId);
+            given(sessionRepository.findByIdAndDeletedAtIsNull(sessionId)).willReturn(Optional.of(session));
+
+            Set<UUID> processingSessions = ConcurrentHashMap.newKeySet();
+            processingSessions.add(sessionId);
+            ReflectionTestUtils.setField(chatService, "processingSessions", processingSessions);
+
+            // when & then
+            assertThatThrownBy(() -> chatService.chat(sessionId, userId, "질문"))
+                    .isInstanceOf(BaseException.class)
+                    .hasMessage(AiErrorCode.CHAT_SESSION_ALREADY_PROCESSING.getMessage());
+        }
+
+        @Test
+        @DisplayName("처리 중 예외 발생해도 세션 반드시 해제")
+        @SuppressWarnings("unchecked")
+        void exceptionDuringProcessing_sessionAlwaysReleased() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            ChatSession session = createSession(userId);
+            given(sessionRepository.findByIdAndDeletedAtIsNull(sessionId)).willReturn(Optional.of(session));
+            given(messageRepository.findBySessionIdOrderByIdDesc(eq(sessionId), any(Pageable.class)))
+                    .willReturn(Collections.emptyList());
+            given(hybridSearchService.search(anyString())).willThrow(new RuntimeException("검색 오류"));
+
+            // when & then
+            assertThatThrownBy(() -> chatService.chat(sessionId, userId, "질문"))
+                    .isInstanceOf(RuntimeException.class);
+
+            Set<UUID> processingSessions = (Set<UUID>) ReflectionTestUtils.getField(chatService, "processingSessions");
+            assertThat(processingSessions).doesNotContain(sessionId);
+        }
+
+        @Test
+        @DisplayName("정상 처리 완료 후 세션 해제")
+        @SuppressWarnings("unchecked")
+        void success_sessionReleasedAfterProcessing() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            ChatSession session = createSession(userId);
+            given(sessionRepository.findByIdAndDeletedAtIsNull(sessionId)).willReturn(Optional.of(session));
+            given(messageRepository.findBySessionIdOrderByIdDesc(eq(sessionId), any(Pageable.class)))
+                    .willReturn(Collections.emptyList());
+            given(hybridSearchService.search(anyString())).willReturn(List.of("문서"));
+            mockChatClientResponse("AI 응답");
+
+            // when
+            chatService.chat(sessionId, userId, "질문");
+
+            // then
+            Set<UUID> processingSessions = (Set<UUID>) ReflectionTestUtils.getField(chatService, "processingSessions");
+            assertThat(processingSessions).doesNotContain(sessionId);
         }
     }
 
