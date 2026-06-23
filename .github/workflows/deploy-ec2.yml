@@ -92,7 +92,7 @@ jobs:
           chmod +x monitoring/prometheus/ecs-discovery.sh
           # /etc/cron.d 에 등록해서 ec2-user 권한으로 5분마다 실행
           sudo mkdir -p /etc/cron.d
-          echo "*/5 * * * * ec2-user /home/ec2-user/sanji-jk/monitoring/prometheus/ecs-discovery.sh >> /var/log/ecs-discovery.log 2>&1" | sudo tee /etc/cron.d/ecs-discovery > /dev/null
+          echo "*/5 * * * * ec2-user /home/ec2-user/sanji-jk/monitoring/prometheus/ecs-discovery.sh >> /home/ec2-user/ecs-discovery.log 2>&1" | sudo tee /etc/cron.d/ecs-discovery > /dev/null
           # 첫 배포 시 즉시 한 번 실행 (ec2-user로)
           sudo -u ec2-user /home/ec2-user/sanji-jk/monitoring/prometheus/ecs-discovery.sh || true
           docker compose -f docker-compose.monitoring.yml pull
