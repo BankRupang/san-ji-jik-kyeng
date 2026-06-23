@@ -14,9 +14,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import lombok.extern.slf4j.Slf4j;
-import org.redisson.api.RLock;
-import org.redisson.api.RedissonClient;
-import org.redisson.client.RedisConnectionException;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -30,15 +27,16 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class ChatService {
 
-    private static final String PROCESSING_LOCK_KEY = "chat:processing:";
+    private final Set<UUID> processingSessions = ConcurrentHashMap.newKeySet();
 
     private final ChatClient chatClient;
     private final ChatSessionRepository sessionRepository;
@@ -46,7 +44,6 @@ public class ChatService {
     private final HybridSearchService hybridSearchService;
     private final TransactionTemplate transactionTemplate;
     private final ObservationRegistry observationRegistry;
-    private final RedissonClient redissonClient;
     private final Counter reformulationSuccessCounter;
     private final Counter reformulationFailCounter;
     private final Counter aiResponseFailCounter;
@@ -54,15 +51,13 @@ public class ChatService {
     public ChatService(ChatClient chatClient, ChatSessionRepository sessionRepository,
                        ChatMessageRepository messageRepository, HybridSearchService hybridSearchService,
                        TransactionTemplate transactionTemplate,
-                       ObservationRegistry observationRegistry, MeterRegistry meterRegistry,
-                       RedissonClient redissonClient) {
+                       ObservationRegistry observationRegistry, MeterRegistry meterRegistry) {
         this.chatClient = chatClient;
         this.sessionRepository = sessionRepository;
         this.messageRepository = messageRepository;
         this.hybridSearchService = hybridSearchService;
         this.transactionTemplate = transactionTemplate;
         this.observationRegistry = observationRegistry;
-        this.redissonClient = redissonClient;
         this.reformulationSuccessCounter = Counter.builder("query.reformulation.success")
                 .description("쿼리 재작성 성공 횟수")
                 .register(meterRegistry);
@@ -88,18 +83,7 @@ public class ChatService {
     public String chat(UUID sessionId, UUID userId, String userMessage) {
         validateSession(sessionId, userId);
 
-        RLock lock = redissonClient.getLock(PROCESSING_LOCK_KEY + sessionId);
-        boolean acquired;
-        try {
-            acquired = lock.tryLock(0, -1, TimeUnit.SECONDS);
-        } catch (RedisConnectionException e) {
-            log.error("Redis 연결 실패로 분산 락을 획득할 수 없습니다 - sessionId: {}", sessionId, e);
-            throw new BaseException(AiErrorCode.LOCK_UNAVAILABLE);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new BaseException(AiErrorCode.LOCK_INTERRUPTED);
-        }
-        if (!acquired) {
+        if (!processingSessions.add(sessionId)) {
             throw new BaseException(AiErrorCode.CHAT_SESSION_ALREADY_PROCESSING);
         }
 
@@ -128,9 +112,7 @@ public class ChatService {
                         return response;
                     });
         } finally {
-            if (lock.isHeldByCurrentThread()) {
-                lock.unlock();
-            }
+            processingSessions.remove(sessionId);
         }
     }
 

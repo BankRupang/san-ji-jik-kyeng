@@ -17,9 +17,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.redisson.api.RLock;
-import org.redisson.api.RedissonClient;
-import org.redisson.client.RedisConnectionException;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -34,8 +31,9 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -62,20 +60,14 @@ class ChatServiceTest {
     @Mock
     private TransactionTemplate transactionTemplate;
 
-    @Mock
-    private RedissonClient redissonClient;
-
-    @Mock
-    private RLock lock;
-
     private ChatService chatService;
 
     @BeforeEach
     @SuppressWarnings("unchecked")
-    void setUp() throws Exception {
+    void setUp() {
         chatService = new ChatService(chatClient, sessionRepository, messageRepository,
                 hybridSearchService, transactionTemplate,
-                ObservationRegistry.NOOP, new SimpleMeterRegistry(), redissonClient);
+                ObservationRegistry.NOOP, new SimpleMeterRegistry());
         ReflectionTestUtils.setField(chatService, "sessionExpireHours", 24);
         ReflectionTestUtils.setField(chatService, "maxHistory", 10);
 
@@ -89,11 +81,6 @@ class ChatServiceTest {
             TransactionCallback<?> action = invocation.getArgument(0);
             return action.doInTransaction(null);
         }).when(transactionTemplate).execute(any());
-
-        // 기본 락 동작: 정상 획득 (개별 테스트에서 재정의 가능)
-        lenient().when(redissonClient.getLock(anyString())).thenReturn(lock);
-        lenient().doReturn(true).when(lock).tryLock(anyLong(), anyLong(), any(TimeUnit.class));
-        lenient().when(lock.isHeldByCurrentThread()).thenReturn(true);
     }
 
     private void mockChatClientResponse(String response) {
@@ -317,18 +304,21 @@ class ChatServiceTest {
     }
 
     @Nested
-    @DisplayName("분산 락")
-    class DistributedLock {
+    @DisplayName("중복 요청 방지")
+    class ConcurrentRequest {
 
         @Test
-        @DisplayName("락 획득 실패 시 409 CONFLICT 반환")
-        void lockAcquireFailed_throwsConflict() throws Exception {
+        @DisplayName("이미 처리 중인 세션에 요청 시 409 반환")
+        void alreadyProcessing_throwsConflict() {
             // given
             UUID userId = UUID.randomUUID();
             UUID sessionId = UUID.randomUUID();
             ChatSession session = createSession(userId);
             given(sessionRepository.findByIdAndDeletedAtIsNull(sessionId)).willReturn(Optional.of(session));
-            doReturn(false).when(lock).tryLock(anyLong(), anyLong(), any(TimeUnit.class));
+
+            Set<UUID> processingSessions = ConcurrentHashMap.newKeySet();
+            processingSessions.add(sessionId);
+            ReflectionTestUtils.setField(chatService, "processingSessions", processingSessions);
 
             // when & then
             assertThatThrownBy(() -> chatService.chat(sessionId, userId, "질문"))
@@ -337,27 +327,9 @@ class ChatServiceTest {
         }
 
         @Test
-        @DisplayName("InterruptedException 발생 시 503 반환 및 스레드 인터럽트 플래그 복원")
-        void interrupted_throwsServiceUnavailableAndRestoresInterruptFlag() throws Exception {
-            // given
-            UUID userId = UUID.randomUUID();
-            UUID sessionId = UUID.randomUUID();
-            ChatSession session = createSession(userId);
-            given(sessionRepository.findByIdAndDeletedAtIsNull(sessionId)).willReturn(Optional.of(session));
-            doThrow(InterruptedException.class).when(lock).tryLock(anyLong(), anyLong(), any(TimeUnit.class));
-
-            // when & then
-            assertThatThrownBy(() -> chatService.chat(sessionId, userId, "질문"))
-                    .isInstanceOf(BaseException.class)
-                    .hasMessage(AiErrorCode.LOCK_INTERRUPTED.getMessage());
-
-            assertThat(Thread.currentThread().isInterrupted()).isTrue();
-            Thread.interrupted(); // 다른 테스트에 영향 없도록 플래그 초기화
-        }
-
-        @Test
-        @DisplayName("처리 중 예외 발생해도 락 반드시 해제")
-        void exceptionDuringProcessing_lockAlwaysReleased() {
+        @DisplayName("처리 중 예외 발생해도 세션 반드시 해제")
+        @SuppressWarnings("unchecked")
+        void exceptionDuringProcessing_sessionAlwaysReleased() {
             // given
             UUID userId = UUID.randomUUID();
             UUID sessionId = UUID.randomUUID();
@@ -371,28 +343,14 @@ class ChatServiceTest {
             assertThatThrownBy(() -> chatService.chat(sessionId, userId, "질문"))
                     .isInstanceOf(RuntimeException.class);
 
-            verify(lock).unlock(); // 예외가 나도 finally에서 해제
+            Set<UUID> processingSessions = (Set<UUID>) ReflectionTestUtils.getField(chatService, "processingSessions");
+            assertThat(processingSessions).doesNotContain(sessionId);
         }
 
         @Test
-        @DisplayName("Redis 연결 장애 시 503 SERVICE_UNAVAILABLE 반환")
-        void redisConnectionFailed_throws503() throws Exception {
-            // given
-            UUID userId = UUID.randomUUID();
-            UUID sessionId = UUID.randomUUID();
-            ChatSession session = createSession(userId);
-            given(sessionRepository.findByIdAndDeletedAtIsNull(sessionId)).willReturn(Optional.of(session));
-            doThrow(new RedisConnectionException("연결 실패")).when(lock).tryLock(anyLong(), anyLong(), any(TimeUnit.class));
-
-            // when & then
-            assertThatThrownBy(() -> chatService.chat(sessionId, userId, "질문"))
-                    .isInstanceOf(BaseException.class)
-                    .hasMessage(AiErrorCode.LOCK_UNAVAILABLE.getMessage());
-        }
-
-        @Test
-        @DisplayName("정상 처리 완료 후 락 해제")
-        void success_lockReleasedAfterProcessing() {
+        @DisplayName("정상 처리 완료 후 세션 해제")
+        @SuppressWarnings("unchecked")
+        void success_sessionReleasedAfterProcessing() {
             // given
             UUID userId = UUID.randomUUID();
             UUID sessionId = UUID.randomUUID();
@@ -407,7 +365,8 @@ class ChatServiceTest {
             chatService.chat(sessionId, userId, "질문");
 
             // then
-            verify(lock).unlock();
+            Set<UUID> processingSessions = (Set<UUID>) ReflectionTestUtils.getField(chatService, "processingSessions");
+            assertThat(processingSessions).doesNotContain(sessionId);
         }
     }
 
