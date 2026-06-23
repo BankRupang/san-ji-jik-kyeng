@@ -51,7 +51,7 @@ public class OrderService {
         // 3. 보증금 주문 생성 및 저장
         Order order = Order.createDepositOrder(
                 userId,
-                userInfo.userName(),
+                userInfo.name(),
                 userInfo.slackId(),
                 auction.auctionId(),
                 auction.auctionTitle(),
@@ -96,7 +96,7 @@ public class OrderService {
         Order order = Order.createWinningOrder(
                 event.winnerId(),
                 event.sellerId(),
-                userInfo.userName(),
+                userInfo.name(),
                 userInfo.slackId(),
                 event.auctionId(),
                 event.auctionTitle(),
