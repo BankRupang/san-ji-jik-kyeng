@@ -180,14 +180,12 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=auction_schema
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      SPRING_DATA_REDIS_HOST: redis
       SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092
       LOKI_URL: http://loki:3100
     depends_on:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
       postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
       kafka: { condition: service_started }
 
   # prod에서는 Auto Scaling(2~6 태스크). 로컬은 단일 컨테이너
@@ -248,6 +246,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=payment_schema
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
       SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092
       TOSS_PAYMENTS_SECRET_KEY: ${TOSS_SECRET_KEY}
       TOSS_PAYMENTS_CLIENT_KEY: ${TOSS_CLIENT_KEY}
@@ -256,6 +255,7 @@ services:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
       postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
       kafka: { condition: service_started }
 
   notification-service:
@@ -271,6 +271,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=notification_schema
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
       SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092
       SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
       LOKI_URL: http://loki:3100
@@ -278,6 +279,7 @@ services:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
       postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
       kafka: { condition: service_started }
 
   ai-service:
