@@ -6,6 +6,10 @@ spring:
     name: ai-service
   config:
     import: "optional:configserver:"
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
   servlet:
     multipart:
       max-file-size: 10MB
@@ -62,6 +66,7 @@ ai:
   chat:
     session-expire-hours: 24
     max-history: 10
+    processing-lock-ttl-seconds: 60
     similarity-threshold: 0.7
     top-k: 3
   document:

@@ -287,6 +287,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=ai_schema
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
       LOKI_URL: http://loki:3100
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       LANGFUSE_HOST: http://langfuse:3000
@@ -295,6 +296,7 @@ services:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
       postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
       langfuse: { condition: service_started }
 
   # LLM 트레이싱 (Langfuse v2 self-hosted)

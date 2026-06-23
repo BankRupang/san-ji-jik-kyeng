@@ -14,6 +14,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -28,11 +30,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class ChatService {
+
+    private static final String PROCESSING_LOCK_KEY = "chat:processing:";
 
     private final ChatClient chatClient;
     private final ChatSessionRepository sessionRepository;
@@ -40,6 +45,7 @@ public class ChatService {
     private final HybridSearchService hybridSearchService;
     private final TransactionTemplate transactionTemplate;
     private final ObservationRegistry observationRegistry;
+    private final RedissonClient redissonClient;
     private final Counter reformulationSuccessCounter;
     private final Counter reformulationFailCounter;
     private final Counter aiResponseFailCounter;
@@ -47,13 +53,15 @@ public class ChatService {
     public ChatService(ChatClient chatClient, ChatSessionRepository sessionRepository,
                        ChatMessageRepository messageRepository, HybridSearchService hybridSearchService,
                        TransactionTemplate transactionTemplate,
-                       ObservationRegistry observationRegistry, MeterRegistry meterRegistry) {
+                       ObservationRegistry observationRegistry, MeterRegistry meterRegistry,
+                       RedissonClient redissonClient) {
         this.chatClient = chatClient;
         this.sessionRepository = sessionRepository;
         this.messageRepository = messageRepository;
         this.hybridSearchService = hybridSearchService;
         this.transactionTemplate = transactionTemplate;
         this.observationRegistry = observationRegistry;
+        this.redissonClient = redissonClient;
         this.reformulationSuccessCounter = Counter.builder("query.reformulation.success")
                 .description("쿼리 재작성 성공 횟수")
                 .register(meterRegistry);
@@ -71,6 +79,9 @@ public class ChatService {
     @Value("${ai.chat.max-history:10}")
     private int maxHistory;
 
+    @Value("${ai.chat.processing-lock-ttl-seconds:60}")
+    private int lockTtlSeconds;
+
     @Transactional
     public ChatSession createSession(UUID userId) {
         return sessionRepository.save(ChatSession.create(userId, sessionExpireHours));
@@ -78,6 +89,18 @@ public class ChatService {
 
     public String chat(UUID sessionId, UUID userId, String userMessage) {
         validateSession(sessionId, userId);
+
+        RLock lock = redissonClient.getLock(PROCESSING_LOCK_KEY + sessionId);
+        boolean acquired;
+        try {
+            acquired = lock.tryLock(0, lockTtlSeconds, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BaseException(AiErrorCode.CHAT_SESSION_ALREADY_PROCESSING);
+        }
+        if (!acquired) {
+            throw new BaseException(AiErrorCode.CHAT_SESSION_ALREADY_PROCESSING);
+        }
 
         try {
             return Observation.createNotStarted("chat.pipeline", observationRegistry)
@@ -104,13 +127,9 @@ public class ChatService {
                         return response;
                     });
         } finally {
-            transactionTemplate.executeWithoutResult(status ->
-                    sessionRepository.findByIdAndDeletedAtIsNull(sessionId)
-                            .ifPresent(session -> {
-                                session.markActive();
-                                sessionRepository.save(session);
-                            })
-            );
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
     }
 
@@ -146,16 +165,11 @@ public class ChatService {
             if (!session.getUserId().equals(userId)) {
                 throw new BaseException(AiErrorCode.CHAT_SESSION_ACCESS_DENIED);
             }
-            if (session.isProcessing()) {
-                throw new BaseException(AiErrorCode.CHAT_SESSION_ALREADY_PROCESSING);
-            }
             if (session.isExpired()) {
                 session.expire();
                 sessionRepository.save(session);
                 return true;
             }
-            session.markProcessing();
-            sessionRepository.save(session);
             return false;
         }));
         if (expired) {

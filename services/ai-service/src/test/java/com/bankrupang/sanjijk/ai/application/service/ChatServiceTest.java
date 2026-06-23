@@ -17,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -32,6 +34,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,16 +61,23 @@ class ChatServiceTest {
     @Mock
     private TransactionTemplate transactionTemplate;
 
+    @Mock
+    private RedissonClient redissonClient;
+
+    @Mock
+    private RLock lock;
+
     private ChatService chatService;
 
     @BeforeEach
     @SuppressWarnings("unchecked")
-    void setUp() {
+    void setUp() throws Exception {
         chatService = new ChatService(chatClient, sessionRepository, messageRepository,
                 hybridSearchService, transactionTemplate,
-                ObservationRegistry.NOOP, new SimpleMeterRegistry());
+                ObservationRegistry.NOOP, new SimpleMeterRegistry(), redissonClient);
         ReflectionTestUtils.setField(chatService, "sessionExpireHours", 24);
         ReflectionTestUtils.setField(chatService, "maxHistory", 10);
+        ReflectionTestUtils.setField(chatService, "lockTtlSeconds", 60);
 
         lenient().doAnswer(invocation -> {
             Consumer<TransactionStatus> action = invocation.getArgument(0);
@@ -79,9 +89,13 @@ class ChatServiceTest {
             TransactionCallback<?> action = invocation.getArgument(0);
             return action.doInTransaction(null);
         }).when(transactionTemplate).execute(any());
+
+        // 기본 락 동작: 정상 획득 (개별 테스트에서 재정의 가능)
+        lenient().when(redissonClient.getLock(anyString())).thenReturn(lock);
+        lenient().doReturn(true).when(lock).tryLock(anyLong(), anyLong(), any(TimeUnit.class));
+        lenient().when(lock.isHeldByCurrentThread()).thenReturn(true);
     }
 
-    // ChatClient 플루언트 체인 공통 모킹
     private void mockChatClientResponse(String response) {
         ChatClient.ChatClientRequestSpec requestSpec = mock(ChatClient.ChatClientRequestSpec.class);
         ChatClient.CallResponseSpec callSpec = mock(ChatClient.CallResponseSpec.class);
@@ -283,7 +297,6 @@ class ChatServiceTest {
                     .willReturn(history);
             given(hybridSearchService.search(anyString())).willReturn(List.of("입찰 규정"));
 
-            // 첫 번째 호출(쿼리 재작성)은 실패, 두 번째 호출(응답 생성)은 성공
             ChatClient.ChatClientRequestSpec requestSpec = mock(ChatClient.ChatClientRequestSpec.class);
             ChatClient.CallResponseSpec callSpec = mock(ChatClient.CallResponseSpec.class);
             given(chatClient.prompt()).willReturn(requestSpec);
@@ -300,6 +313,85 @@ class ChatServiceTest {
 
             // then
             assertThat(response).isEqualTo("fallback 기반 AI 답변");
+        }
+    }
+
+    @Nested
+    @DisplayName("분산 락")
+    class DistributedLock {
+
+        @Test
+        @DisplayName("락 획득 실패 시 409 CONFLICT 반환")
+        void lockAcquireFailed_throwsConflict() throws Exception {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            ChatSession session = createSession(userId);
+            given(sessionRepository.findByIdAndDeletedAtIsNull(sessionId)).willReturn(Optional.of(session));
+            doReturn(false).when(lock).tryLock(anyLong(), anyLong(), any(TimeUnit.class));
+
+            // when & then
+            assertThatThrownBy(() -> chatService.chat(sessionId, userId, "질문"))
+                    .isInstanceOf(BaseException.class)
+                    .hasMessage(AiErrorCode.CHAT_SESSION_ALREADY_PROCESSING.getMessage());
+        }
+
+        @Test
+        @DisplayName("InterruptedException 발생 시 409 반환 및 스레드 인터럽트 플래그 복원")
+        void interrupted_throwsConflictAndRestoresInterruptFlag() throws Exception {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            ChatSession session = createSession(userId);
+            given(sessionRepository.findByIdAndDeletedAtIsNull(sessionId)).willReturn(Optional.of(session));
+            doThrow(InterruptedException.class).when(lock).tryLock(anyLong(), anyLong(), any(TimeUnit.class));
+
+            // when & then
+            assertThatThrownBy(() -> chatService.chat(sessionId, userId, "질문"))
+                    .isInstanceOf(BaseException.class)
+                    .hasMessage(AiErrorCode.CHAT_SESSION_ALREADY_PROCESSING.getMessage());
+
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+            Thread.interrupted(); // 다른 테스트에 영향 없도록 플래그 초기화
+        }
+
+        @Test
+        @DisplayName("처리 중 예외 발생해도 락 반드시 해제")
+        void exceptionDuringProcessing_lockAlwaysReleased() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            ChatSession session = createSession(userId);
+            given(sessionRepository.findByIdAndDeletedAtIsNull(sessionId)).willReturn(Optional.of(session));
+            given(messageRepository.findBySessionIdOrderByIdDesc(eq(sessionId), any(Pageable.class)))
+                    .willReturn(Collections.emptyList());
+            given(hybridSearchService.search(anyString())).willThrow(new RuntimeException("검색 오류"));
+
+            // when & then
+            assertThatThrownBy(() -> chatService.chat(sessionId, userId, "질문"))
+                    .isInstanceOf(RuntimeException.class);
+
+            verify(lock).unlock(); // 예외가 나도 finally에서 해제
+        }
+
+        @Test
+        @DisplayName("정상 처리 완료 후 락 해제")
+        void success_lockReleasedAfterProcessing() {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            ChatSession session = createSession(userId);
+            given(sessionRepository.findByIdAndDeletedAtIsNull(sessionId)).willReturn(Optional.of(session));
+            given(messageRepository.findBySessionIdOrderByIdDesc(eq(sessionId), any(Pageable.class)))
+                    .willReturn(Collections.emptyList());
+            given(hybridSearchService.search(anyString())).willReturn(List.of("문서"));
+            mockChatClientResponse("AI 응답");
+
+            // when
+            chatService.chat(sessionId, userId, "질문");
+
+            // then
+            verify(lock).unlock();
         }
     }
 

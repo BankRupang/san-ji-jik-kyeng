@@ -17,7 +17,7 @@ public enum AiErrorCode implements ErrorCode {
     DOCUMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "AI-006", "문서를 찾을 수 없습니다."),
     DOCUMENT_EMPTY(HttpStatus.BAD_REQUEST, "AI-007", "빈 파일은 등록할 수 없습니다."),
     DOCUMENT_CONTENT_EMPTY(HttpStatus.BAD_REQUEST, "AI-008", "파일에서 텍스트 내용을 추출할 수 없습니다."),
-    CHAT_SESSION_ALREADY_PROCESSING(HttpStatus.TOO_MANY_REQUESTS, "AI-009", "이미 처리 중인 요청이 있습니다.");
+    CHAT_SESSION_ALREADY_PROCESSING(HttpStatus.CONFLICT, "AI-009", "이미 처리 중인 요청이 있습니다.");
 
     private final HttpStatus status;
     private final String code;
