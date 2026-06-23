@@ -24,7 +24,7 @@ public class PaymentSchedulerTransaction {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markExpireFailed(UUID paymentId) {
-        paymentRepository.findById(paymentId).ifPresent(payment -> {
+        paymentRepository.findByIdWithLock(paymentId).ifPresent(payment -> {
             if (payment.getStatus() == PaymentStatus.READY) {
                 payment.markExpireFailed();
                 log.warn("[EXPIRE] Payment 만료 처리 실패 상태 기록 - paymentId: {}", paymentId);
@@ -37,7 +37,7 @@ public class PaymentSchedulerTransaction {
     public void expireOne(Payment payment) {
         // detached entity 재사용 대신 DB에서 현재 상태 fresh load
         // → 조회 후 confirmPayment 호출로 IN_PROGRESS 변경된 경우 덮어쓰기 방지
-        Payment fresh = paymentRepository.findById(payment.getId())
+        Payment fresh = paymentRepository.findByIdWithLock(payment.getId())
                 .orElseThrow(PaymentNotFoundException::new);
         fresh.expire(); // DB가 IN_PROGRESS면 InvalidPaymentStatusException → 외부 catch 처리
         paymentHistoryRepository.save(PaymentHistory.of(
