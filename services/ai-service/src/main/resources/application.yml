@@ -49,13 +49,6 @@ spring:
         distance-type: COSINE_DISTANCE
         dimensions: 768
         schema-name: ai_schema
-    chat:
-      observations:
-        include-prompt: false
-        include-completion: false
-    embedding:
-      observations:
-        include-input: false
 
 eureka:
   client:
