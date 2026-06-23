@@ -16,6 +16,6 @@ public class UserNotificationCacheService {
 
     @Cacheable(value = "notificationEnabled", key = "#userId.toString()")
     public UserNotificationResponse getNotificationEnabled(UUID userId) {
-        return userServiceClient.getNotificationEnabled(userId);
+        return userServiceClient.getNotificationEnabled(userId).getData();
     }
 }
