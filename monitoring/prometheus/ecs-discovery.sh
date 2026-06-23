@@ -2,6 +2,7 @@
 # ECS Fargate 태스크의 private IP를 조회해서 Prometheus file_sd_configs 형식 JSON으로 저장
 # 포트는 서비스 이름 기준으로 매핑 (portMappings가 신뢰할 수 없는 경우 대비)
 # cron: */5 * * * * ec2-user /home/ec2-user/sanji-jk/monitoring/prometheus/ecs-discovery.sh >> /var/log/ecs-discovery.log 2>&1
+PATH=/usr/local/bin:/usr/bin:/bin
 
 CLUSTER="sanji-prod-cluster"
 REGION="ap-northeast-2"
@@ -43,6 +44,8 @@ PORT_MAP = {
     'bid-service':       19091,
 }
 
+SKIP = {'keycloak'}
+
 tasks = json.load(sys.stdin)
 targets = []
 for t in tasks:
@@ -52,6 +55,8 @@ for t in tasks:
     # 'arn:.../sanji-prod-user-service:3' -> 'user-service'
     family = t.get('def', '').split('/')[-1].rsplit(':', 1)[0]
     svc = family.replace('sanji-prod-', '')
+    if svc in SKIP:
+        continue
     port = PORT_MAP.get(svc, 8080)
     targets.append({'targets': [f'{ip}:{port}'], 'labels': {'application': family}})
 print(json.dumps(targets, indent=2))
