@@ -23,7 +23,7 @@ Kafka EC2는 재기동 시 입찰 이벤트가 끊기기 때문에 자동 배포
 ## AWS 인증 방식
 
 Access Key를 GitHub Secret에 저장하지 않습니다. GitHub Actions가 발급한 단기 OIDC 토큰으로 AWS에 로그인합니다.
-IAM에 역할이 미리 정의되어 있으며, 신뢰 조건은 `repo:BankRupang/sanji-jk:*`에서 온 토큰만 허용합니다.
+IAM에 역할이 미리 정의되어 있으며, 신뢰 조건은 `repo:BankRupang/san-ji-jik-kyeng:*`에서 온 토큰만 허용합니다.
 
 GitHub 저장소 변수 `AWS_ROLE_ARN`에 해당 역할 ARN을 등록해두어야 합니다.
 
