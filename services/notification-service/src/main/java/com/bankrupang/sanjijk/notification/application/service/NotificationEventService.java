@@ -24,6 +24,7 @@ public class NotificationEventService {
 
     private static final DateTimeFormatter DUE_AT_FORMATTER =
             DateTimeFormatter.ofPattern("MM월 dd일 HH:mm");
+    private static final String PAYMENT_TYPE_REPAY = "REPAY";
 
     private final NotificationLogRepository notificationLogRepository;
     private final ApplicationEventPublisher eventPublisher;
@@ -61,7 +62,7 @@ public class NotificationEventService {
                 event.getAuctionId());
 
         // REPAY(보증금)는 sellerId = null, finalPrice = null → 판매자 알림 스킵
-        if (!"REPAY".equals(event.getPaymentType())) {
+        if (!PAYMENT_TYPE_REPAY.equals(event.getPaymentType())) {
             processAndPublish(event.getSellerId(), NotificationType.PAYMENT_COMPLETED,
                     "거래 완료!",
                     String.format("거래 완료! %s / 낙찰가: %,d원",
