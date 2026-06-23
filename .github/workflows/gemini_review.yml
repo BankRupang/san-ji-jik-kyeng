@@ -44,6 +44,24 @@ jobs:
             done
           fi
 
+      - name: Get full content of changed files
+        run: |
+          grep '^diff --git' diff.txt | sed 's/diff --git a\/.* b\///' > changed_files.txt
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            if [ -f "$file" ]; then
+              echo "=== FULL FILE: $file ==="
+              head -500 "$file"
+              total_lines=$(wc -l < "$file")
+              if [ "$total_lines" -gt 500 ]; then
+                echo "[... $((total_lines - 500))줄 생략 ...]"
+              fi
+              echo "=== END FILE: $file ==="
+              echo ""
+            fi
+          done < changed_files.txt > full_context.txt
+
       - name: Run Gemini Review
         id: gemini_review
         uses: actions/github-script@v7
@@ -68,14 +86,28 @@ jobs:
               return;
             }
 
+            let fullContext = "";
+            try {
+              const raw = fs.readFileSync("full_context.txt", "utf8");
+              if (raw.trim()) fullContext = raw;
+            } catch (err) {
+              console.log("full_context.txt not found, skipping.");
+            }
+
             const prompt = `
             ${promptBase}
-            
+
             Below is the git diff:
-            
+
               <git diff>
               ${diff_output}
               </git diff>
+
+              ${fullContext ? `Below is the full current content of each changed file. Use this to cross-reference and avoid suggesting changes that are already present in the file:
+
+              <full file content>
+              ${fullContext}
+              </full file content>` : ""}
               `;
             
             const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
