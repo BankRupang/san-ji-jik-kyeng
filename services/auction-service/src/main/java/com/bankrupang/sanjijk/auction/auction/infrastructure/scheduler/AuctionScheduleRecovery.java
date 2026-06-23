@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import com.bankrupang.sanjijk.auction.auction.domain.entity.Auction;
 import com.bankrupang.sanjijk.auction.auction.domain.repository.AuctionRepository;
 import com.bankrupang.sanjijk.auction.auction.domain.type.AuctionStatus;
+import com.bankrupang.sanjijk.auction.global.util.AuctionLogContext;
 
 @Slf4j
 @Component
@@ -36,14 +37,16 @@ public class AuctionScheduleRecovery {
     }
 
     private void recoverSchedule(Auction auction, LocalDateTime now) {
-        if (auction.getStatus() == AuctionStatus.READY) {
-            recoverStartSchedule(auction, now);
-            return;
-        }
+        AuctionLogContext.runWithAuctionId(auction.getId(), () -> {
+            if (auction.getStatus() == AuctionStatus.READY) {
+                recoverStartSchedule(auction, now);
+                return;
+            }
 
-        if (auction.getStatus() == AuctionStatus.PROGRESS) {
-            recoverEndCheckSchedule(auction, now);
-        }
+            if (auction.getStatus() == AuctionStatus.PROGRESS) {
+                recoverEndCheckSchedule(auction, now);
+            }
+        });
     }
 
     private void recoverStartSchedule(Auction auction, LocalDateTime now) {

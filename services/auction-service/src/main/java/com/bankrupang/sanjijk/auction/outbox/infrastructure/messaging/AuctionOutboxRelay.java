@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import com.bankrupang.sanjijk.auction.global.util.AuctionLogContext;
 import com.bankrupang.sanjijk.auction.outbox.domain.entity.AuctionOutbox;
 
 @Slf4j
@@ -43,6 +44,10 @@ public class AuctionOutboxRelay {
     }
 
     private boolean publishEvent(AuctionOutbox outbox) {
+        return AuctionLogContext.callWithAuctionId(outbox.getAggregateId(), () -> publishEventWithAuctionContext(outbox));
+    }
+
+    private boolean publishEventWithAuctionContext(AuctionOutbox outbox) {
         String topic = auctionEventTopicResolver.resolve(outbox.getEventType());
         String key = outbox.getAggregateId().toString();
 
