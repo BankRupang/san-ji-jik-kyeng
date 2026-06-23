@@ -8,15 +8,12 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UuidGenerator;
-import org.springframework.data.annotation.CreatedBy;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
 @Table(name = "p_payment_history")
-@EntityListeners(AuditingEntityListener.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PaymentHistory {
@@ -26,7 +23,6 @@ public class PaymentHistory {
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
-    // 논리적 FK — payment 삭제돼도 히스토리는 보존
     @Column(name = "payment_id")
     private UUID paymentId;
 
@@ -39,7 +35,7 @@ public class PaymentHistory {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "prev_status")
-    private PaymentStatus prevStatus;   // 최초 생성 시 NULL
+    private PaymentStatus prevStatus;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "next_status", nullable = false)
@@ -57,13 +53,14 @@ public class PaymentHistory {
     @Column(name = "failure_message", length = 510)
     private String failureMessage;
 
+    // HTTP 컨텍스트 없는 Kafka/Scheduler 환경에서 @CreatedBy 사용 불가
+    // → nullable = true로 변경, 직접 주입
+    @Column(name = "created_by")
+    private UUID createdBy;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
-    @CreatedBy
-    @Column(name = "created_by", nullable = false, updatable = false)
-    private UUID createdBy;
 
     // ================================
     // 팩토리 메서드
@@ -78,7 +75,8 @@ public class PaymentHistory {
             String reason,
             int amount,
             String failureCode,
-            String failureMessage
+            String failureMessage,
+            UUID createdBy       // nullable - Kafka 컨텍스트에서는 null
     ) {
         PaymentHistory history = new PaymentHistory();
         history.paymentId = paymentId;
@@ -90,6 +88,7 @@ public class PaymentHistory {
         history.amount = amount;
         history.failureCode = failureCode;
         history.failureMessage = failureMessage;
+        history.createdBy = createdBy;
         return history;
     }
 }

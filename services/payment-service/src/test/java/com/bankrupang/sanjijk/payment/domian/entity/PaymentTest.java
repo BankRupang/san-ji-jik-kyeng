@@ -36,7 +36,8 @@ class PaymentTest {
             payment = Payment.create(
                     orderId, userId, sellerId, auctionId,
                     "참외 10박스", "tossOrder-001",
-                    PaymentType.NORMAL, 500000, null
+                    PaymentType.NORMAL, 500000, null,
+                    null  // NORMAL은 endAt 불필요
             );
         }
 
@@ -120,7 +121,7 @@ class PaymentTest {
     }
 
     // ──────────────────────────────────────────
-    // REPAY 결제 (보증금 재결제 - 위약금)
+    // REPAY 결제 (보증금 결제)
     // ──────────────────────────────────────────
     @Nested
     @DisplayName("REPAY 결제 상태 전이")
@@ -133,7 +134,8 @@ class PaymentTest {
             payment = Payment.create(
                     orderId, userId, null, auctionId,
                     "참외 10박스", "tossOrder-002",
-                    PaymentType.REPAY, 50000, 500000
+                    PaymentType.REPAY, 50000, 500000,
+                    LocalDateTime.now().plusHours(2)  // REPAY는 endAt 있음
             );
         }
 
@@ -156,6 +158,12 @@ class PaymentTest {
         void failRepay() {
             payment.fail("REJECT_CARD", "카드 잔액 부족");
             assertThat(payment.getStatus()).isEqualTo(PaymentStatus.ABORTED);
+        }
+
+        @Test
+        @DisplayName("endAt 저장 확인")
+        void endAt_saved() {
+            assertThat(payment.getEndAt()).isNotNull();
         }
     }
 }
