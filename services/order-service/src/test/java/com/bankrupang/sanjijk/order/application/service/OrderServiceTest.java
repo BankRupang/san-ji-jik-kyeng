@@ -64,7 +64,7 @@ class OrderServiceTest {
             userId = UUID.randomUUID();
             request = new OrderDepositCreateRequest(UUID.randomUUID());
             auctionInfo = new AuctionInfoResponse(request.auctionId(), "싱싱한 광어", 10000, LocalDateTime.now().plusDays(1));
-            userInfoResp = new UserInfoResponse(userId, "사람", "UI123456");
+            userInfoResp = new UserInfoResponse("사람", "UI123456");
         }
 
         @Test
@@ -124,7 +124,7 @@ class OrderServiceTest {
                     10000,
                     LocalDateTime.now()
             );
-            userInfo = new UserInfoResponse(event.winnerId(), "사람", "UI123456");
+            userInfo = new UserInfoResponse("사람", "UI123456");
         }
 
         @Test
