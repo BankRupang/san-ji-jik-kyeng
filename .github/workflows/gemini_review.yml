@@ -47,46 +47,7 @@ jobs:
           fi
 
       - name: Get full content of changed files
-        run: |
-          while IFS= read -r file; do
-            [ -z "$file" ] && continue
-            if [ -f "$file" ]; then
-              total_lines=$(wc -l < "$file")
-              echo "=== FULL FILE: $file ==="
-
-              if [ "$total_lines" -le 500 ]; then
-                cat "$file"
-              else
-                echo "[파일 크기: ${total_lines}줄 - 선언부 및 변경 구간만 표시]"
-                echo "--- 선언부 (1-80줄) ---"
-                sed -n '1,80p' "$file"
-
-                awk -v f="$file" '
-                  /^diff --git/ { printing = (index($0, " b/" f) > 0) }
-                  printing && /^@@ / {
-                    hunk = $0
-                    sub(/ @@.*$/, "", hunk)
-                    split(hunk, parts, " ")
-                    new_part = parts[3]
-                    sub(/\+/, "", new_part)
-                    sub(/,.*/, "", new_part)
-                    if (new_part + 0 > 0) print new_part + 0
-                  }
-                ' diff.txt | while read hunk_start; do
-                  range_start=$((hunk_start > 30 ? hunk_start - 30 : 1))
-                  range_end=$((hunk_start + 100 > total_lines ? total_lines : hunk_start + 100))
-                  if [ "$range_start" -gt 80 ]; then
-                    echo ""
-                    echo "--- 변경 구간 (${range_start}-${range_end}줄) ---"
-                    sed -n "${range_start},${range_end}p" "$file"
-                  fi
-                done
-              fi
-
-              echo "=== END FILE: $file ==="
-              echo ""
-            fi
-          done < changed_files.txt > full_context.txt
+        run: bash .github/scripts/extract_context.sh changed_files.txt diff.txt > full_context.txt
 
       - name: Run Gemini Review
         id: gemini_review
