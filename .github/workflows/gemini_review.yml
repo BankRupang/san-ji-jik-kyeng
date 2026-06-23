@@ -47,7 +47,7 @@ jobs:
           fi
 
       - name: Get full content of changed files
-        run: bash .github/scripts/extract_context.sh changed_files.txt diff.txt > full_context.txt
+        run: node .github/scripts/extract_context.js changed_files.txt diff.txt > full_context.txt
 
       - name: Run Gemini Review
         id: gemini_review
