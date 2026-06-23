@@ -126,12 +126,10 @@ services:
       SPRING_PROFILES_ACTIVE: dev
       SPRING_CLOUD_CONFIG_URI: http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
-      KEYCLOAK_ISSUER_URI: http://keycloak:18080/realms/${KEYCLOAK_REALM}
       LOKI_URL: http://loki:3100
     depends_on:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
-      keycloak: { condition: service_started }
 
   # ================================================================
   # 비즈니스 서비스
@@ -161,12 +159,10 @@ services:
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI: ${KEYCLOAK_SERVER_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs
       MANAGER_KEY: ${MANAGER_KEY}
       MASTER_KEY: ${MASTER_KEY}
-      KEYCLOAK_ISSUER_URI: http://keycloak:18080/realms/${KEYCLOAK_REALM}
       LOKI_URL: http://loki:3100
     depends_on:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
-      keycloak: { condition: service_started }
       postgres: { condition: service_healthy }
       keycloak: { condition: service_started }
       redis: {condition: service_healthy}
@@ -278,15 +274,10 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092
       SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
-      KEYCLOAK_ISSUER_URI: http://keycloak:18080/realms/${KEYCLOAK_REALM}
       LOKI_URL: http://loki:3100
-      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
-      FALLBACK_SLACK_ID: ${FALLBACK_SLACK_ID:-}
-      FALLBACK_NOTIFICATION_ALLOW: ${FALLBACK_NOTIFICATION_ALLOW:-false}
     depends_on:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
-      keycloak: { condition: service_started }
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
       kafka: { condition: service_started }
