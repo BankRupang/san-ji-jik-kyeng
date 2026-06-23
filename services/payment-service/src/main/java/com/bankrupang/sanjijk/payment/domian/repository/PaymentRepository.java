@@ -3,6 +3,7 @@ package com.bankrupang.sanjijk.payment.domian.repository;
 import com.bankrupang.sanjijk.payment.domian.entity.Payment;
 import com.bankrupang.sanjijk.payment.domian.enums.PaymentStatus;
 import com.bankrupang.sanjijk.payment.domian.enums.PaymentType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -33,5 +34,6 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     @Query("SELECT p FROM Payment p WHERE p.status = :status AND p.requestedAt < :expiredBefore")
     List<Payment> findExpiredPayments(
             @Param("status") PaymentStatus status,
-            @Param("expiredBefore") LocalDateTime expiredBefore);
+            @Param("expiredBefore") LocalDateTime expiredBefore,
+            Pageable pageable);
 }

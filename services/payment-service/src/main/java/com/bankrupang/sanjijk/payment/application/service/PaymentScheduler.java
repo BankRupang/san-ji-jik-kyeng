@@ -5,6 +5,8 @@ import com.bankrupang.sanjijk.payment.domian.enums.PaymentStatus;
 import com.bankrupang.sanjijk.payment.domian.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -20,14 +22,17 @@ public class PaymentScheduler {
     private final PaymentSchedulerTransaction paymentSchedulerTransaction;
 
     private static final int EXPIRE_MINUTES = 15;
+    private static final int BATCH_SIZE = 100;
 
     // 1분마다 실행 - READY 상태에서 15분 초과한 Payment 만료 처리
     @Scheduled(fixedDelay = 60_000)
     public void expireReadyPayments() {
         LocalDateTime expiredBefore = LocalDateTime.now().minusMinutes(EXPIRE_MINUTES);
 
+        Pageable pageable = PageRequest.of(0, BATCH_SIZE);
+
         List<Payment> expiredPayments = paymentRepository
-                .findExpiredPayments(PaymentStatus.READY, expiredBefore);
+                .findExpiredPayments(PaymentStatus.READY, expiredBefore, pageable);
 
         if (expiredPayments.isEmpty()) return;
 
