@@ -45,6 +45,7 @@ import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionD
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionListResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionStartResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionUpdateResponse;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionDepositInfoResponse;
 import com.bankrupang.sanjijk.auction.auction.infrastructure.client.BidClient;
 import com.bankrupang.sanjijk.auction.auction.infrastructure.client.dto.HighestBidResponse;
 import com.bankrupang.sanjijk.auction.outbox.application.service.AuctionOutboxService;
@@ -1243,4 +1244,44 @@ class AuctionServiceTest {
         }).when(transactionAfterCommitExecutor).execute(any(Runnable.class));
     }
 
+    @Nested
+    @DisplayName("getAuctionDepositInfo()")
+    class GetAuctionDepositInfo {
+
+        @Test
+        @DisplayName("성공 - 경매 및 상품 정보가 정상적으로 조회된다")
+        void success() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+
+            Product product = createProduct(sellerId, productId);
+            Auction auction = createAuction(sellerId, productId, auctionId);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+
+            // when
+            AuctionDepositInfoResponse response = auctionService.getAuctionDepositInfo(auctionId);
+
+            // then
+            assertThat(response.depositAmount()).isEqualTo(auction.getStartPrice());
+            assertThat(response.auctionTitle()).isEqualTo(product.getName());
+            assertThat(response.endAt()).isEqualTo(auction.getEndAt());
+        }
+
+        @Test
+        @DisplayName("실패 - 존재하지 않는 경매 ID인 경우 예외를 발생시킨다")
+        void fail_auctionNotFound() {
+            // given
+            UUID auctionId = UUID.randomUUID();
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> auctionService.getAuctionDepositInfo(auctionId))
+                    .isInstanceOf(AuctionException.class)
+                    .hasMessageContaining(AuctionErrorCode.AUCTION_NOT_FOUND.getMessage());
+        }
+    }
 }
