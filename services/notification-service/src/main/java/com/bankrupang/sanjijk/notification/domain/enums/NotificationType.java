@@ -6,5 +6,6 @@ public enum NotificationType {
     PAYMENT_COMPLETED,
     PAYMENT_FAILED,
     DEPOSIT_FORFEITED,
+    REFUND_COMPLETED,
     BID_OVERTAKEN
 }

@@ -34,6 +34,39 @@ public class VectorStoreRepository {
         return total == null ? 0L : total;
     }
 
+    public List<String> hybridSearch(String vectorStr, String query, double similarityThreshold, int searchLimit, int topK) {
+        return jdbcTemplate.queryForList("""
+                WITH vector_results AS (
+                    SELECT id, content,
+                           ROW_NUMBER() OVER (ORDER BY embedding <=> CAST(? AS vector)) AS rank
+                    FROM ai_schema.vector_store
+                    WHERE 1 - (embedding <=> CAST(? AS vector)) >= ?
+                    LIMIT ?
+                ),
+                text_results AS (
+                    SELECT id, content,
+                           ROW_NUMBER() OVER (
+                               ORDER BY ts_rank(to_tsvector('simple', content), plainto_tsquery('simple', ?)) DESC
+                           ) AS rank
+                    FROM ai_schema.vector_store
+                    WHERE to_tsvector('simple', content) @@ plainto_tsquery('simple', ?)
+                    LIMIT ?
+                ),
+                rrf_scores AS (
+                    SELECT
+                        COALESCE(v.id, t.id) AS id,
+                        COALESCE(v.content, t.content) AS content,
+                        COALESCE(1.0 / (60 + v.rank), 0.0) + COALESCE(1.0 / (60 + t.rank), 0.0) AS rrf_score
+                    FROM vector_results v
+                    FULL OUTER JOIN text_results t ON v.id = t.id
+                )
+                SELECT content FROM rrf_scores ORDER BY rrf_score DESC LIMIT ?
+                """, String.class,
+                vectorStr, vectorStr, similarityThreshold, searchLimit,
+                query, query, searchLimit,
+                topK);
+    }
+
     public List<DocumentInfoResponse> findDocuments(int limit, long offset) {
         return jdbcTemplate.query("""
                 SELECT metadata->>'title' AS title,
