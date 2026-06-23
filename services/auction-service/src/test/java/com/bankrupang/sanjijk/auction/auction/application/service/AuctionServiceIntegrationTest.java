@@ -3,7 +3,11 @@ package com.bankrupang.sanjijk.auction.auction.application.service;
 import com.bankrupang.sanjijk.auction.auction.domain.entity.Auction;
 import com.bankrupang.sanjijk.auction.auction.domain.repository.AuctionRepository;
 import com.bankrupang.sanjijk.auction.auction.domain.type.AuctionStatus;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCancelRequest;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCloseRequest;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.request.AuctionCreateRequest;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCancelResponse;
+import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCloseResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionCreateResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionStartResponse;
 import com.bankrupang.sanjijk.auction.outbox.domain.entity.AuctionOutbox;
@@ -117,5 +121,78 @@ class AuctionServiceIntegrationTest {
         boolean hasStartEvent = outboxes.stream()
                 .anyMatch(o -> AuctionEventType.AUCTION_START.equals(o.getEventType()) && o.getAggregateId().equals(auction.getId()));
         assertThat(hasStartEvent).isTrue();
+    }
+
+    @Test
+    @DisplayName("수동 경매 마감 통합 테스트 - 경매 상태가 WON으로 갱신되고 Outbox 테이블에 AUCTION_WON 이벤트가 저장된다")
+    void closeAuctionManually_integration() {
+        // given
+        LocalDateTime startAt = LocalDateTime.now().minusHours(1);
+        Auction auction = Auction.create(
+                product.getId(),
+                sellerId,
+                15000,
+                1000,
+                startAt,
+                startAt.plusHours(1)
+        );
+        auction.start();
+        auctionRepository.save(auction);
+
+        UUID winnerId = UUID.randomUUID();
+        AuctionCloseRequest request = new AuctionCloseRequest(winnerId, 20000);
+
+        // when
+        AuctionCloseResponse response = auctionService.closeAuctionManually(auction.getId(), request);
+
+        // then
+        assertThat(response.status()).isEqualTo(AuctionStatus.WON);
+        assertThat(response.winnerId()).isEqualTo(winnerId);
+        assertThat(response.finalPrice()).isEqualTo(20000);
+
+        // DB 상태 업데이트 검증
+        Auction updatedAuction = auctionRepository.findById(auction.getId()).orElse(null);
+        assertThat(updatedAuction).isNotNull();
+        assertThat(updatedAuction.getStatus()).isEqualTo(AuctionStatus.WON);
+        assertThat(updatedAuction.getWinnerId()).isEqualTo(winnerId);
+        assertThat(updatedAuction.getFinalPrice()).isEqualTo(20000);
+
+        // Outbox 검증
+        List<AuctionOutbox> outboxes = auctionOutboxRepository.findAll();
+        assertThat(outboxes).isNotEmpty();
+        boolean hasWonEvent = outboxes.stream()
+                .anyMatch(o -> AuctionEventType.AUCTION_WON.equals(o.getEventType()) && o.getAggregateId().equals(auction.getId()));
+        assertThat(hasWonEvent).isTrue();
+    }
+
+    @Test
+    @DisplayName("경매 취소 통합 테스트 - READY 상태의 경매를 취소하면 CANCELLED 상태로 정상 변경된다")
+    void cancelAuction_integration() {
+        // given
+        LocalDateTime startAt = LocalDateTime.now().plusDays(2);
+        Auction auction = Auction.create(
+                product.getId(),
+                sellerId,
+                10000,
+                1000,
+                startAt,
+                startAt.plusHours(2)
+        );
+        auctionRepository.save(auction);
+
+        AuctionCancelRequest request = new AuctionCancelRequest("단순 변심으로 인한 취소");
+
+        // when
+        AuctionCancelResponse response = auctionService.cancelAuction(sellerId, "SELLER", auction.getId(), request);
+
+        // then
+        assertThat(response.status()).isEqualTo(AuctionStatus.CANCELLED);
+        assertThat(response.reason()).isEqualTo("단순 변심으로 인한 취소");
+
+        // DB 상태 업데이트 검증
+        Auction updatedAuction = auctionRepository.findById(auction.getId()).orElse(null);
+        assertThat(updatedAuction).isNotNull();
+        assertThat(updatedAuction.getStatus()).isEqualTo(AuctionStatus.CANCELLED);
+        assertThat(updatedAuction.getCancelReason()).isEqualTo("단순 변심으로 인한 취소");
     }
 }
