@@ -11,3 +11,10 @@ datasources:
     type: loki
     uid: loki
     url: http://loki:3100
+
+  - name: CloudWatch
+    type: cloudwatch
+    uid: cloudwatch
+    jsonData:
+      authType: default
+      defaultRegion: ap-northeast-2
