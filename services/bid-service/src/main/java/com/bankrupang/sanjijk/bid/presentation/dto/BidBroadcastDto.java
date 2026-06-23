@@ -8,8 +8,8 @@ import lombok.Getter;
 public class BidBroadcastDto {
     private String type;
     private String auctionId;
-    private Long currentPrice;
+    private Integer currentPrice;
     private String previousHighestBidderId;
     private String highestBidderId;
-    private Long nextMinPrice;
+    private Integer nextMinPrice;
 }
