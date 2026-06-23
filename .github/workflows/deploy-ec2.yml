@@ -76,12 +76,22 @@ jobs:
           cd "${REPO_DIR}"
           KAFKA_PRIVATE_IP=$(aws ssm get-parameter --name /sanji/prod/kafka/private-ip --query Parameter.Value --output text --region ap-northeast-2)
           GRAFANA_ADMIN_PASSWORD=$(aws ssm get-parameter --name /sanji/prod/monitoring/grafana-admin-password --with-decryption --query Parameter.Value --output text --region ap-northeast-2)
+          SLACK_WEBHOOK_URL=$(aws ssm get-parameter --name /sanji/prod/monitoring/slack-webhook-url --with-decryption --query Parameter.Value --output text --region ap-northeast-2)
           cat > .env <<EOF
           KAFKA_PRIVATE_IP=${KAFKA_PRIVATE_IP}
           GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+          SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
           EOF
           chmod 600 .env
           envsubst '$KAFKA_PRIVATE_IP' < monitoring/prometheus/prometheus.prod.yml.template > monitoring/prometheus/prometheus.prod.yml
+          # ecs-targets.json이 없으면 빈 파일 생성 (Prometheus 컨테이너가 마운트 실패 방지)
+          [ -f monitoring/prometheus/ecs-targets.json ] || echo "[]" > monitoring/prometheus/ecs-targets.json
+          # ecs-discovery.sh 실행 권한 부여
+          chmod +x monitoring/prometheus/ecs-discovery.sh
+          # /etc/cron.d 에 등록해서 ec2-user 권한으로 5분마다 실행
+          echo "*/5 * * * * ec2-user /home/ec2-user/sanji-jk/monitoring/prometheus/ecs-discovery.sh >> /var/log/ecs-discovery.log 2>&1" | sudo tee /etc/cron.d/ecs-discovery > /dev/null
+          # 첫 배포 시 즉시 한 번 실행 (ec2-user로)
+          sudo -u ec2-user /home/ec2-user/sanji-jk/monitoring/prometheus/ecs-discovery.sh || true
           docker compose -f docker-compose.monitoring.yml pull
           docker compose -f docker-compose.monitoring.yml up -d
           EOS
