@@ -13,6 +13,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./monitoring/prometheus/prometheus.prod.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus/ecs-targets.json:/etc/prometheus/ecs-targets.json
       - prom-data:/prometheus
     ports: ["9090:9090"]
 

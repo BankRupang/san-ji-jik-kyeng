@@ -11,3 +11,11 @@ scrape_configs:
           - "${KAFKA_PRIVATE_IP}:7071"
           - "${KAFKA_PRIVATE_IP}:9100"
 
+  # ECS Fargate 앱: ecs-discovery.sh(cron 5분)가 주기적으로 태스크 IP를 JSON 파일에 기록
+  # Spring Boot Actuator /actuator/prometheus 엔드포인트에서 지표 수집
+  - job_name: "ecs-apps"
+    metrics_path: "/actuator/prometheus"
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/ecs-targets.json
+        refresh_interval: 5m
