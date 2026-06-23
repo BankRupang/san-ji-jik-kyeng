@@ -16,6 +16,7 @@ import io.micrometer.observation.ObservationRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.RedisConnectionException;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -79,9 +80,6 @@ public class ChatService {
     @Value("${ai.chat.max-history:10}")
     private int maxHistory;
 
-    @Value("${ai.chat.processing-lock-ttl-seconds:60}")
-    private int lockTtlSeconds;
-
     @Transactional
     public ChatSession createSession(UUID userId) {
         return sessionRepository.save(ChatSession.create(userId, sessionExpireHours));
@@ -93,10 +91,13 @@ public class ChatService {
         RLock lock = redissonClient.getLock(PROCESSING_LOCK_KEY + sessionId);
         boolean acquired;
         try {
-            acquired = lock.tryLock(0, lockTtlSeconds, TimeUnit.SECONDS);
+            acquired = lock.tryLock(0, -1, TimeUnit.SECONDS);
+        } catch (RedisConnectionException e) {
+            log.error("Redis 연결 실패로 분산 락을 획득할 수 없습니다 - sessionId: {}", sessionId, e);
+            throw new BaseException(AiErrorCode.LOCK_UNAVAILABLE);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new BaseException(AiErrorCode.CHAT_SESSION_ALREADY_PROCESSING);
+            throw new BaseException(AiErrorCode.LOCK_INTERRUPTED);
         }
         if (!acquired) {
             throw new BaseException(AiErrorCode.CHAT_SESSION_ALREADY_PROCESSING);

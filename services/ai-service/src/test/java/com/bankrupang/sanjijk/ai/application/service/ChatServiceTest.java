@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.RedisConnectionException;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -77,7 +78,6 @@ class ChatServiceTest {
                 ObservationRegistry.NOOP, new SimpleMeterRegistry(), redissonClient);
         ReflectionTestUtils.setField(chatService, "sessionExpireHours", 24);
         ReflectionTestUtils.setField(chatService, "maxHistory", 10);
-        ReflectionTestUtils.setField(chatService, "lockTtlSeconds", 60);
 
         lenient().doAnswer(invocation -> {
             Consumer<TransactionStatus> action = invocation.getArgument(0);
@@ -337,8 +337,8 @@ class ChatServiceTest {
         }
 
         @Test
-        @DisplayName("InterruptedException 발생 시 409 반환 및 스레드 인터럽트 플래그 복원")
-        void interrupted_throwsConflictAndRestoresInterruptFlag() throws Exception {
+        @DisplayName("InterruptedException 발생 시 503 반환 및 스레드 인터럽트 플래그 복원")
+        void interrupted_throwsServiceUnavailableAndRestoresInterruptFlag() throws Exception {
             // given
             UUID userId = UUID.randomUUID();
             UUID sessionId = UUID.randomUUID();
@@ -349,7 +349,7 @@ class ChatServiceTest {
             // when & then
             assertThatThrownBy(() -> chatService.chat(sessionId, userId, "질문"))
                     .isInstanceOf(BaseException.class)
-                    .hasMessage(AiErrorCode.CHAT_SESSION_ALREADY_PROCESSING.getMessage());
+                    .hasMessage(AiErrorCode.LOCK_INTERRUPTED.getMessage());
 
             assertThat(Thread.currentThread().isInterrupted()).isTrue();
             Thread.interrupted(); // 다른 테스트에 영향 없도록 플래그 초기화
@@ -372,6 +372,22 @@ class ChatServiceTest {
                     .isInstanceOf(RuntimeException.class);
 
             verify(lock).unlock(); // 예외가 나도 finally에서 해제
+        }
+
+        @Test
+        @DisplayName("Redis 연결 장애 시 503 SERVICE_UNAVAILABLE 반환")
+        void redisConnectionFailed_throws503() throws Exception {
+            // given
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            ChatSession session = createSession(userId);
+            given(sessionRepository.findByIdAndDeletedAtIsNull(sessionId)).willReturn(Optional.of(session));
+            doThrow(new RedisConnectionException("연결 실패")).when(lock).tryLock(anyLong(), anyLong(), any(TimeUnit.class));
+
+            // when & then
+            assertThatThrownBy(() -> chatService.chat(sessionId, userId, "질문"))
+                    .isInstanceOf(BaseException.class)
+                    .hasMessage(AiErrorCode.LOCK_UNAVAILABLE.getMessage());
         }
 
         @Test

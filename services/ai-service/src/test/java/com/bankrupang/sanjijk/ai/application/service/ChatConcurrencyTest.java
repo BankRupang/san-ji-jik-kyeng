@@ -72,7 +72,6 @@ class ChatConcurrencyTest {
                 ObservationRegistry.NOOP, new SimpleMeterRegistry(), redissonClient);
         ReflectionTestUtils.setField(chatService, "sessionExpireHours", 24);
         ReflectionTestUtils.setField(chatService, "maxHistory", 10);
-        ReflectionTestUtils.setField(chatService, "lockTtlSeconds", 60);
 
         // void 메서드는 doAnswer().when() 사용
         lenient().doAnswer(invocation -> {
@@ -107,9 +106,12 @@ class ChatConcurrencyTest {
         given(messageRepository.findBySessionIdOrderByIdDesc(eq(sessionId), any()))
                 .willReturn(Collections.emptyList());
 
-        // 500ms 대기 → 나머지 스레드가 tryLock(waitTime=0) 시도할 충분한 시간 확보
+        // Thread 1이 락을 점유한 시점을 정확히 포착 → sleep 없이 결정론적으로 동기화
+        CountDownLatch lockHeldLatch = new CountDownLatch(1);
+        CountDownLatch releaseProcessingLatch = new CountDownLatch(1);
         given(hybridSearchService.search(anyString())).willAnswer(inv -> {
-            Thread.sleep(500);
+            lockHeldLatch.countDown();                          // Thread 1: 락 점유 중 신호
+            releaseProcessingLatch.await(5, TimeUnit.SECONDS); // 나머지 스레드가 실패할 때까지 대기
             return List.of("경매 문서");
         });
 
@@ -122,34 +124,44 @@ class ChatConcurrencyTest {
         given(requestSpec.call()).willReturn(callSpec);
         given(callSpec.content()).willReturn("AI 응답");
 
-        int threadCount = 5;
-        CountDownLatch startLatch = new CountDownLatch(1);
-        CountDownLatch doneLatch = new CountDownLatch(threadCount);
         List<String> successes = new CopyOnWriteArrayList<>();
         List<BaseException> conflicts = new CopyOnWriteArrayList<>();
+        CountDownLatch othersDone = new CountDownLatch(4);
 
-        for (int i = 0; i < threadCount; i++) {
+        // Thread 1: 락을 선점할 스레드
+        Thread thread1 = new Thread(() -> {
+            try {
+                successes.add(chatService.chat(sessionId, userId, "질문"));
+            } catch (BaseException e) {
+                conflicts.add(e);
+            }
+        });
+        thread1.start();
+
+        // Thread 1이 락을 획득하고 pipeline에 진입한 후에 나머지 스레드 출발
+        lockHeldLatch.await(5, TimeUnit.SECONDS);
+
+        // Threads 2-5: 락이 점유된 상태에서 즉시 실패
+        for (int i = 0; i < 4; i++) {
             new Thread(() -> {
                 try {
-                    startLatch.await();
-                    String response = chatService.chat(sessionId, userId, "질문");
-                    successes.add(response);
+                    chatService.chat(sessionId, userId, "질문");
+                    successes.add("success");
                 } catch (BaseException e) {
                     conflicts.add(e);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
                 } finally {
-                    doneLatch.countDown();
+                    othersDone.countDown();
                 }
             }).start();
         }
 
-        startLatch.countDown(); // 5개 스레드 동시 출발
-        doneLatch.await(10, TimeUnit.SECONDS);
+        othersDone.await(5, TimeUnit.SECONDS); // Threads 2-5 완료 대기
+        releaseProcessingLatch.countDown();     // Thread 1 해제
+        thread1.join(5000);
 
         // then: Redis SETNX 원자성 보장 → 정확히 1개만 성공
         assertThat(successes).hasSize(1);
-        assertThat(conflicts).hasSize(threadCount - 1);
+        assertThat(conflicts).hasSize(4);
         assertThat(conflicts).allSatisfy(e ->
                 assertThat(e.getErrorCode()).isEqualTo(AiErrorCode.CHAT_SESSION_ALREADY_PROCESSING));
     }
@@ -162,7 +174,6 @@ class ChatConcurrencyTest {
         UUID sessionId = UUID.randomUUID();
         ChatSession session = ChatSession.create(userId, 24);
         ReflectionTestUtils.setField(session, "id", sessionId);
-        ReflectionTestUtils.setField(chatService, "lockTtlSeconds", 1); // TTL 1초로 단축
 
         given(sessionRepository.findByIdAndDeletedAtIsNull(sessionId)).willReturn(Optional.of(session));
         given(messageRepository.findBySessionIdOrderByIdDesc(eq(sessionId), any()))
