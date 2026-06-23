@@ -14,9 +14,16 @@ spring:
         initial-interval: 1000
         max-interval: 2000
     gateway:
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOriginPatterns: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            allowCredentials: true
       routes:
         - id: user-service
-          uri: lb://user-service          # Eureka에 등록된 서비스 이름으로 로드밸런싱
+          uri: lb://user-service
           predicates:
             - Path=/api/v1/auth/**, /api/v1/users/**
 

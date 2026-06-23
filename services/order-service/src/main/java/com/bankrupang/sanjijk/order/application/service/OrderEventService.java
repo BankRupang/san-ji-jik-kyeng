@@ -25,13 +25,14 @@ public class OrderEventService implements OrderEventPublisher {
 
     @Override
     @Transactional
-    public void publishDepositCreated(Order order) {
+    public void publishDepositCreated(Order order, LocalDateTime endAt) {
         DepositCreatedEvent event = new DepositCreatedEvent(
                 order.getId(),
                 order.getUserId(),
                 order.getAuctionId(),
                 order.getAuctionTitle(),
                 order.getAmount(),
+                endAt,
                 LocalDateTime.now()
         );
         saveOutbox(order.getId(), "DEPOSIT_CREATED", event);

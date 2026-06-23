@@ -10,27 +10,25 @@ import java.util.UUID;
 public record OrderResponse(
         UUID orderId,
         String orderNumber,
-        UUID userId,
-        String userName,
-        UUID auctionId,
-        String auctionTitle,
         OrderType orderType,
+        UUID auctionId,
         int amount,
         OrderStatus status,
-        LocalDateTime createdAt
+        LocalDateTime paymentDueAt,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt
 ) {
     public static OrderResponse from(Order order) {
         return new OrderResponse(
                 order.getId(),
                 order.getOrderNumber(),
-                order.getUserId(),
-                order.getUserName(),
-                order.getAuctionId(),
-                order.getAuctionTitle(),
                 order.getOrderType(),
+                order.getAuctionId(),
                 order.getAmount(),
                 order.getStatus(),
-                order.getCreatedAt()
+                order.getPaymentDueAt(),
+                order.getCreatedAt(),
+                order.getUpdatedAt()
         );
     }
 }

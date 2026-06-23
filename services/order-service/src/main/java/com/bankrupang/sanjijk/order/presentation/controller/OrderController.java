@@ -6,10 +6,12 @@ import com.bankrupang.sanjijk.order.presentation.dto.request.OrderDepositCreateR
 import com.bankrupang.sanjijk.order.presentation.dto.response.OrderResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.data.domain.Page;
 import java.util.UUID;
 
 @RestController
@@ -25,7 +27,22 @@ public class OrderController {
             @Valid @RequestBody OrderDepositCreateRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.create(orderService.createDepositOrder(userId,request)));
+                .body(ApiResponse.create(orderService.createDepositOrder(userId, request)));
+    }
 
+    @GetMapping("/deposit/me")
+    public ResponseEntity<ApiResponse<Page<OrderResponse>>> getMyDepositOrders(
+            @RequestHeader("X-User-Id") UUID userId,
+            Pageable pageable
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(orderService.getMyDepositOrders(userId, pageable)));
+    }
+
+    @GetMapping("/winning/me")
+    public ResponseEntity<ApiResponse<Page<OrderResponse>>> getMyWinningOrders(
+            @RequestHeader("X-User-Id") UUID userId,
+            Pageable pageable
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(orderService.getMyWinningOrders(userId, pageable)));
     }
 }

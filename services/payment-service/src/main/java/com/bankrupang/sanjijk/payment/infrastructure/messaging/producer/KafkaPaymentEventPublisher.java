@@ -1,6 +1,8 @@
 package com.bankrupang.sanjijk.payment.infrastructure.messaging.producer;
 
 import com.bankrupang.sanjijk.payment.domian.entity.PaymentOutbox;
+import com.bankrupang.sanjijk.payment.domian.enums.OutboxStatus;
+import com.bankrupang.sanjijk.payment.infrastructure.messaging.handler.RefundRequestHandler;
 import com.bankrupang.sanjijk.payment.infrastructure.outbox.PaymentOutboxJpaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -9,6 +11,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -16,22 +19,42 @@ import java.util.List;
 public class KafkaPaymentEventPublisher {
 
     private final PaymentOutboxJpaRepository paymentOutboxJpaRepository;
-
-    // @Lazy self 주입 대신 Transaction 클래스 분리
-    // → @Transactional이 걸린 메서드를 같은 클래스에서 호출하면 프록시 우회로 트랜잭션 무시됨
     private final KafkaPaymentEventPublisherTransaction kafkaPaymentEventPublisherTransaction;
+    private final RefundRequestHandler refundRequestHandler;
 
-    // 5초마다 Outbox 테이블 폴링 → Kafka 발행
     @Scheduled(fixedDelay = 5000)
     public void relay() {
         List<PaymentOutbox> outboxList = paymentOutboxJpaRepository
                 .findRetryableOutboxes(PageRequest.of(0, 100), PaymentOutbox.MAX_RETRY_COUNT);
 
-        for (PaymentOutbox outbox : outboxList) {
+        if (outboxList.isEmpty()) return;
+
+        List<UUID> ids = outboxList.stream().map(PaymentOutbox::getId).toList();
+
+        // REQUIRES_NEW: 즉시 커밋하여 다른 인스턴스가 IN_PROGRESS를 볼 수 있도록 함
+        int updated = kafkaPaymentEventPublisherTransaction.claimBatch(ids);
+        if (updated == 0) {
+            log.debug("[OUTBOX] 선점 실패 - 다른 인스턴스가 처리 중");
+            return;
+        }
+
+        // 실제 선점된 항목만 처리 (FAILED 항목 일부 미선점 가능)
+        List<PaymentOutbox> claimedOutboxes = paymentOutboxJpaRepository
+                .findByIdInAndStatus(ids, OutboxStatus.IN_PROGRESS);
+
+        for (PaymentOutbox outbox : claimedOutboxes) {
             try {
-                kafkaPaymentEventPublisherTransaction.relayOne(outbox);
+                if ("REFUND_REQUEST".equals(outbox.getEventType())) {
+                    refundRequestHandler.handle(outbox);
+                    kafkaPaymentEventPublisherTransaction.markOnePublished(outbox.getId()); // REQUIRES_NEW: 즉시 커밋
+                } else {
+                    kafkaPaymentEventPublisherTransaction.relayOne(outbox);
+                }
             } catch (Exception e) {
-                log.error("[OUTBOX] relay 처리 중 오류 - outboxId: {}", outbox.getId(), e);
+                log.error("[OUTBOX] relay 처리 중 오류 - outboxId: {}, eventType: {}",
+                        outbox.getId(), outbox.getEventType(), e);
+                // REQUIRES_NEW: IN_PROGRESS 고착 방지
+                kafkaPaymentEventPublisherTransaction.markOneFailed(outbox.getId());
             }
         }
     }

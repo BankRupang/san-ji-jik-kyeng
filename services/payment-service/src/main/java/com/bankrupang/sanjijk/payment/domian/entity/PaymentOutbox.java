@@ -77,6 +77,10 @@ public class PaymentOutbox {
     // 상태 전이 메서드
     // ================================
 
+    public void markInProgress() {
+        this.status = OutboxStatus.IN_PROGRESS;
+    }
+
     public void markPublished() {
         this.status = OutboxStatus.PUBLISHED;
         this.publishedAt = LocalDateTime.now();

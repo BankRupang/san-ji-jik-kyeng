@@ -36,11 +36,14 @@ import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionD
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionListResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionStartResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionUpdateResponse;
+import com.bankrupang.sanjijk.auction.global.util.AuctionLogContext;
 import com.bankrupang.sanjijk.auction.outbox.application.service.AuctionOutboxService;
 import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepository;
 import com.bankrupang.sanjijk.auction.product.exception.ProductErrorCode;
 import com.bankrupang.sanjijk.auction.product.exception.ProductException;
+import com.bankrupang.sanjijk.auction.auction.infrastructure.client.BidClient;
+import com.bankrupang.sanjijk.auction.auction.infrastructure.client.dto.HighestBidResponse;
 import com.bankrupang.sanjijk.common.response.PageResponse;
 import com.bankrupang.sanjijk.common.util.PageableUtils;
 
@@ -56,12 +59,14 @@ public class AuctionService {
     private final AuctionScheduleManager auctionScheduleManager;
     private final AuctionSchedulerJobService auctionSchedulerJobService;
     private final TransactionAfterCommitExecutor transactionAfterCommitExecutor;
+    private final BidClient bidClient;
 
     @Transactional
     public AuctionCreateResponse createAuction(UUID userId, String userRole, AuctionCreateRequest request) {
         Product product = getExistingProduct(request.productId());
         validateProductOwnerOrMaster(product, userId, userRole);
         validateStartAt(request.startAt());
+        validateDuplicateAuction(product.getId());
 
         LocalDateTime endAt = request.startAt().plusHours(1);
 
@@ -83,6 +88,17 @@ public class AuctionService {
     public AuctionDetailResponse getAuction(UUID auctionId) {
         Auction auction = getExistingAuction(auctionId);
         Product product = getExistingProduct(auction.getProductId());
+
+        if (auction.getStatus() == AuctionStatus.PROGRESS) {
+            try {
+                HighestBidResponse highestBid = bidClient.getHighestBid(auctionId);
+                if (highestBid != null) {
+                    return AuctionDetailResponse.of(auction, product, highestBid.winnerId(), highestBid.finalPrice());
+                }
+            } catch (Exception e) {
+                log.warn("경매 상세 조회 중 bid-service 최고가 조회 실패 - auctionId: {}, error: {}", auctionId, e.getMessage());
+            }
+        }
 
         return AuctionDetailResponse.of(auction, product);
     }
@@ -156,86 +172,116 @@ public class AuctionService {
 
     @Transactional
     public AuctionCloseResponse closeAuctionManually(UUID auctionId, AuctionCloseRequest request) {
-        Auction auction = getExistingAuction(auctionId);
+        return AuctionLogContext.callWithAuctionId(auctionId, () -> {
+            Auction auction = getExistingAuction(auctionId);
 
-        return closeAuction(auction, request);
+            return closeAuction(auction, request, "MANUAL");
+        });
     }
 
     @Transactional
-    public AuctionCloseResponse closeAuctionByEndedEvent(UUID auctionId, boolean hasBid, UUID winnerId, Long finalPrice) {
-        Auction auction = getExistingAuction(auctionId);
-        AuctionCloseRequest request = hasBid
-                ? new AuctionCloseRequest(winnerId, toFinalPrice(finalPrice))
-                : null;
+    public AuctionCloseResponse closeAuctionByEndedEvent(UUID auctionId, boolean hasBid, UUID winnerId, Integer finalPrice) {
+        return AuctionLogContext.callWithAuctionId(auctionId, () -> {
+            Auction auction = getExistingAuction(auctionId);
+            AuctionCloseRequest request = hasBid
+                    ? new AuctionCloseRequest(winnerId, finalPrice)
+                    : null;
 
-        return closeAuction(auction, request);
+            return closeAuction(auction, request, "AUCTION_ENDED");
+        });
     }
 
     @Transactional
     public void extendAuctionByExtendedEvent(UUID auctionId, LocalDateTime newEndAt) {
-        Auction auction = getExistingAuction(auctionId);
+        AuctionLogContext.runWithAuctionId(auctionId, () -> {
+            Auction auction = getExistingAuction(auctionId);
 
-        if (auction.getStatus() != AuctionStatus.PROGRESS) {
-            log.info("경매 연장 이벤트 처리 생략 - PROGRESS 상태가 아닙니다. auctionId: {}, status: {}",
-                    auctionId, auction.getStatus());
-            return;
-        }
+            if (auction.getStatus() != AuctionStatus.PROGRESS) {
+                log.info("경매 연장 이벤트 처리 생략 - PROGRESS 상태가 아닙니다. auctionId: {}, status: {}",
+                        auctionId, auction.getStatus());
+                return;
+            }
 
-        if (newEndAt == null) {
-            throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_PERIOD);
-        }
+            if (newEndAt == null) {
+                throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_PERIOD);
+            }
 
-        if (!newEndAt.isAfter(auction.getEndAt())) {
-            log.info("경매 연장 이벤트 처리 생략 - 기존 종료 시각 이후가 아닙니다. auctionId: {}, currentEndAt: {}, newEndAt: {}",
-                    auctionId, auction.getEndAt(), newEndAt);
-            return;
-        }
+            if (!newEndAt.isAfter(auction.getEndAt())) {
+                log.info("경매 연장 이벤트 처리 생략 - 기존 종료 시각 이후가 아닙니다. auctionId: {}, currentEndAt: {}, newEndAt: {}",
+                        auctionId, auction.getEndAt(), newEndAt);
+                return;
+            }
 
-        auction.extendEndAt(newEndAt);
-        scheduleEndCheckJobAfterCommit(auction);
+            LocalDateTime previousEndAt = auction.getEndAt();
+            auction.extendEndAt(newEndAt);
+            log.info("경매 종료 시각 연장 - auctionId: {}, trigger: AUCTION_EXTENDED, previousEndAt: {}, newEndAt: {}, extensionCount: {}",
+                    auctionId, previousEndAt, auction.getEndAt(), auction.getExtensionCount());
+            scheduleEndCheckJobAfterCommit(auction);
+        });
     }
 
     @Transactional
     public void completeAuctionPayment(UUID auctionId) {
-        Auction auction = getExistingAuction(auctionId);
+        AuctionLogContext.runWithAuctionId(auctionId, () -> {
+            Auction auction = getExistingAuction(auctionId);
 
-        if (auction.getStatus() == AuctionStatus.SUCCESS || auction.getStatus() == AuctionStatus.FAIL) {
-            log.info("결제 완료 이벤트 처리 생략 - 이미 최종 상태입니다. auctionId: {}, status: {}",
-                    auctionId, auction.getStatus());
-            return;
-        }
+            if (auction.getStatus() == AuctionStatus.SUCCESS || auction.getStatus() == AuctionStatus.FAIL) {
+                log.info("결제 완료 이벤트 처리 생략 - 이미 최종 상태입니다. auctionId: {}, status: {}",
+                        auctionId, auction.getStatus());
+                return;
+            }
 
-        auction.markSuccess();
+            AuctionStatus previousStatus = auction.getStatus();
+            auction.markSuccess();
+            log.info("경매 상태 전이 - auctionId: {}, trigger: PAYMENT_COMPLETED, previousStatus: {}, currentStatus: {}",
+                    auctionId, previousStatus, auction.getStatus());
+        });
     }
 
     @Transactional
     public void failAuctionPayment(UUID auctionId) {
-        Auction auction = getExistingAuction(auctionId);
+        AuctionLogContext.runWithAuctionId(auctionId, () -> {
+            Auction auction = getExistingAuction(auctionId);
 
-        if (auction.getStatus() == AuctionStatus.SUCCESS || auction.getStatus() == AuctionStatus.FAIL) {
-            log.info("결제 실패 이벤트 처리 생략 - 이미 최종 상태입니다. auctionId: {}, status: {}",
-                    auctionId, auction.getStatus());
-            return;
-        }
+            if (auction.getStatus() == AuctionStatus.SUCCESS || auction.getStatus() == AuctionStatus.FAIL) {
+                log.info("결제 실패 이벤트 처리 생략 - 이미 최종 상태입니다. auctionId: {}, status: {}",
+                        auctionId, auction.getStatus());
+                return;
+            }
 
-        auction.markFailed();
+            AuctionStatus previousStatus = auction.getStatus();
+            auction.markFailed();
+            log.info("경매 상태 전이 - auctionId: {}, trigger: PAYMENT_FAILED, previousStatus: {}, currentStatus: {}",
+                    auctionId, previousStatus, auction.getStatus());
+        });
     }
 
-    private AuctionCloseResponse closeAuction(Auction auction, AuctionCloseRequest request) {
+    private AuctionCloseResponse closeAuction(Auction auction, AuctionCloseRequest request, String trigger) {
         if (isAlreadyClosed(auction)) {
+            log.info("경매 마감 처리 생략 - 이미 종료된 상태입니다. auctionId: {}, trigger: {}, status: {}",
+                    auction.getId(), trigger, auction.getStatus());
             return AuctionCloseResponse.from(auction);
         }
 
         validateCloseRequest(auction, request);
 
+        AuctionStatus previousStatus = auction.getStatus();
         auction.markResultPending();
+        log.info("경매 상태 전이 - auctionId: {}, trigger: {}, previousStatus: {}, currentStatus: {}",
+                auction.getId(), trigger, previousStatus, auction.getStatus());
         Product product = getExistingProduct(auction.getProductId());
 
         if (hasWinningResult(request)) {
+            previousStatus = auction.getStatus();
             auction.markWon(request.winnerId(), request.finalPrice());
+            log.info("경매 상태 전이 - auctionId: {}, trigger: {}, previousStatus: {}, currentStatus: {}, winnerId: {}, finalPrice: {}",
+                    auction.getId(), trigger, previousStatus, auction.getStatus(), auction.getWinnerId(), auction.getFinalPrice());
             auctionOutboxService.saveAuctionWonEvent(auction, product);
         } else {
+            previousStatus = auction.getStatus();
             auction.markFailed();
+            log.info("경매 상태 전이 - auctionId: {}, trigger: {}, previousStatus: {}, currentStatus: {}",
+                    auction.getId(), trigger, previousStatus, auction.getStatus());
             auctionOutboxService.saveAuctionFailedEvent(auction, product);
         }
 
@@ -277,6 +323,16 @@ public class AuctionService {
     private void validateStartAt(LocalDateTime startAt) {
         if (!startAt.isAfter(LocalDateTime.now())) {
             throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_PERIOD);
+        }
+    }
+
+    private void validateDuplicateAuction(UUID productId) {
+        boolean hasActiveAuction = auctionRepository.existsByProductIdAndStatusInAndDeletedAtIsNull(
+                productId,
+                List.of(AuctionStatus.READY, AuctionStatus.PROGRESS)
+        );
+        if (hasActiveAuction) {
+            throw new AuctionException(AuctionErrorCode.DUPLICATE_AUCTION);
         }
     }
 
@@ -331,17 +387,7 @@ public class AuctionService {
         ));
     }
 
-    private Integer toFinalPrice(Long finalPrice) {
-        if (finalPrice == null) {
-            return null;
-        }
 
-        try {
-            return Math.toIntExact(finalPrice);
-        } catch (ArithmeticException e) {
-            throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_RESULT);
-        }
-    }
 
     private boolean isAlreadyClosed(Auction auction) {
         return auction.getStatus() == AuctionStatus.WON || auction.getStatus() == AuctionStatus.FAIL;

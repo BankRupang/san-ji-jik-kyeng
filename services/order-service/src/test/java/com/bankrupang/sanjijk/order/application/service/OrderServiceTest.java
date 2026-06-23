@@ -56,7 +56,8 @@ class OrderServiceTest {
                     "싱싱한 광어",
                     10000,
                     "사람",
-                    "UI123456"
+                    "UI123456",
+                    LocalDateTime.now().plusDays(1)
             );
         }
 
@@ -74,12 +75,11 @@ class OrderServiceTest {
             // then
             assertThat(response.orderType()).isEqualTo(OrderType.DEPOSIT);
             assertThat(response.status()).isEqualTo(OrderStatus.PENDING);
-            assertThat(response.userId()).isEqualTo(userId);
             assertThat(response.auctionId()).isEqualTo(request.auctionId());
             assertThat(response.amount()).isEqualTo(10000);
 
             verify(orderRepository).save(any(Order.class));
-            verify(orderEventService).publishDepositCreated(any(Order.class));
+            verify(orderEventService).publishDepositCreated(any(Order.class), any(LocalDateTime.class));
         }
 
         @Test
@@ -94,7 +94,7 @@ class OrderServiceTest {
             assertThatThrownBy(() -> orderService.createDepositOrder(userId, request))
                     .isInstanceOf(RuntimeException.class);
             verify(orderRepository, never()).save(any(Order.class));
-            verify(orderEventService, never()).publishDepositCreated(any(Order.class));
+            verify(orderEventService, never()).publishDepositCreated(any(Order.class), any(LocalDateTime.class));
 
         }
     }

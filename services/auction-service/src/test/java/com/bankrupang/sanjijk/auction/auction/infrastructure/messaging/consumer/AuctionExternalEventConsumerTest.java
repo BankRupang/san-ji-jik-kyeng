@@ -50,7 +50,7 @@ class AuctionExternalEventConsumerTest {
                 auctionId,
                 true,
                 winnerId,
-                15000L,
+                15000,
                 LocalDateTime.now()
         );
 
@@ -58,7 +58,7 @@ class AuctionExternalEventConsumerTest {
         consumer.consumeAuctionEnded(objectMapper.writeValueAsString(event));
 
         // then
-        verify(auctionService).closeAuctionByEndedEvent(auctionId, true, winnerId, 15000L);
+        verify(auctionService).closeAuctionByEndedEvent(auctionId, true, winnerId, 15000);
     }
 
     @Test

@@ -11,6 +11,6 @@ public class AuctionEndedEvent {
     private String auctionId;
     private boolean hasBid;
     private String winnerId;
-    private Long finalPrice;
+    private Integer finalPrice;
     private LocalDateTime endedAt;
 }

@@ -14,6 +14,6 @@ public class AuctionStartedEvent {
     private String productName;
     private String status;
     private LocalDateTime startAt;
-    private Long startPrice;
-    private Long bidUnit;
+    private Integer startPrice;
+    private Integer bidUnit;
 }

@@ -1,18 +1,24 @@
 package com.bankrupang.sanjijk.user.application.service;
 
+import com.bankrupang.sanjijk.common.response.PageResponse;
+import com.bankrupang.sanjijk.common.util.PageableUtils;
 import com.bankrupang.sanjijk.user.domain.UserRole;
 import com.bankrupang.sanjijk.user.domain.UserStatus;
 import com.bankrupang.sanjijk.user.domain.entity.User;
 import com.bankrupang.sanjijk.user.domain.exception.*;
 import com.bankrupang.sanjijk.user.domain.repository.UserRepository;
+import com.bankrupang.sanjijk.user.domain.repository.UserSpecification;
+import com.bankrupang.sanjijk.user.infrastructure.config.RedisKeys;
 import com.bankrupang.sanjijk.user.infrastructure.keycloak.KeycloakService;
+import com.bankrupang.sanjijk.user.presentation.dto.request.*;
 import com.bankrupang.sanjijk.user.presentation.dto.response.*;
-import com.bankrupang.sanjijk.user.presentation.dto.request.UserAdminSignupRequest;
-import com.bankrupang.sanjijk.user.presentation.dto.request.UserLoginRequest;
-import com.bankrupang.sanjijk.user.presentation.dto.request.UserSignupRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +31,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final KeycloakService keycloakService;
+    private final StringRedisTemplate redisTemplate;
 
     @Value("${admin.manager-key}")
     private String managerKey;
@@ -32,10 +39,11 @@ public class UserService {
     @Value("${admin.master-key}")
     private String masterKey;
 
+    // 일반 사용자 가입
     @Transactional
     public UserResponse signup(UserSignupRequest request) {
         validateUserRole(request.role());
-        validateDuplicateUser(request.username(), request.email());
+        validateDuplicateUser(request.username());
         validateDuplicateBusinessNumber(request.businessNumber());
 
         UUID keycloakId = keycloakService.createUser(
@@ -64,11 +72,12 @@ public class UserService {
         }
     }
 
+    // 관리자 가입
     @Transactional
     public UserResponse adminSignup(UserAdminSignupRequest request) {
         validateAdminRole(request.role());
         validateAdminKey(request.role(), request.adminKey());
-        validateDuplicateUser(request.username(), request.email());
+        validateDuplicateUser(request.username());
 
         UUID keycloakId = keycloakService.createUser(
                 request.username(),
@@ -96,6 +105,7 @@ public class UserService {
         }
     }
 
+    // 로그인
     @Transactional
     public UserLoginResponse login(UserLoginRequest request) {
         // 1. DB에서 유저 상태 확인 (정지/탈퇴 여부)
@@ -112,6 +122,64 @@ public class UserService {
 
     }
 
+    // 유저 프로필 수정
+    @Transactional
+    public UserResponse updateUserInfo(UUID userId, UserInfoUpdateRequest request) {
+        User user = findUserByIdOrElseThrow(userId);
+
+        user.updateUserInfo(request.name(), request.phone(), request.slackId());
+        return UserResponse.from(user);
+    }
+
+    // 사업자 번호 수정
+    @Transactional
+    public UserResponse updateBusinessNumber(UUID userId, UserBusinessNumberUpdateRequest request) {
+        User user = findUserByIdOrElseThrow(userId);
+
+        user.updateBusinessNumber(request.businessNumber());
+        return UserResponse.from(user);
+    }
+
+    @Transactional(readOnly = true)
+    public UserResponse getUser(UUID userId) {
+        User user = findUserByIdOrElseThrow(userId);
+        return UserResponse.from(user);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<UserListResponse> getUsers(UserRole role, UserStatus status, int page, int size) {
+        Pageable pageable = PageableUtils.ofDefault(page, size);
+
+        Specification<User> spec = UserSpecification.hasRole(role)
+                .and(UserSpecification.hasStatus(status));
+
+        Page<User> users = userRepository.findAll(spec, pageable);
+
+        return PageResponse.of(users.map(UserListResponse::from));
+    }
+
+    // 유저 탈퇴
+    @Transactional
+    public void deleteUser(UUID userId) {
+        User user = findUserByIdOrElseThrow(userId);
+        user.deleteUser();
+    }
+
+    // 유저 계정 일시정지 [마스터 전용]
+    @Transactional
+    public void suspendUser(UserSuspendedRequest request) {
+        User user = findUserByIdOrElseThrow(request.userId());
+        user.suspendUser();
+        redisTemplate.opsForSet().add(RedisKeys.SUSPENDED_USERS, request.userId().toString());
+    }
+
+    // 유저 계정 일시정지 혜지 [마스터 전용]
+    @Transactional
+    public void unsuspendUser(UserSuspendedRequest request) {
+        User user = findUserByIdOrElseThrow(request.userId());
+        user.unsuspendUser();
+        redisTemplate.opsForSet().remove(RedisKeys.SUSPENDED_USERS, request.userId().toString());
+    }
 
     // 일반 가입 롤 검증 — BUYER, SELLER만 허용
     private void validateUserRole(UserRole role) {
@@ -135,13 +203,10 @@ public class UserService {
         }
     }
 
-    // 중복 검증 (username, email)
-    private void validateDuplicateUser(String username, String email) {
+    // 중복 검증 (username)
+    private void validateDuplicateUser(String username) {
         if (userRepository.existsByUsername(username)) {
             throw new UserUsernameExistsException();
-        }
-        if (userRepository.existsByEmail(email)) {
-            throw new UserEmailExistsException();
         }
     }
 

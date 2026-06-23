@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,6 +45,8 @@ import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionD
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionListResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionStartResponse;
 import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionUpdateResponse;
+import com.bankrupang.sanjijk.auction.auction.infrastructure.client.BidClient;
+import com.bankrupang.sanjijk.auction.auction.infrastructure.client.dto.HighestBidResponse;
 import com.bankrupang.sanjijk.auction.outbox.application.service.AuctionOutboxService;
 import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepository;
@@ -75,6 +78,9 @@ class AuctionServiceTest {
 
     @Mock
     private TransactionAfterCommitExecutor transactionAfterCommitExecutor;
+
+    @Mock
+    private BidClient bidClient;
 
     @Nested
     @DisplayName("createAuction()")
@@ -221,6 +227,26 @@ class AuctionServiceTest {
                     .hasMessage(AuctionErrorCode.INVALID_AUCTION_PERIOD.getMessage());
             verify(auctionRepository, never()).save(any(Auction.class));
         }
+
+        @Test
+        @DisplayName("실패 - 이미 진행 중이거나 대기 중인 경매가 존재하면 경매를 생성할 수 없다")
+        void fail_duplicate_auction() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            AuctionCreateRequest request = createRequest(productId, LocalDateTime.now().plusDays(1));
+            Product product = createProduct(sellerId, productId);
+
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            given(auctionRepository.existsByProductIdAndStatusInAndDeletedAtIsNull(any(UUID.class), any(Collection.class)))
+                    .willReturn(true);
+
+            // when & then
+            assertThatThrownBy(() -> auctionService.createAuction(sellerId, "SELLER", request))
+                    .isInstanceOf(AuctionException.class)
+                    .hasMessage(AuctionErrorCode.DUPLICATE_AUCTION.getMessage());
+            verify(auctionRepository, never()).save(any(Auction.class));
+        }
     }
 
     @Nested
@@ -255,6 +281,58 @@ class AuctionServiceTest {
             assertThat(result.startPrice()).isEqualTo(10000);
             assertThat(result.startAt()).isEqualTo(auction.getStartAt());
             assertThat(result.endAt()).isEqualTo(auction.getEndAt());
+        }
+
+        @Test
+        @DisplayName("성공 - PROGRESS 상태의 경매를 조회할 때 bid-service를 통해 현재 최고가 정보를 조회해와 반영한다")
+        void success_progress_with_highest_bid() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            UUID winnerId = UUID.randomUUID();
+            int finalPrice = 15000;
+            Product product = createProduct(sellerId, productId);
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start(); // READY -> PROGRESS
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            given(bidClient.getHighestBid(auctionId)).willReturn(new HighestBidResponse(winnerId, finalPrice));
+
+            // when
+            AuctionDetailResponse result = auctionService.getAuction(auctionId);
+
+            // then
+            assertThat(result.auctionId()).isEqualTo(auctionId);
+            assertThat(result.status()).isEqualTo(AuctionStatus.PROGRESS);
+            assertThat(result.winnerId()).isEqualTo(winnerId);
+            assertThat(result.finalPrice()).isEqualTo(finalPrice);
+        }
+
+        @Test
+        @DisplayName("성공 - PROGRESS 상태의 경매 조회 시 bid-service 조회 실패(예외)하더라도 기존 경매 정보를 그대로 반환한다")
+        void success_progress_highest_bid_fail_graceful() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Product product = createProduct(sellerId, productId);
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start(); // READY -> PROGRESS
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            given(bidClient.getHighestBid(auctionId)).willThrow(new RuntimeException("Feign Exception"));
+
+            // when
+            AuctionDetailResponse result = auctionService.getAuction(auctionId);
+
+            // then
+            assertThat(result.auctionId()).isEqualTo(auctionId);
+            assertThat(result.status()).isEqualTo(AuctionStatus.PROGRESS);
+            assertThat(result.winnerId()).isNull();
+            assertThat(result.finalPrice()).isNull();
         }
 
         @Test
@@ -744,7 +822,7 @@ class AuctionServiceTest {
                     auctionId,
                     true,
                     winnerId,
-                    15000L
+                    15000
             );
 
             // then
@@ -812,7 +890,7 @@ class AuctionServiceTest {
                     auctionId,
                     true,
                     winnerId,
-                    15000L
+                    15000
             );
 
             // then

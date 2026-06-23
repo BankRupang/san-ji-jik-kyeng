@@ -12,11 +12,15 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Component;
 
+import lombok.extern.slf4j.Slf4j;
+
+import com.bankrupang.sanjijk.auction.global.util.AuctionLogContext;
+
+@Slf4j
 @Component
 public class AuctionScheduleManager {
 
     private final ThreadPoolTaskScheduler taskScheduler;
-    // TODO: 다중 인스턴스 환경에서는 동일 경매 잡이 중복 실행될 수 있으므로 ShedLock 적용 후 분산 락으로 보강한다.
     private final Map<UUID, ScheduledFuture<?>> startJobs = new ConcurrentHashMap<>();
     private final Map<UUID, ScheduledFuture<?>> endCheckJobs = new ConcurrentHashMap<>();
 
@@ -27,19 +31,37 @@ public class AuctionScheduleManager {
     }
 
     public void scheduleStartJob(UUID auctionId, LocalDateTime startAt, Runnable job) {
-        scheduleJob(startJobs, auctionId, startAt, job);
+        AuctionLogContext.runWithAuctionId(auctionId, () -> {
+            scheduleJob(startJobs, auctionId, startAt, job);
+            log.info("경매 시작 잡 등록 - auctionId: {}, scheduledAt: {}", auctionId, startAt);
+        });
     }
 
     public void scheduleEndCheckJob(UUID auctionId, LocalDateTime endAt, Runnable job) {
-        scheduleJob(endCheckJobs, auctionId, endAt, job);
+        AuctionLogContext.runWithAuctionId(auctionId, () -> {
+            scheduleJob(endCheckJobs, auctionId, endAt, job);
+            log.info("경매 마감 확인 잡 등록 - auctionId: {}, scheduledAt: {}", auctionId, endAt);
+        });
     }
 
     public boolean cancelStartJob(UUID auctionId) {
-        return cancelJob(startJobs, auctionId);
+        return AuctionLogContext.callWithAuctionId(auctionId, () -> {
+            boolean cancelled = cancelJob(startJobs, auctionId);
+            if (cancelled) {
+                log.info("경매 시작 잡 취소 - auctionId: {}", auctionId);
+            }
+            return cancelled;
+        });
     }
 
     public boolean cancelEndCheckJob(UUID auctionId) {
-        return cancelJob(endCheckJobs, auctionId);
+        return AuctionLogContext.callWithAuctionId(auctionId, () -> {
+            boolean cancelled = cancelJob(endCheckJobs, auctionId);
+            if (cancelled) {
+                log.info("경매 마감 확인 잡 취소 - auctionId: {}", auctionId);
+            }
+            return cancelled;
+        });
     }
 
     public boolean hasStartJob(UUID auctionId) {
