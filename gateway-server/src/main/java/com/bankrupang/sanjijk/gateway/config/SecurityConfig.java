@@ -51,7 +51,7 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.POST, "/api/v1/auth/signup").permitAll()
                         .pathMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                         .pathMatchers(HttpMethod.POST, "/api/v1/auth/admin/signup").permitAll()
-                        .pathMatchers("/actuator/health").permitAll()
+                        .pathMatchers("/actuator/health", "/actuator/prometheus").permitAll()
                         .anyExchange().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
