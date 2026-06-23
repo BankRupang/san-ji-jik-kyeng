@@ -31,19 +31,21 @@ public class PaymentScheduler {
 
         Pageable pageable = PageRequest.of(0, BATCH_SIZE);
 
-        List<Payment> expiredPayments = paymentRepository
-                .findExpiredPayments(PaymentStatus.READY, expiredBefore, pageable);
+        while (true) {
+            List<Payment> expiredPayments = paymentRepository
+                    .findExpiredPayments(PaymentStatus.READY, expiredBefore, pageable);
 
-        if (expiredPayments.isEmpty()) return;
+            if (expiredPayments.isEmpty()) break;
 
-        log.info("[EXPIRE] 만료 대상 Payment: {}건", expiredPayments.size());
+            log.info("[EXPIRE] 만료 대상 Payment: {}건", expiredPayments.size());
 
-        for (Payment payment : expiredPayments) {
-            try {
-                paymentSchedulerTransaction.expireOne(payment);
-            } catch (Exception e) {
-                log.error("[EXPIRE] Payment 만료 처리 실패 - paymentId: {}, error: {}",
-                        payment.getId(), e.getMessage(), e);
+            for (Payment payment : expiredPayments) {
+                try {
+                    paymentSchedulerTransaction.expireOne(payment);
+                } catch (Exception e) {
+                    log.error("[EXPIRE] Payment 만료 처리 실패 - paymentId: {}, error: {}",
+                            payment.getId(), e.getMessage(), e);
+                }
             }
         }
     }
