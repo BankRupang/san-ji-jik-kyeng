@@ -1,6 +1,8 @@
 package com.bankrupang.sanjijk.order.infrastructure.messaging.handler;
 
+import com.bankrupang.sanjijk.common.exception.BaseException;
 import com.bankrupang.sanjijk.order.domain.entity.OrderOutbox;
+import com.bankrupang.sanjijk.order.domain.exception.OrderErrorCode;
 import com.bankrupang.sanjijk.order.infrastructure.messaging.consumer.dto.AuctionFailedEvent;
 import com.bankrupang.sanjijk.order.infrastructure.outbox.OrderOutboxJpaRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -44,6 +46,7 @@ public class AuctionFailedHandler {
             orderOutboxJpaRepository.save(outbox);
         } catch (JsonProcessingException e) {
             log.error("[AUCTION_FAILED] Outbox 저장 실패 - auctionId: {}", auctionId, e);
+            throw new BaseException(OrderErrorCode.ORDER_EVENT_PUBLISH_FAILED);
         }
     }
 }
