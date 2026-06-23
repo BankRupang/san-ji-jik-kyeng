@@ -9,6 +9,7 @@ public record DepositCreatedEvent(
         UUID auctionId,
         String auctionTitle,
         int depositAmount,
+        LocalDateTime endAt,
         LocalDateTime occurredAt
 ) {
 }

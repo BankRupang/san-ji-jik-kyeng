@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 public record OrderDepositCreateRequest(
@@ -21,6 +22,9 @@ public record OrderDepositCreateRequest(
         String userName,
 
         @NotBlank(message = "슬랙 아이디는 필수입니다.")
-        String slackId
+        String slackId,
+
+        @NotNull(message = "경매 종료 시각은 필수입니다.")
+        LocalDateTime endAt
 ) {
 }
