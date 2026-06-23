@@ -75,6 +75,7 @@ jobs:
           fi
           cd "${REPO_DIR}"
           KAFKA_PRIVATE_IP=$(aws ssm get-parameter --name /sanji/prod/kafka/private-ip --query Parameter.Value --output text --region ap-northeast-2)
+          export KAFKA_PRIVATE_IP
           GRAFANA_ADMIN_PASSWORD=$(aws ssm get-parameter --name /sanji/prod/monitoring/grafana-admin-password --with-decryption --query Parameter.Value --output text --region ap-northeast-2)
           SLACK_WEBHOOK_URL=$(aws ssm get-parameter --name /sanji/prod/monitoring/slack-webhook-url --with-decryption --query Parameter.Value --output text --region ap-northeast-2)
           cat > .env <<EOF
