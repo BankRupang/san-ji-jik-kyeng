@@ -76,6 +76,7 @@ class PaymentConfirmTransactionTest {
             given(payment.getOrderId()).willReturn(UUID.randomUUID());
             given(payment.getPaymentType()).willReturn(PaymentType.REPAY);
             given(paymentRepository.findByTossOrderId("tossOrderId")).willReturn(Optional.of(payment));
+            given(paymentRepository.findByIdWithLock(paymentId)).willReturn(Optional.of(payment));
 
             // when
             UUID result = paymentConfirmTransaction.prepareConfirm(request, userId);
@@ -90,10 +91,13 @@ class PaymentConfirmTransactionTest {
         @DisplayName("금액 불일치 - PaymentAmountMismatchException")
         void amount_mismatch_throws() {
             // given
+            UUID paymentId = UUID.randomUUID();
             PaymentConfirmRequest request = new PaymentConfirmRequest("paymentKey", "tossOrderId", 100_000);
             Payment payment = mock(Payment.class);
+            given(payment.getId()).willReturn(paymentId);
             given(payment.getAmount()).willReturn(200_000); // 다른 금액
             given(paymentRepository.findByTossOrderId("tossOrderId")).willReturn(Optional.of(payment));
+            given(paymentRepository.findByIdWithLock(paymentId)).willReturn(Optional.of(payment));
 
             // when & then
             assertThatThrownBy(() -> paymentConfirmTransaction.prepareConfirm(request, UUID.randomUUID()))
