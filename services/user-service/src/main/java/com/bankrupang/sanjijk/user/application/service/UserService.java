@@ -108,7 +108,7 @@ public class UserService {
     // 로그인
     @Transactional
     public UserLoginResponse login(UserLoginRequest request) {
-        // 1. DB에서 유저 상태 확인 (정지/탈퇴 여부)
+        // 1. DB에서 유저 상태 확인 (탈퇴 여부)
         User user = userRepository.findByUsername(request.username())
                 .orElseThrow(UserNotFoundException::new);
 
@@ -120,24 +120,6 @@ public class UserService {
         // 3. UserLoginResponse로 변환해서 반환
         return new UserLoginResponse(token.accessToken(), token.refreshToken());
 
-    }
-
-    // 유저 프로필 수정
-    @Transactional
-    public UserResponse updateUserInfo(UUID userId, UserInfoUpdateRequest request) {
-        User user = findUserByIdOrElseThrow(userId);
-
-        user.updateUserInfo(request.name(), request.phone(), request.slackId());
-        return UserResponse.from(user);
-    }
-
-    // 사업자 번호 수정
-    @Transactional
-    public UserResponse updateBusinessNumber(UUID userId, UserBusinessNumberUpdateRequest request) {
-        User user = findUserByIdOrElseThrow(userId);
-
-        user.updateBusinessNumber(request.businessNumber());
-        return UserResponse.from(user);
     }
 
     @Transactional(readOnly = true)
@@ -156,6 +138,24 @@ public class UserService {
         Page<User> users = userRepository.findAll(spec, pageable);
 
         return PageResponse.of(users.map(UserListResponse::from));
+    }
+
+    // 유저 프로필 수정
+    @Transactional
+    public UserResponse updateUserInfo(UUID userId, UserInfoUpdateRequest request) {
+        User user = findUserByIdOrElseThrow(userId);
+
+        user.updateUserInfo(request.name(), request.phone(), request.slackId());
+        return UserResponse.from(user);
+    }
+
+    // 사업자 번호 수정
+    @Transactional
+    public UserResponse updateBusinessNumber(UUID userId, UserBusinessNumberUpdateRequest request) {
+        User user = findUserByIdOrElseThrow(userId);
+
+        user.updateBusinessNumber(request.businessNumber());
+        return UserResponse.from(user);
     }
 
     // 유저 탈퇴
