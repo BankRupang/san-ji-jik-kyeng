@@ -5,15 +5,17 @@ spring:
   application:
     name: user-service
 
+  config:
+    import: "optional:configserver:"
+
   data:
     redis:
       host: ${REDIS_HOST}
       port: 6379
 
-  # 컨피그 서버 오류로 실행이 안되어 비활성화
   cloud:
     config:
-      enabled: false
+      fail-fast: true
 
 
   jpa:
