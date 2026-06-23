@@ -42,6 +42,8 @@ import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepository;
 import com.bankrupang.sanjijk.auction.product.exception.ProductErrorCode;
 import com.bankrupang.sanjijk.auction.product.exception.ProductException;
+import com.bankrupang.sanjijk.auction.auction.infrastructure.client.BidClient;
+import com.bankrupang.sanjijk.auction.auction.infrastructure.client.dto.HighestBidResponse;
 import com.bankrupang.sanjijk.common.response.PageResponse;
 import com.bankrupang.sanjijk.common.util.PageableUtils;
 
@@ -57,12 +59,14 @@ public class AuctionService {
     private final AuctionScheduleManager auctionScheduleManager;
     private final AuctionSchedulerJobService auctionSchedulerJobService;
     private final TransactionAfterCommitExecutor transactionAfterCommitExecutor;
+    private final BidClient bidClient;
 
     @Transactional
     public AuctionCreateResponse createAuction(UUID userId, String userRole, AuctionCreateRequest request) {
         Product product = getExistingProduct(request.productId());
         validateProductOwnerOrMaster(product, userId, userRole);
         validateStartAt(request.startAt());
+        validateDuplicateAuction(product.getId());
 
         LocalDateTime endAt = request.startAt().plusHours(1);
 
@@ -84,6 +88,17 @@ public class AuctionService {
     public AuctionDetailResponse getAuction(UUID auctionId) {
         Auction auction = getExistingAuction(auctionId);
         Product product = getExistingProduct(auction.getProductId());
+
+        if (auction.getStatus() == AuctionStatus.PROGRESS) {
+            try {
+                HighestBidResponse highestBid = bidClient.getHighestBid(auctionId);
+                if (highestBid != null) {
+                    return AuctionDetailResponse.of(auction, product, highestBid.winnerId(), highestBid.finalPrice());
+                }
+            } catch (Exception e) {
+                log.warn("경매 상세 조회 중 bid-service 최고가 조회 실패 - auctionId: {}, error: {}", auctionId, e.getMessage());
+            }
+        }
 
         return AuctionDetailResponse.of(auction, product);
     }
@@ -165,11 +180,11 @@ public class AuctionService {
     }
 
     @Transactional
-    public AuctionCloseResponse closeAuctionByEndedEvent(UUID auctionId, boolean hasBid, UUID winnerId, Long finalPrice) {
+    public AuctionCloseResponse closeAuctionByEndedEvent(UUID auctionId, boolean hasBid, UUID winnerId, Integer finalPrice) {
         return AuctionLogContext.callWithAuctionId(auctionId, () -> {
             Auction auction = getExistingAuction(auctionId);
             AuctionCloseRequest request = hasBid
-                    ? new AuctionCloseRequest(winnerId, toFinalPrice(finalPrice))
+                    ? new AuctionCloseRequest(winnerId, finalPrice)
                     : null;
 
             return closeAuction(auction, request, "AUCTION_ENDED");
@@ -311,6 +326,16 @@ public class AuctionService {
         }
     }
 
+    private void validateDuplicateAuction(UUID productId) {
+        boolean hasActiveAuction = auctionRepository.existsByProductIdAndStatusInAndDeletedAtIsNull(
+                productId,
+                List.of(AuctionStatus.READY, AuctionStatus.PROGRESS)
+        );
+        if (hasActiveAuction) {
+            throw new AuctionException(AuctionErrorCode.DUPLICATE_AUCTION);
+        }
+    }
+
     private boolean isMaster(String userRole) {
         return "MASTER".equalsIgnoreCase(userRole) || "ROLE_MASTER".equalsIgnoreCase(userRole);
     }
@@ -362,17 +387,7 @@ public class AuctionService {
         ));
     }
 
-    private Integer toFinalPrice(Long finalPrice) {
-        if (finalPrice == null) {
-            return null;
-        }
 
-        try {
-            return Math.toIntExact(finalPrice);
-        } catch (ArithmeticException e) {
-            throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_RESULT);
-        }
-    }
 
     private boolean isAlreadyClosed(Auction auction) {
         return auction.getStatus() == AuctionStatus.WON || auction.getStatus() == AuctionStatus.FAIL;

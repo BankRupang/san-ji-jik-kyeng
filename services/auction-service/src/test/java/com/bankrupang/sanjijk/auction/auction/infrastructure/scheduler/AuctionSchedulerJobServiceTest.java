@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.bankrupang.sanjijk.auction.auction.domain.entity.Auction;
 import com.bankrupang.sanjijk.auction.auction.domain.repository.AuctionRepository;
 import com.bankrupang.sanjijk.auction.auction.domain.type.AuctionStatus;
+import com.bankrupang.sanjijk.auction.auction.application.service.AuctionService;
+import com.bankrupang.sanjijk.auction.auction.application.service.AuctionFallbackService;
+import com.bankrupang.sanjijk.auction.auction.infrastructure.client.dto.HighestBidResponse;
 import com.bankrupang.sanjijk.auction.outbox.application.service.AuctionOutboxService;
 import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepository;
@@ -33,8 +37,20 @@ import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepositor
 @ExtendWith(MockitoExtension.class)
 class AuctionSchedulerJobServiceTest {
 
-    @InjectMocks
     private AuctionSchedulerJobService auctionSchedulerJobService;
+
+    @BeforeEach
+    void setUp() {
+        auctionSchedulerJobService = new AuctionSchedulerJobService(
+                auctionRepository,
+                productRepository,
+                auctionOutboxService,
+                auctionScheduleManager,
+                schedulerJobServiceProvider,
+                auctionFallbackService,
+                auctionServiceProvider
+        );
+    }
 
     @Mock
     private AuctionRepository auctionRepository;
@@ -50,6 +66,12 @@ class AuctionSchedulerJobServiceTest {
 
     @Mock
     private ObjectProvider<AuctionSchedulerJobService> schedulerJobServiceProvider;
+
+    @Mock
+    private AuctionFallbackService auctionFallbackService;
+
+    @Mock
+    private ObjectProvider<AuctionService> auctionServiceProvider;
 
     @Nested
     @DisplayName("startAuction()")
@@ -152,8 +174,58 @@ class AuctionSchedulerJobServiceTest {
     class CheckAuctionEnd {
 
         @Test
-        @DisplayName("성공 - PROGRESS 경매의 마감 시각 도달 여부를 확인한다")
-        void success_progress() {
+        @DisplayName("성공 - PROGRESS 경매 마감 시 bid-service 최고입찰자 정보가 존재할 경우 낙찰 처리한다")
+        void success_progress_with_bid() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            UUID winnerId = UUID.randomUUID();
+            Integer finalPrice = 12000;
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start();
+
+            AuctionService proxiedAuctionService = mock(AuctionService.class);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            given(auctionFallbackService.getHighestBidWithRetry(auctionId))
+                    .willReturn(new HighestBidResponse(winnerId, finalPrice));
+            given(auctionServiceProvider.getObject()).willReturn(proxiedAuctionService);
+
+            // when
+            auctionSchedulerJobService.checkAuctionEnd(auctionId);
+
+            // then
+            verify(proxiedAuctionService).closeAuctionByEndedEvent(auctionId, true, winnerId, 12000);
+        }
+
+        @Test
+        @DisplayName("성공 - PROGRESS 경매 마감 시 최고입찰자가 없으면 유찰 처리한다")
+        void success_progress_no_bid() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            auction.start();
+
+            AuctionService proxiedAuctionService = mock(AuctionService.class);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            given(auctionFallbackService.getHighestBidWithRetry(auctionId))
+                    .willReturn(new HighestBidResponse(null, null));
+            given(auctionServiceProvider.getObject()).willReturn(proxiedAuctionService);
+
+            // when
+            auctionSchedulerJobService.checkAuctionEnd(auctionId);
+
+            // then
+            verify(proxiedAuctionService).closeAuctionByEndedEvent(auctionId, false, null, null);
+        }
+
+        @Test
+        @DisplayName("성공 - PROGRESS 경매 마감 시 bid-service 조회 실패하더라도 예외를 무시하고 상태를 유지한다")
+        void success_progress_fallback_fail_ignores_exception() {
             // given
             UUID sellerId = UUID.randomUUID();
             UUID productId = UUID.randomUUID();
@@ -162,14 +234,15 @@ class AuctionSchedulerJobServiceTest {
             auction.start();
 
             given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            given(auctionFallbackService.getHighestBidWithRetry(auctionId))
+                    .willThrow(new RuntimeException("Feign Failure"));
 
             // when
             auctionSchedulerJobService.checkAuctionEnd(auctionId);
 
             // then
             assertThat(auction.getStatus()).isEqualTo(AuctionStatus.PROGRESS);
-            verify(auctionOutboxService, never()).saveAuctionFailedEvent(any(Auction.class), any(Product.class));
-            verify(auctionOutboxService, never()).saveAuctionWonEvent(any(Auction.class), any(Product.class));
+            verify(auctionServiceProvider, never()).getObject();
         }
 
         @Test
@@ -188,8 +261,8 @@ class AuctionSchedulerJobServiceTest {
 
             // then
             assertThat(auction.getStatus()).isEqualTo(AuctionStatus.READY);
-            verify(auctionOutboxService, never()).saveAuctionFailedEvent(any(Auction.class), any(Product.class));
-            verify(auctionOutboxService, never()).saveAuctionWonEvent(any(Auction.class), any(Product.class));
+            verify(auctionFallbackService, never()).getHighestBidWithRetry(any(UUID.class));
+            verify(auctionServiceProvider, never()).getObject();
         }
     }
 

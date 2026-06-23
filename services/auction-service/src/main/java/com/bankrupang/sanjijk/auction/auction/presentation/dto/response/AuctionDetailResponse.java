@@ -34,6 +34,21 @@ public record AuctionDetailResponse(
         );
     }
 
+    public static AuctionDetailResponse of(Auction auction, Product product, UUID winnerId, Integer finalPrice) {
+        return new AuctionDetailResponse(
+                auction.getId(),
+                ProductInfo.from(product),
+                auction.getSellerId(),
+                auction.getStatus(),
+                auction.getBidUnit(),
+                auction.getStartPrice(),
+                winnerId,
+                finalPrice,
+                auction.getStartAt(),
+                auction.getEndAt()
+        );
+    }
+
     public record ProductInfo(
             UUID productId,
             String name,
