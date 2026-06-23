@@ -8,14 +8,11 @@ import java.util.UUID;
 
 @Getter
 @NoArgsConstructor
-public class PaymentCompletedEvent {
+public class RefundCompletedEvent {
 
     private UUID auctionId;
     private String auctionTitle;
-    private UUID winnerId;
-    private UUID sellerId;
-    private Integer finalPrice;
-    private int paidAmount;
-    private String paymentType;
+    private UUID userId;
+    private int cancelAmount;
     private LocalDateTime occurredAt;
 }
