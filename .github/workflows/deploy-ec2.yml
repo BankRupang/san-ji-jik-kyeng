@@ -97,6 +97,9 @@ jobs:
           sudo -u ec2-user /home/ec2-user/sanji-jk/monitoring/prometheus/ecs-discovery.sh || true
           docker compose -f docker-compose.monitoring.yml pull
           docker compose -f docker-compose.monitoring.yml up -d
+          # prometheus.prod.yml은 바인드 마운트 파일이라 up -d만으로는 컨테이너가 재시작되지 않음
+          # 설정 변경이 반영되도록 명시적으로 재시작
+          docker compose -f docker-compose.monitoring.yml restart prometheus
           EOS
 
           # 대상 EC2(Role 태그)와 실행할 스크립트를 짝지어 SSM으로 보내고 완료까지 기다립니다.
