@@ -273,8 +273,10 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_KAFKA_BOOTSTRAPSERVERS: kafka:9092
-      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
       LOKI_URL: http://loki:3100
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
+      FALLBACK_SLACK_ID: ${FALLBACK_SLACK_ID:-}
+      FALLBACK_NOTIFICATION_ALLOW: ${FALLBACK_NOTIFICATION_ALLOW:-false}
     depends_on:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }

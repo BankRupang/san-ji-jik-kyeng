@@ -1,5 +1,6 @@
 package com.bankrupang.sanjijk.notification.infrastructure.feign;
 
+import com.bankrupang.sanjijk.common.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -17,8 +18,8 @@ public class UserServiceClientFallback implements UserServiceClient {
     private boolean fallbackNotificationAllow;
 
     @Override
-    public UserNotificationResponse getNotificationEnabled(UUID userId) {
+    public ApiResponse<UserNotificationResponse> getNotificationEnabled(UUID userId) {
         log.warn("user-service 호출 실패, fallback 사용 userId={}", userId);
-        return new UserNotificationResponse(userId, fallbackSlackId, fallbackNotificationAllow);
+        return ApiResponse.ok(new UserNotificationResponse(userId, fallbackSlackId, fallbackNotificationAllow));
     }
 }

@@ -1,5 +1,6 @@
 package com.bankrupang.sanjijk.notification.infrastructure.feign;
 
+import com.bankrupang.sanjijk.common.response.ApiResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -12,6 +13,6 @@ import java.util.UUID;
 )
 public interface UserServiceClient {
 
-    @GetMapping("/internal/v1/users/{userId}/notification-enabled")
-    UserNotificationResponse getNotificationEnabled(@PathVariable UUID userId);
+    @GetMapping("/internal/v1/users/{userId}/notify-allow")
+    ApiResponse<UserNotificationResponse> getNotificationEnabled(@PathVariable UUID userId);
 }

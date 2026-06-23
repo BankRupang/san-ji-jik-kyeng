@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,6 +23,7 @@ public class NotificationRetryService {
     private final NotificationSendPort notificationSendPort;
     private final NotificationEventService notificationEventService;
 
+    @Transactional(readOnly = true)
     public void retryPending() {
         Pageable pageable = PageRequest.of(0, 50);
         List<NotificationLog> pendingLogs = notificationLogRepository
