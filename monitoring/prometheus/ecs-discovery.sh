@@ -41,7 +41,7 @@ PORT_MAP = {
     'payment-service':   19095,
     'notification-service': 19096,
     'ai-service':        19097,
-    'bid-service':       19091,
+    'bid-service':       19093,
 }
 
 SKIP = {'keycloak'}
