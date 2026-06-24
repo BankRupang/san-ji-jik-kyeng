@@ -95,9 +95,9 @@ public class User extends BaseEntity {
     }
 
     public void validateStatusForLogin() {
-        if (status == UserStatus.SUSPENDED) {
-            throw new UserSuspendedException();
-        }
+//        if (status == UserStatus.SUSPENDED) {
+//            throw new UserSuspendedException();
+//        }
         if (status == UserStatus.DELETED) {
             throw new UserDeletedException();
         }

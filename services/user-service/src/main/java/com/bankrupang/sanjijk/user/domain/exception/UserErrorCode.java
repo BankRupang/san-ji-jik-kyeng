@@ -15,11 +15,11 @@ public enum UserErrorCode implements ErrorCode {
     KEYCLOAK_USER_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "USER-004", "keycloak 계정 생성에 실패했습니다"),
     INVALID_ADMIN_KEY(HttpStatus.UNAUTHORIZED, "USER-005", "관리자 키가 올바르지 않습니다"),
     INVALID_ROLE_FOR_SIGNUP(HttpStatus.BAD_REQUEST, "USER-006", "해당 엔드포인트에서 사용할 수 없는 역할입니다"),
-    LOGIN_FAILED(HttpStatus.CONFLICT, "USER-007", "로그인에 실패하였습니다"),
+    LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "USER-007", "로그인에 실패하였습니다"),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER-008", "해당 유저를 찾을 수 없습니다"),
-    USER_SUSPENDED(HttpStatus.BAD_REQUEST, "USER-009", "해당 계정은 일시 정지 상태입니다"),
-    USER_DELETED(HttpStatus.BAD_REQUEST,"USER_010", "해당 계정은 탈퇴된 계정입니다"),
-    USER_NOT_SUSPENDED(HttpStatus.BAD_REQUEST, "USER-011", "정지 상태가 아닌 계정입니다");
+    USER_SUSPENDED(HttpStatus.FORBIDDEN, "USER-009", "해당 계정은 일시 정지 상태입니다"),
+    USER_DELETED(HttpStatus.FORBIDDEN,"USER-010", "해당 계정은 탈퇴된 계정입니다"),
+    USER_NOT_SUSPENDED(HttpStatus.CONFLICT, "USER-011", "정지 상태가 아닌 계정입니다");
 
 
     private final HttpStatus status;
