@@ -73,7 +73,7 @@ chmod 600 .env
 envsubst '$KAFKA_PRIVATE_IP' < monitoring/prometheus/prometheus.prod.yml.template > monitoring/prometheus/prometheus.prod.yml
 
 # ecs-targets.json 초기화 (없을 때만)
-[ -f monitoring/prometheus/ecs-targets.json ] || sudo -u ec2-user sh -c 'echo "[]" > monitoring/prometheus/ecs-targets.json'
+[ -f monitoring/prometheus/ecs-targets.json ] || echo "[]" > monitoring/prometheus/ecs-targets.json
 chown ec2-user:ec2-user monitoring/prometheus/ecs-targets.json
 
 # ECS 디스커버리 크론 등록
