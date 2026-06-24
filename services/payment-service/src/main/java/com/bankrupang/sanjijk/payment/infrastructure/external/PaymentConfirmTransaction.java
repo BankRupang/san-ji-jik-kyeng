@@ -43,6 +43,10 @@ public class PaymentConfirmTransaction {
         Payment payment = paymentRepository.findByTossOrderId(request.tossOrderId())
                 .orElseThrow(PaymentNotFoundException::new);
 
+        // 비관적 락으로 재조회 - 동시 요청이 둘 다 READY를 읽어 중복 승인하는 것을 방지
+        payment = paymentRepository.findByIdWithLock(payment.getId())
+                .orElseThrow(PaymentNotFoundException::new);
+
         if (payment.getAmount() != request.amount()) {
             log.warn("[CONFIRM] 금액 불일치 - expected: {}, actual: {}", payment.getAmount(), request.amount());
             throw new PaymentAmountMismatchException();

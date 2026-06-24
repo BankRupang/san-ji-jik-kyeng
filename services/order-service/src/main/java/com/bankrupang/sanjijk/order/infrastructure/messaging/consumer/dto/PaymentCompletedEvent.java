@@ -9,8 +9,8 @@ public record PaymentCompletedEvent(
         String auctionTitle,
         UUID winnerId,
         UUID sellerId,
-        int finalPrice,
-        int paidAmount,
+        Integer finalPrice,
+        Integer paidAmount,
         String paymentType,
         LocalDateTime occurredAt
 ) {

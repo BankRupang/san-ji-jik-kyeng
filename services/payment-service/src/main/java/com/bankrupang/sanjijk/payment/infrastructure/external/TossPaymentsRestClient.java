@@ -13,6 +13,9 @@ import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -29,6 +32,7 @@ public class TossPaymentsRestClient implements TossPaymentsClient{
         log.info("[TossPayments] 결제 승인 요청 - orderId: {}, amount: {}", request.orderId(), request.amount());
         TossPaymentResponse response = tossPaymentsHttpClient.post()
                 .uri("/v1/payments/confirm")
+                .header("Idempotency-Key", request.orderId())
                 .body(request)
                 .retrieve()
                 .onStatus(HttpStatusCode::isError, (req, res) -> {
@@ -47,8 +51,14 @@ public class TossPaymentsRestClient implements TossPaymentsClient{
         // paymentKey로 환불 API 호출하기에 마스킹 처리 필수
         log.info("[TossPayments] 환불 요청 - paymentKey: {}..., cancelAmount: {}",
                 paymentKey.substring(0, 8), request.cancelAmount());
+        String cancelIdempotencyKey = UUID.nameUUIDFromBytes(
+                (paymentKey + ":" + (request.cancelAmount() != null ? request.cancelAmount() : "FULL"))
+                        .getBytes(StandardCharsets.UTF_8)
+        ).toString();
+
         TossPaymentResponse response = tossPaymentsHttpClient.post()
                 .uri("/v1/payments/{paymentKey}/cancel", paymentKey)
+                .header("Idempotency-Key", cancelIdempotencyKey)
                 .body(request)
                 .retrieve()
                 .onStatus(HttpStatusCode::isError, (req, res) -> {

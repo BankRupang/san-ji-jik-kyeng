@@ -10,11 +10,13 @@ import java.util.UUID;
 @NoArgsConstructor
 public class PaymentCompletedEvent {
 
+    private UUID orderId;
     private UUID auctionId;
     private String auctionTitle;
     private UUID winnerId;
     private UUID sellerId;
-    private int finalPrice;
+    private Integer finalPrice;
     private int paidAmount;
+    private String paymentType;
     private LocalDateTime occurredAt;
 }

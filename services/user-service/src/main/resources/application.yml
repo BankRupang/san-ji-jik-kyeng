@@ -1,4 +1,4 @@
-﻿server:
+server:
   port: 19091
 
 spring:
@@ -12,9 +12,10 @@ spring:
     redis:
       host: ${REDIS_HOST}
       port: 6379
-
+  
   cloud:
     config:
+      enabled: true
       fail-fast: true
 
 
@@ -30,7 +31,7 @@ spring:
   # 로컬 DB 연결
   datasource:
     url: ${POSTGRES_DB_URL}
-    username: ${POSTGRES_USERNAME}
+    username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
     driver-class-name: org.postgresql.Driver
 

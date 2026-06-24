@@ -90,6 +90,9 @@ public class Payment extends BaseEntity {
     @Column(name = "cancel_reason", length = 500)
     private String cancelReason;
 
+    @Version
+    private Long version;
+
     // ================================
     // 팩토리 메서드
     // ================================

@@ -53,56 +53,11 @@
       "serviceAccountClientId": "user-service",
       "enabled": true,
       "clientRoles": {
-        "realm-management": ["manage-users"]
+        "realm-management": [
+          "manage-users",
+          "view-users"
+          ]
       }
-    },
-    {
-      "username": "testbuyer",
-      "email": "buyer@test.com",
-      "firstName": "구매자",
-      "lastName": "테스터",
-      "enabled": true,
-      "emailVerified": true,
-      "credentials": [
-        { "type": "password", "value": "Test1234!", "temporary": false }
-      ],
-      "realmRoles": ["BUYER"]
-    },
-    {
-      "username": "testseller",
-      "email": "seller@test.com",
-      "firstName": "판매자",
-      "lastName": "테스터",
-      "enabled": true,
-      "emailVerified": true,
-      "credentials": [
-        { "type": "password", "value": "Test1234!", "temporary": false }
-      ],
-      "realmRoles": ["SELLER"]
-    },
-    {
-      "username": "testmanager",
-      "email": "manager@test.com",
-      "firstName": "매니저",
-      "lastName": "관리자",
-      "enabled": true,
-      "emailVerified": true,
-      "credentials": [
-        { "type": "password", "value": "Test1234!", "temporary": false }
-      ],
-      "realmRoles": ["MANAGER"]
-    },
-    {
-      "username": "testmaster",
-      "email": "master@test.com",
-      "firstName": "마스터",
-      "lastName": "관리자",
-      "enabled": true,
-      "emailVerified": true,
-      "credentials": [
-        { "type": "password", "value": "Test1234!", "temporary": false }
-      ],
-      "realmRoles": ["MASTER"]
     }
   ]
 }

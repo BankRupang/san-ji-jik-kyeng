@@ -24,6 +24,7 @@ public class NotificationEventService {
 
     private static final DateTimeFormatter DUE_AT_FORMATTER =
             DateTimeFormatter.ofPattern("MM월 dd일 HH:mm");
+    private static final String PAYMENT_TYPE_REPAY = "REPAY";
 
     private final NotificationLogRepository notificationLogRepository;
     private final ApplicationEventPublisher eventPublisher;
@@ -60,11 +61,14 @@ public class NotificationEventService {
                         event.getAuctionTitle(), event.getPaidAmount()),
                 event.getAuctionId());
 
-        processAndPublish(event.getSellerId(), NotificationType.PAYMENT_COMPLETED,
-                "거래 완료!",
-                String.format("거래 완료! %s / 낙찰가: %,d원",
-                        event.getAuctionTitle(), event.getFinalPrice()),
-                event.getAuctionId());
+        // REPAY(보증금)는 sellerId = null, finalPrice = null → 판매자 알림 스킵
+        if (!PAYMENT_TYPE_REPAY.equals(event.getPaymentType())) {
+            processAndPublish(event.getSellerId(), NotificationType.PAYMENT_COMPLETED,
+                    "거래 완료!",
+                    String.format("거래 완료! %s / 낙찰가: %,d원",
+                            event.getAuctionTitle(), event.getFinalPrice()),
+                    event.getAuctionId());
+        }
     }
 
     public void handlePaymentFailed(PaymentFailedEvent event) {
@@ -72,6 +76,14 @@ public class NotificationEventService {
                 "결제 실패",
                 String.format("결제 실패 / %s / 사유: %s / 15분 내 재결제를 시도해주세요.",
                         event.getAuctionTitle(), event.getFailureMessage()),
+                event.getAuctionId());
+    }
+
+    public void handleRefundCompleted(RefundCompletedEvent event) {
+        processAndPublish(event.getUserId(), NotificationType.REFUND_COMPLETED,
+                "보증금 환불 완료",
+                String.format("보증금 환불 완료 / %s / 환불 금액: %,d원",
+                        event.getAuctionTitle(), event.getCancelAmount()),
                 event.getAuctionId());
     }
 
@@ -90,11 +102,19 @@ public class NotificationEventService {
     }
 
     public void handleBidOvertaken(BidOvertakenEvent event) {
-        processAndPublish(event.getPreviousBidderId(), NotificationType.BID_OVERTAKEN,
+        if (event.getPreviousBidderId() == null || event.getPreviousBidderId().isBlank()) {
+            log.info("이전 최고 입찰자 없음 (첫 입찰), BID_OVERTAKEN 알림 스킵");
+            return;
+        }
+        if (event.getNewPrice() == null || event.getNextMinPrice() == null) {
+            log.warn("BID_OVERTAKEN 가격 정보 누락, 알림 스킵 - auctionId={}", event.getAuctionId());
+            return;
+        }
+        processAndPublish(UUID.fromString(event.getPreviousBidderId()), NotificationType.BID_OVERTAKEN,
                 "입찰 추월 알림",
                 String.format("입찰 추월 알림 / %s / 현재가: %,d원 / 다음 최소 입찰가: %,d원",
                         event.getAuctionTitle(), event.getNewPrice(), event.getNextMinPrice()),
-                event.getAuctionId());
+                UUID.fromString(event.getAuctionId()));
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -117,7 +137,7 @@ public class NotificationEventService {
 
     private String resolveReferenceType(NotificationType type) {
         return switch (type) {
-            case PAYMENT_COMPLETED, PAYMENT_FAILED, DEPOSIT_FORFEITED -> "PAYMENT";
+            case PAYMENT_COMPLETED, PAYMENT_FAILED, DEPOSIT_FORFEITED, REFUND_COMPLETED -> "PAYMENT";
             case BID_OVERTAKEN -> "BID";
             default -> "AUCTION";
         };
@@ -125,6 +145,10 @@ public class NotificationEventService {
 
     private void processAndPublish(UUID userId, NotificationType type,
                                    String title, String message, UUID referenceId) {
+        if (userId == null) {
+            log.warn("userId is null, 알림 스킵 - type={}", type);
+            return;
+        }
         UserNotificationResponse response = userNotificationCacheService.getNotificationEnabled(userId);
 
         if (!response.isNotificationAllow()) {
