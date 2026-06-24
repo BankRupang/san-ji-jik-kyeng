@@ -45,13 +45,11 @@ jobs:
           read -r -d '' KAFKA_SCRIPT <<'EOS' || true
           set -e
           REPO_DIR=/home/ec2-user/san-ji-jik-kyeng
-          if [ -z "${REPO_DIR}" ]; then echo "REPO_DIR is empty"; exit 1; fi
           if [ -d "${REPO_DIR}/.git" ]; then
             git -C "${REPO_DIR}" fetch origin main
             git -C "${REPO_DIR}" reset --hard origin/main
           else
-            rm -rf "${REPO_DIR}"
-            git clone https://github.com/BankRupang/san-ji-jik-kyeng.git "${REPO_DIR}"
+            git clone --branch main --single-branch https://github.com/BankRupang/san-ji-jik-kyeng.git "${REPO_DIR}"
           fi
           bash "${REPO_DIR}/scripts/deploy-kafka.sh"
           EOS
@@ -59,13 +57,11 @@ jobs:
           read -r -d '' MONITORING_SCRIPT <<'EOS' || true
           set -e
           REPO_DIR=/home/ec2-user/san-ji-jik-kyeng
-          if [ -z "${REPO_DIR}" ]; then echo "REPO_DIR is empty"; exit 1; fi
           if [ -d "${REPO_DIR}/.git" ]; then
             git -C "${REPO_DIR}" fetch origin main
             git -C "${REPO_DIR}" reset --hard origin/main
           else
-            rm -rf "${REPO_DIR}"
-            git clone https://github.com/BankRupang/san-ji-jik-kyeng.git "${REPO_DIR}"
+            git clone --branch main --single-branch https://github.com/BankRupang/san-ji-jik-kyeng.git "${REPO_DIR}"
           fi
           bash "${REPO_DIR}/scripts/deploy-monitoring.sh"
           EOS
