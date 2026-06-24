@@ -12,6 +12,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.HashOperations;
@@ -34,6 +36,7 @@ import static org.mockito.Mockito.when;
  * DB I/O 없이 Redis 상태 기반으로 8가지 비즈니스 조건을 검증한다.
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("시나리오 1.1 - 입찰 유효성 검증")
 class BidServiceValidationTest {
 
@@ -58,6 +61,8 @@ class BidServiceValidationTest {
         when(lock.tryLock(anyLong(), anyLong(), any(TimeUnit.class))).thenReturn(true);
         when(lock.isHeldByCurrentThread()).thenReturn(true);
         when(redisTemplate.opsForHash()).thenReturn(hashOperations);
+        // 기본: 보증금 납부 완료 상태
+        when(redisTemplate.hasKey(anyString())).thenReturn(true);
     }
 
     private BidRequestDto createRequest(Integer bidPrice, Integer clientSeenPrice) {
@@ -125,6 +130,18 @@ class BidServiceValidationTest {
                 .isInstanceOf(BidException.class)
                 .extracting(e -> ((BidException) e).getErrorCode())
                 .isEqualTo(BidErrorCode.BID_PRICE_OUTDATED);
+    }
+
+    @Test
+    @DisplayName("보증금 미납 시 DEPOSIT_NOT_PAID")
+    void bid_depositNotPaid() {
+        when(hashOperations.entries(anyString())).thenReturn(validAuctionInfo());
+        when(redisTemplate.hasKey(anyString())).thenReturn(false);
+
+        assertThatThrownBy(() -> bidService.bid(auctionId, userId, createRequest(11000, 10000)))
+                .isInstanceOf(BidException.class)
+                .extracting(e -> ((BidException) e).getErrorCode())
+                .isEqualTo(BidErrorCode.DEPOSIT_NOT_PAID);
     }
 
     @Test

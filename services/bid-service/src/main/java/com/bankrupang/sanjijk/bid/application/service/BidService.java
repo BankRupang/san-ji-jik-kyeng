@@ -78,7 +78,10 @@ public class BidService {
             }
 
 
-            //Boolean hasPaid = redisTemplate.hasKey("auction:" + auctionId + ":deposit:" + userId);
+            Boolean hasPaid = redisTemplate.hasKey("auction:" + auctionId + ":deposit:" + userId);
+            if (!Boolean.TRUE.equals(hasPaid)) {
+                throw new BidException(BidErrorCode.DEPOSIT_NOT_PAID);
+            }
 
             if (Duration.between(LocalDateTime.now(), endAt).getSeconds() <= 30) {
                 LocalDateTime newEndAt = endAt.plusMinutes(1);

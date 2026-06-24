@@ -63,6 +63,7 @@ class BidServiceAntiSnipingTest {
         when(lock.isHeldByCurrentThread()).thenReturn(true);
         when(redisTemplate.opsForHash()).thenReturn(hashOperations);
         when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
+        when(redisTemplate.hasKey(anyString())).thenReturn(true);
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
     }
 
