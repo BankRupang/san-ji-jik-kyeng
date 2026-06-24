@@ -202,7 +202,7 @@ App은 서비스별로 독립 ECS 서비스로 분리해 운영합니다. 아직
 | App *(Fargate, 서비스별 분리)* | 서비스별 독립 태스크 | 서비스별 2 vCPU / 메모리 가변 | JVM 기동, 서비스당 부하 시 ~1GB |
 | 입찰서버 *(Fargate, Auto Scaling)* | 실시간 입찰(WebSocket) | 2 vCPU / 8GB, 2~6 태스크 | STOMP 세션 + JVM, 8GB가 시작 최소치 |
 | Kafka *(EC2)* | 메시지 브로커 | t3.medium (2C/4GB) | 실시간 입찰 이벤트 경유, 단일 브로커 |
-| 모니터링 *(EC2)* | Prometheus/Loki/Grafana | t3.medium (2C/4GB) | 전체 scrape와 로그 수집 |
+| 모니터링 *(EC2)* | Prometheus/Loki/Grafana/LangFuse | t3.medium (2C/4GB) | 전체 scrape와 로그 수집, LLM 트레이싱 |
 
 **서비스별 분리 영향**: App을 묶음에서 서비스별로 나누면 태스크 수가 늘어 [9] 월 비용과 아래 Auto Scaling 최소 태스크 수에 영향이 있습니다. 비용은 서비스 수만큼 증가하지만 차이는 크지 않습니다.
 
@@ -629,7 +629,7 @@ Kafka consumer 처리가 밀리면 최고가 갱신, 주문, 알림이 순차로
 | ECS Fargate (App) | CPU/Memory 사용률, 실행 중 태스크 수, JVM Heap·GC, HTTP 요청 처리량(TPS), HTTP 5xx 에러율 | Spring Actuator → Prometheus 스크레이프 |
 | ECS Fargate (Bid) | CPU/Memory 사용률, 실행 중 태스크 수, 스케일아웃 이벤트, JVM Heap·GC, 입찰 TPS, WS 연결 수, 입찰 실패율 | Spring Actuator → Prometheus 스크레이프 |
 | EC2 + Kafka | Consumer Lag, Rebalance Count, Producer/Consumer 처리량, t3 CPU 크레딧 잔량(CPUCreditBalance), 브로커 디스크 사용률 | JMX Exporter + Node Exporter → Prometheus 스크레이프 |
-| EC2 (모니터링) | CPU, EBS(디스크) 사용률, Prometheus/Loki/Grafana 프로세스 생존 여부 | Node Exporter self-scrape |
+| EC2 (모니터링) | CPU, EBS(디스크) 사용률, Prometheus/Loki/Grafana/LangFuse 프로세스 생존 여부 | Node Exporter self-scrape |
 | ElastiCache (Redis) | Cache Hit Rate, Evictions, CurrConnections, 메모리 사용률 | Grafana CloudWatch datasource |
 | RDS (PostgreSQL) | CPU, DatabaseConnections, Read/Write IOPS | Grafana CloudWatch datasource |
 | ALB | RequestCount, HTTPCode_ELB_5XX_Count, TargetResponseTime p95 | Grafana CloudWatch datasource |
@@ -716,6 +716,22 @@ Kafka consumer 처리가 밀리면 최고가 갱신, 주문, 알림이 순차로
     | ai-service | LLM 분석 소요시간(도전) | Spring Actuator Custom Metric → Prometheus | 30초 초과 → Alert |
     | ai-service | LLM 분석 실패율(도전) | Spring Actuator Custom Metric → Prometheus | 실패율 10% 초과 → Alert |
     | ai-service | aiops_log 저장 건수(도전) | Spring Actuator Custom Metric → Prometheus | 분당 100건 초과 → Alert |
+
+## LangFuse (LLM 관측)
+
+응답시간, 성공률 같은 일반 지표는 Prometheus로 수집하지만, LLM 특화 정보(프롬프트 내용, 토큰 수, 모델별 요금)는 Prometheus로 수집할 수 없습니다.
+LangFuse는 이 부분을 채워주는 LLM 전용 관측 도구입니다.
+
+| 수집 정보 (`LangfuseSpanExporter`) | 설명 |
+| --- | --- |
+| `gen_ai.prompt` | 메시지 타입과 텍스트를 포함한 전체 입력 내용 |
+| `gen_ai.completion` | 모델이 반환한 응답 텍스트 |
+| `gen_ai.request.model` | 호출된 모델 이름 |
+| `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` | 요청별 입력/출력 토큰 수 및 합계 |
+| `startTime` / `endTime` | LLM 호출 구간 시작/종료 시각 |
+
+**운영 방식: 모니터링 EC2 자체 호스팅 (LangFuse v2)**
+- 모니터링 EC2에서 포트번호 3001로 운영합니다.
 
 ## 알람 임계값
 
@@ -842,7 +858,7 @@ Kafka consumer 처리가 밀리면 최고가 갱신, 주문, 알림이 순차로
                         K3 <-.->|Raft| K1
                     end
     
-                    Mon["모니터링 EC2<br>t3.medium<br>Prometheus / Loki / Grafana / Kafka UI"]:::base
+                    Mon["모니터링 EC2<br>t3.medium<br>Prometheus / Loki / Grafana / LangFuse / Kafka UI"]:::base
                 end
     
                 subgraph PrivSub["Private Subnet"]
@@ -872,6 +888,7 @@ Kafka consumer 처리가 밀리면 최고가 갱신, 주문, 알림이 순차로
         ECS -->|"이벤트 consume"| KafkaCL
     
         ECS -.->|"metrics / logs"| Mon
+        AI -.->|"LLM 트레이싱"| Mon
         KafkaCL -.->|"metrics / logs"| Mon
     
         RW -.->|"metrics"| CW
