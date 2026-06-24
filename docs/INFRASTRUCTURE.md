@@ -141,14 +141,9 @@ JMeter는 테스트 대상 서버 바깥에서 가짜 요청과 연결을 대량
 
 **왜 NAT가 필요 없나**: NAT Gateway는 공인 IP가 없는 Private Subnet 서버가 인터넷으로 나가게 해주는 중계기입니다. ECR 이미지 pull, PG사/Slack/Gemini API 호출 같은 아웃바운드가 NAT를 거칩니다. 그런데 NAT는 시간 과금과 데이터 처리 요금(GB당)이 둘 다 붙습니다. 예산이 한정된 상황에서 NAT를 24시간 켜두는 비용이 부담입니다.
 
-<aside>
-💡
-
-- **아웃바운드**: 서버에서 외부로 나가는 트래픽
-  (예: Fargate 태스크가 ECR에서 이미지를 pull하는 것, Slack API를 호출하는 것)
-- **인바운드**: 외부에서 서버로 들어오는 트래픽
-  (예: 사용자가 ALB로 HTTP 요청을 보내는 것)
-</aside>
+> **아웃바운드**: 서버에서 외부로 나가는 트래픽 (예: Fargate 태스크가 ECR에서 이미지를 pull하는 것, Slack API를 호출하는 것)
+>
+> **인바운드**: 외부에서 서버로 들어오는 트래픽(예: 사용자가 ALB로 HTTP 요청을 보내는 것)
 
 **채택: Public Subnet 배치**
 
@@ -219,12 +214,9 @@ App은 서비스별로 독립 ECS 서비스로 분리해 운영합니다. 아직
 ECS Fargate 태스크는 배포나 장애 재시작 시 컨테이너가 완전히 새로 교체됩니다.
 교체된 컨테이너의 로컬 파일시스템은 초기화되므로 Kafka 메시지와 Prometheus 메트릭이 사라집니다. EFS(Elastic File System)를 마운트하면 해결할 수 있지만 추가 비용과 마운트 설정 복잡성이 생깁니다. 따라서 Kafka와 모니터링은 로컬 디스크가 유지되는 EC2 위에서 Docker Compose로 운영합니다.
 
-<aside>
-💡
-
-- **Stateless**: 서버가 자체적으로 데이터를 저장하지 않습니다. 요청을 처리하고 나면 서버에 아무것도 남지 않습니다. App, Bid 서비스가 해당됩니다. 어느 태스크가 요청을 처리해도 결과가 같으므로 태스크를 자유롭게 교체하거나 늘릴 수 있습니다.
-- **Stateful**: 서버가 로컬 디스크에 데이터를 저장합니다. Kafka는 수신한 메시지를 로컬 디스크에 기록하고, Prometheus는 수집한 메트릭을 로컬에 쌓습니다. 이 데이터가 서버 재시작 후에도 살아 있어야 합니다.
-</aside>
+> **Stateless**: 서버가 자체적으로 데이터를 저장하지 않습니다. 요청을 처리하고 나면 서버에 아무것도 남지 않습니다. App, Bid 서비스가 해당됩니다. 어느 태스크가 요청을 처리해도 결과가 같으므로 태스크를 자유롭게 교체하거나 늘릴 수 있습니다.
+> 
+>**Stateful**: 서버가 로컬 디스크에 데이터를 저장합니다. Kafka는 수신한 메시지를 로컬 디스크에 기록하고, Prometheus는 수집한 메트릭을 로컬에 쌓습니다. 이 데이터가 서버 재시작 후에도 살아 있어야 합니다.
 
 | 선택지 | 운영 방식 |
 | --- | --- |
@@ -448,16 +440,11 @@ blue-green은 무중단 요구가 생기고 WS 드레이닝이 필요할 때 재
 
 배포 전략 세 가지는 서비스를 중단하지 않고 신버전으로 교체하는 방식의 차이입니다.
 
-<aside>
-💡
-
-**compose pull & up**: 구버전 컨테이너를 내리고 신버전을 올립니다. 그 사이 잠깐 서비스가 중단됩니다.
-
-**Blue-Green**: 구버전(Blue) 서버를 그대로 두고 신버전(Green) 서버를 별도로 띄운 뒤 트래픽을 전환합니다. 문제가 생기면 즉시 Blue로 돌아갑니다.
-
-**Canary**: 신버전 서버에 트래픽 일부만 먼저 보내고 이상 없으면 전체로 확대합니다.
-
-</aside>
+> **compose pull & up**: 구버전 컨테이너를 내리고 신버전을 올립니다. 그 사이 잠깐 서비스가 중단됩니다.
+> 
+> **Blue-Green**: 구버전(Blue) 서버를 그대로 두고 신버전(Green) 서버를 별도로 띄운 뒤 트래픽을 전환합니다. 문제가 생기면 즉시 Blue로 돌아갑니다.
+> 
+> **Canary**: 신버전 서버에 트래픽 일부만 먼저 보내고 이상 없으면 전체로 확대합니다.
 
 **결론: compose pull & up**
 단순하고 추가 서버가 필요 없습니다.
@@ -475,16 +462,11 @@ blue-green은 무중단 요구가 생기고 WS 드레이닝이 필요할 때 재
 
 ## 의사결정: ECS 서버 배포 전략 ✅
 
-<aside>
-💡
-
-**롤링(Rolling)**: ECS가 구버전 태스크를 한 번에 하나씩 신버전으로 교체합니다. 교체 중에도 나머지 태스크가 트래픽을 받아 HTTP 가용성이 유지됩니다.
-
-**Blue-Green (CodeDeploy)**: 신버전 태스크 세트를 별도로 띄우고 ALB 대상 그룹을 전환합니다. 즉시 롤백이 가능하고 WS 드레이닝을 ALB 레벨에서 제어할 수 있습니다.
-
-**Canary (CodeDeploy)**: 신버전 태스크에 트래픽을 단계적으로 이동합니다.
-
-</aside>
+> **롤링(Rolling)**: ECS가 구버전 태스크를 한 번에 하나씩 신버전으로 교체합니다. 교체 중에도 나머지 태스크가 트래픽을 받아 HTTP 가용성이 유지됩니다.
+> 
+> **Blue-Green (CodeDeploy)**: 신버전 태스크 세트를 별도로 띄우고 ALB 대상 그룹을 전환합니다. 즉시 롤백이 가능하고 WS 드레이닝을 ALB 레벨에서 제어할 수 있습니다.
+> 
+> **Canary (CodeDeploy)**: 신버전 태스크에 트래픽을 단계적으로 이동합니다.
 
 **결론: ECS 롤링 배포**
 
@@ -549,16 +531,22 @@ Terraform으로 전체 인프라를 코드화합니다.
 
 ## 의사결정: CI/CD 방식 ✅
 
-**결론: GitHub Actions + ECR + 전체 빌드**
+**결론: GitHub Actions + ECR(ECS 커스텀 이미지) + 전체 빌드**
 
 ECR은 AWS 내부망이라 pull이 빠르고 IAM으로 접근을 제어합니다.
 
-빌드와 ECR push까지는 공통이고, 그 이후 배포 단계만 서버 유형별로 분기합니다.
+ECS Fargate(App, Bid)는 직접 빌드한 커스텀 이미지를 ECR에 push하고, ECS가 이를 pull하여 배포합니다.
+EC2(Kafka, 모니터링)는 공식 퍼블릭 이미지를 Docker Hub/ghcr.io에서 직접 pull하므로 빌드와 ECR 단계가 없습니다.
+
+> 📢 2차 설계에서는 EC2에서도 ECR Pull한다고 명시했었지만 아래와 같은 이유로 설계를 변경했습니다.
+> 
+> ECR은 직접 빌드한 커스텀 이미지를 보관하는 저장소입니다. 이 프로젝트에서 커스텀 이미지를 빌드하는 대상은 Spring Boot 애플리케이션뿐입니다. 이 이미지들은 ECS Fargate 위에서 실행되므로 ECR에서 pull하는 주체도 ECS Task입니다.
+> 반면 EC2에서 실행하는 컨테이너는 전부 외부에서 공개된 완성품 이미지입니다. 직접 수정하거나 빌드할 내용이 없으므로 ECR에 올릴 이유가 없고, 따라서 EC2가 ECR에 접근할 일도 없습니다.
 
 | 대상 | 배포 명령 | 비고 |
 | --- | --- | --- |
 | **ECS Fargate** (App, Bid) | `aws ecs update-service --force-new-deployment` | ECS가 새 태스크로 롤링 배포, IAM Task Role로 ECR pull |
-| **EC2 + compose** (Kafka, 모니터링) | SSM Run Command로 `docker compose pull && up -d` | EC2 Instance Role로 ECR pull, 경매 금지 구간 배포 |
+| **EC2 + compose** (Kafka, 모니터링) | SSM Run Command로 `docker compose pull && up -d` | Docker Hub/ghcr.io 퍼블릭 이미지 직접 pull, Kafka는 경매 금지 구간 배포 |
 
 **4기준 평가**
 
@@ -600,7 +588,7 @@ flowchart TD
         ssm["SSM Run Command<br>대상 EC2 지정"]
         ssm --> window["경매 금지 구간 대기<br>(진행 중인 경매 없을 때)"]
         window --> compose["docker compose pull<br>&& up -d"]
-        compose --> pull_ec2["EC2가 ECR에서<br>이미지 pull (IAM Instance Role)"]
+        compose --> pull_ec2["EC2가 Docker Hub/ghcr.io에서<br>퍼블릭 이미지 직접 pull"]
     end
 ```
 
@@ -750,7 +738,7 @@ Kafka consumer 처리가 밀리면 최고가 갱신, 주문, 알림이 순차로
 
 # [9] 월 예상 비용
 
-아래 금액은 예상 비용이며, 실제 금액과 다를 수 있습니다.
+아래 금액은 `terraform destroy`를 하지 않고 30일 내내 서버를 기동한 경우의 예상 비용이며, 실제 금액과 다를 수 있습니다.
 
 **산정 기준**:
 
@@ -768,12 +756,7 @@ Kafka consumer 처리가 밀리면 최고가 갱신, 주문, 알림이 순차로
 | CloudWatch | GetMetricData API 호출 | ~$3 | Grafana datasource API 호출 비용<br>(기본 지표 수집은 무료) |
 | **합계** |  | **~$466** |  |
 
-<aside>
-📢
-
-1차 문서에서 App($1.1)과 Bid($0.58)는 "배포 시 태스크가 5분 동안 기동"하는 시간만 계산한 값이었습니다. App, Bid 모두 상시 가동 서비스라는 가정 하에 730시간 기준으로 재산정했습니다.
-
-</aside>
+> 📢 1차 설계에서 App($1.1)과 Bid($0.58)는 "배포 시 태스크가 5분 동안 기동"하는 시간만 계산한 값이었습니다. App, Bid 모두 상시 가동 서비스라는 가정 하에 730시간 기준으로 재산정했습니다.
 
 **고도화 시 비용 변동**
 
@@ -787,9 +770,6 @@ Kafka consumer 처리가 밀리면 최고가 갱신, 주문, 알림이 순차로
 
 - Mermaid 다이어그램
 
-    <aside>
-    💡
-
   **1차 설계 대비 변경** (진한 파란색)
 
     - **Nginx → ALB**
@@ -800,7 +780,6 @@ Kafka consumer 처리가 밀리면 최고가 갱신, 주문, 알림이 순차로
   **고도화 단계 추가** (초록색)
 
     - **Kafka 단일 → 3-브로커 KRaft HA 클러스터**
-    </aside>
 
     ```mermaid
     graph TB
@@ -913,8 +892,8 @@ Kafka consumer 처리가 밀리면 최고가 갱신, 주문, 알림이 순차로
         DeployEC2 --> Mon
     
         ECS -.->|"image pull Task Role"| ECR
-        KafkaCL -.->|"image pull Instance Role"| ECR
-        Mon -.->|"image pull Instance Role"| ECR
+        KafkaCL -.->|"public image pull"| Internet["Docker Hub/ghcr.io"]
+        Mon -.->|"public image pull"| Internet
     ```
 
 - 가시성을 위해 아래 연결들은 다이어그램에서 생략했습니다.
