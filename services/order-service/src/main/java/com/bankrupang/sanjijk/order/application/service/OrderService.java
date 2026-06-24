@@ -6,6 +6,9 @@ import com.bankrupang.sanjijk.order.domain.enums.OrderType;
 import com.bankrupang.sanjijk.order.domain.exception.DuplicateOrderException;
 import com.bankrupang.sanjijk.order.domain.exception.OrderNotFoundException;
 import com.bankrupang.sanjijk.order.domain.repository.OrderRepository;
+import com.bankrupang.sanjijk.order.infrastructure.feign.AuctionClient;
+import com.bankrupang.sanjijk.order.infrastructure.feign.UserClient;
+import com.bankrupang.sanjijk.order.infrastructure.feign.dto.AuctionInfoResponse;
 import com.bankrupang.sanjijk.order.infrastructure.feign.dto.UserInfoResponse;
 import com.bankrupang.sanjijk.order.infrastructure.messaging.consumer.dto.*;
 import com.bankrupang.sanjijk.order.presentation.dto.request.OrderDepositCreateRequest;
@@ -28,29 +31,34 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final OrderEventService orderEventService;
+    private final AuctionClient auctionClient;
+    private final UserClient userClient;
 
 
     @Transactional
     public OrderResponse createDepositOrder(UUID userId, OrderDepositCreateRequest request) {
-        // 1. 멱등성 체크(동일한 유저가 같은 경매에 이미 보증금 주문 있는지 확인)
+        // 1. 멱등성 체크
         orderRepository.findByUserIdAndAuctionIdAndOrderType(userId, request.auctionId(), OrderType.DEPOSIT)
                 .ifPresent(o -> {
                     log.warn("중복 보증금 주문 요청 - userId {}, auctionId: {}", userId, request.auctionId());
                     throw new DuplicateOrderException();
                 });
 
-        // 2. 보증금 주문 생성 및 저장(pending 기본 값)
+        // 2. auction-service / user-service에서 신뢰할 수 있는 데이터 조회
+        AuctionInfoResponse auction = auctionClient.getAuction(request.auctionId());
+        UserInfoResponse userInfo = userClient.getUserInfo(userId);
+
+        // 3. 보증금 주문 생성 및 저장
         Order order = Order.createDepositOrder(
                 userId,
-                request.userName(),
-                request.slackId(),
-                request.auctionId(),
-                request.auctionTitle(),
-                request.amount()
+                userInfo.name(),
+                userInfo.slackId(),
+                auction.auctionId(),
+                auction.auctionTitle(),
+                auction.depositAmount()
         );
 
-        // 멱등성 체크(동시에 들어올 경우)
-        try{
+        try {
             orderRepository.save(order);
         } catch (DataIntegrityViolationException e) {
             log.warn("중복 보증금 주문 - userId {}, auctionId: {}", userId, request.auctionId());
@@ -58,8 +66,8 @@ public class OrderService {
         }
         log.info("보증금 주문 생성 완료 - orderId: {}, userId: {}, auctionId: {}", order.getId(), userId, request.auctionId());
 
-        // 3. 결제 요청 이벤트 발행
-        orderEventService.publishDepositCreated(order, request.endAt());
+        // 4. 결제 요청 이벤트 발행
+        orderEventService.publishDepositCreated(order, auction.endAt());
 
         return OrderResponse.from(order);
     }
@@ -88,7 +96,7 @@ public class OrderService {
         Order order = Order.createWinningOrder(
                 event.winnerId(),
                 event.sellerId(),
-                userInfo.userName(),
+                userInfo.name(),
                 userInfo.slackId(),
                 event.auctionId(),
                 event.auctionTitle(),

@@ -47,7 +47,7 @@ public class PaymentEventConsumer {
     @KafkaListener(topics = "refund-completed", groupId = "order-service")
     public void consumeRefundCompleted(RefundCompletedEvent event) {
         log.info("[KAFKA][CONSUME] REFUND_COMPLETED 수신 - orderId: {}, userId: {}, refundAmount: {}, occurredAt: {}",
-                event.orderId(), event.userId(), event.refundAmount(), event.occurredAt());
+                event.orderId(), event.userId(), event.cancelAmount(), event.occurredAt());
         refundCompletedHandler.handle(event);
     }
 }
