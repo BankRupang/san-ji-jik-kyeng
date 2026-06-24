@@ -21,8 +21,8 @@ public class SecurityConfig {
      * [CORS] 개발 환경 전용 설정.
      * - allowedOrigins: 로컬 브라우저 접근만 허용 (file://, localhost 계열)
      * - prod에서는 실제 도메인으로 교체 필요
-     * - allowedOriginPatterns("*") + allowCredentials(true) 조합은 보안 위험이 있으므로
-     *   명시적 Origin 목록으로 제한
+     * - allowCredentials(false): JWT Bearer 방식은 쿠키 불필요하므로 false로 설정
+     * - prod에서는 allowedOriginPatterns를 실제 도메인으로 교체 필요
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -30,7 +30,7 @@ public class SecurityConfig {
         config.setAllowedOriginPatterns(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
+        config.setAllowCredentials(false);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

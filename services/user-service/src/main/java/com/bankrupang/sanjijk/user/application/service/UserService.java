@@ -130,6 +130,11 @@ public class UserService {
         return UserResponse.from(user);
     }
 
+    public AdminUserDetailResponse getAdminUserDetail(UUID userId) {
+        User user = findUserByIdOrElseThrow(userId);
+        return AdminUserDetailResponse.from(user);
+    }
+
     @Transactional(readOnly = true)
     public PageResponse<UserListResponse> getUsers(UserRole role, UserStatus status, int page, int size) {
         Pageable pageable = PageableUtils.ofDefault(page, size);

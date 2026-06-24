@@ -12,7 +12,7 @@ spring:
                 allowedOriginPatterns: "*"
                 allowedMethods: "*"
                 allowedHeaders: "*"
-                allowCredentials: true
+                allowCredentials: false
           discovery:
             locator:
               enabled: false

@@ -6,6 +6,7 @@ import com.bankrupang.sanjijk.user.application.service.UserService;
 import com.bankrupang.sanjijk.user.domain.UserRole;
 import com.bankrupang.sanjijk.user.domain.UserStatus;
 import com.bankrupang.sanjijk.user.presentation.dto.request.*;
+import com.bankrupang.sanjijk.user.presentation.dto.response.AdminUserDetailResponse;
 import com.bankrupang.sanjijk.user.presentation.dto.response.UserListResponse;
 import com.bankrupang.sanjijk.user.presentation.dto.response.UserLoginResponse;
 import com.bankrupang.sanjijk.user.presentation.dto.response.UserResponse;
@@ -47,10 +48,10 @@ public class UserController {
 
     @PreAuthorize("hasAnyRole('MASTER','MANAGER')")
     @GetMapping("/api/v1/user/one")
-    public ResponseEntity<ApiResponse<UserResponse>> getUser(
+    public ResponseEntity<ApiResponse<AdminUserDetailResponse>> getUser(
             @RequestParam UUID userId) {
         return ResponseEntity.status(HttpStatus.OK)
-                .body(ApiResponse.ok(userService.getUser(userId)));
+                .body(ApiResponse.ok(userService.getAdminUserDetail(userId)));
     }
 
     @PreAuthorize("hasAnyRole('MASTER','MANAGER')")
