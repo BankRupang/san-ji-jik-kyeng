@@ -55,8 +55,8 @@
       "clientRoles": {
         "realm-management": [
           "manage-users",
-          "view-users",
-          "realm-admin"]
+          "view-users"
+          ]
       }
     }
   ]
