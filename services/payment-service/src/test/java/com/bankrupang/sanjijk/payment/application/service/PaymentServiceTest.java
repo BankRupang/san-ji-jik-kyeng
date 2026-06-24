@@ -359,6 +359,9 @@ class PaymentServiceTest {
             given(abortedPayment.getAmount()).willReturn(900_000);
             given(abortedPayment.getOriginalAmount()).willReturn(1_000_000);
             given(paymentRepository.findByOrderIdAndPaymentTypeAndStatus(
+                    orderId, PaymentType.NORMAL, PaymentStatus.READY))
+                    .willReturn(Optional.empty());
+            given(paymentRepository.findByOrderIdAndPaymentTypeAndStatus(
                     orderId, PaymentType.NORMAL, PaymentStatus.ABORTED))
                     .willReturn(Optional.of(abortedPayment));
 
@@ -378,6 +381,9 @@ class PaymentServiceTest {
             Payment abortedPayment = mock(Payment.class);
             given(abortedPayment.getUpdatedAt()).willReturn(LocalDateTime.now().minusMinutes(20));
             given(paymentRepository.findByOrderIdAndPaymentTypeAndStatus(
+                    orderId, PaymentType.NORMAL, PaymentStatus.READY))
+                    .willReturn(Optional.empty());
+            given(paymentRepository.findByOrderIdAndPaymentTypeAndStatus(
                     orderId, PaymentType.NORMAL, PaymentStatus.ABORTED))
                     .willReturn(Optional.of(abortedPayment));
 
@@ -391,6 +397,9 @@ class PaymentServiceTest {
         void not_found_throws() {
             // given
             UUID orderId = UUID.randomUUID();
+            given(paymentRepository.findByOrderIdAndPaymentTypeAndStatus(
+                    orderId, PaymentType.NORMAL, PaymentStatus.READY))
+                    .willReturn(Optional.empty());
             given(paymentRepository.findByOrderIdAndPaymentTypeAndStatus(
                     orderId, PaymentType.NORMAL, PaymentStatus.ABORTED))
                     .willReturn(Optional.empty());
