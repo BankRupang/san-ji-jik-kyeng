@@ -126,10 +126,12 @@ services:
       SPRING_PROFILES_ACTIVE: dev
       SPRING_CLOUD_CONFIG_URI: http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      KEYCLOAK_ISSUER_URI: http://keycloak:18080/realms/${KEYCLOAK_REALM}
       LOKI_URL: http://loki:3100
     depends_on:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
+      keycloak: { condition: service_started }
 
   # ================================================================
   # 비즈니스 서비스
@@ -295,7 +297,6 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?currentSchema=ai_schema
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      KEYCLOAK_ISSUER_URI: http://keycloak:18080/realms/${KEYCLOAK_REALM}
       SPRING_DATA_REDIS_HOST: redis
       LOKI_URL: http://loki:3100
       GEMINI_API_KEY: ${GEMINI_API_KEY}
@@ -304,7 +305,6 @@ services:
     depends_on:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
-      keycloak: { condition: service_started }
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
       langfuse: { condition: service_started }
