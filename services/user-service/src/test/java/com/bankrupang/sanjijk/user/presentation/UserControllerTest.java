@@ -180,9 +180,9 @@ class UserControllerTest {
         @Test
         @DisplayName("MASTER 권한으로 조회 성공 - 200 OK")
         void getUser_asMaster_success() throws Exception {
-            var response = new UserResponse(USER_ID, "testuser", "테스트유저",
-                    "test@test.com", "010-1234-5678", null, null, true, UserRole.BUYER, UserStatus.ACTIVE);
-            given(userService.getUser(any())).willReturn(response);
+            var response = new AdminUserDetailResponse(USER_ID, "testuser", "테스트유저",
+                    "test@test.com", "010-1234-5678", UserRole.BUYER, UserStatus.ACTIVE);
+            given(userService.getAdminUserDetail(any())).willReturn(response);
 
             mockMvc.perform(get("/api/v1/user/one")
                             .param("userId", USER_ID.toString())
@@ -213,7 +213,7 @@ class UserControllerTest {
         @Test
         @DisplayName("존재하지 않는 유저 → 404 Not Found")
         void getUser_notFound_404() throws Exception {
-            given(userService.getUser(any())).willThrow(new UserNotFoundException());
+            given(userService.getAdminUserDetail(any())).willThrow(new UserNotFoundException());
 
             mockMvc.perform(get("/api/v1/user/one")
                             .param("userId", USER_ID.toString())

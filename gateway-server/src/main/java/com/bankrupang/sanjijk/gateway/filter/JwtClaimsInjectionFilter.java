@@ -34,7 +34,8 @@ public class JwtClaimsInjectionFilter implements GlobalFilter, Ordered {
                 .flatMap(auth -> {
                     var jwt = auth.getToken();
                     String userId = jwt.getSubject();
-                    String role = parseRole(jwt.getClaimAsString("role"));
+                    List<String> roles = jwt.getClaimAsStringList("role");
+                    String role = (roles != null && !roles.isEmpty()) ? roles.get(0) : null;
 
                     ServerWebExchange mutated = exchange.mutate()
                             .request(r -> r.headers(headers -> {
@@ -56,17 +57,6 @@ public class JwtClaimsInjectionFilter implements GlobalFilter, Ordered {
     @Override
     public int getOrder() {
         return Ordered.HIGHEST_PRECEDENCE;
-    }
-
-    private String parseRole(String raw) {
-        if (raw == null) return null;
-        String trimmed = raw.trim();
-        if (trimmed.startsWith("[")) {
-            trimmed = trimmed.substring(1, trimmed.length() - 1).replace("\"", "").trim();
-            String[] parts = trimmed.split(",");
-            return parts.length > 0 && !parts[0].isEmpty() ? parts[0].trim() : null;
-        }
-        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private void removeUserHeaders(org.springframework.http.HttpHeaders headers) {
