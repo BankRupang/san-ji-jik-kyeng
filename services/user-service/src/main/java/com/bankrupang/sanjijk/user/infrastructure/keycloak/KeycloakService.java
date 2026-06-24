@@ -63,8 +63,21 @@ public class KeycloakService {
         if (response.getStatus() == 201) {
             String path = response.getLocation().getPath();
             String keycloakUserId = path.substring(path.lastIndexOf("/") + 1);
-            assignRoleToUser(keycloakUserId, role.name());
-            return UUID.fromString(keycloakUserId);
+
+            try {
+                // 유저 생성이 성공한 직후, 역할을 부여합니다.
+                assignRoleToUser(keycloakUserId, role.name());
+                return UUID.fromString(keycloakUserId);
+            } catch (Exception e) {
+                // 역할 부여 중 에러(403 등)가 발생시 만든 Keycloak 유저를 즉시 삭제(롤백)합니다.
+                log.error("Keycloak 유저 생성 후 역할 부여 실패. 생성된 유저 롤백 삭제 진행: userId={}", keycloakUserId, e);
+                try {
+                    usersResource.get(keycloakUserId).remove();
+                } catch (Exception rollbackEx) {
+                    log.error("Keycloak 롤백 삭제마저 실패. 수동 확인 필요: userId={}", keycloakUserId, rollbackEx);
+                }
+                throw new UserKeycloakCreationFailedException();
+            }
         } else {
             log.error("Keycloak 유저 생성 실패. status={}, username={}", response.getStatus(), username);
             throw new UserKeycloakCreationFailedException();

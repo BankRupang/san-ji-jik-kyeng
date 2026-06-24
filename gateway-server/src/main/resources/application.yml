@@ -31,5 +31,5 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:18080/realms/sanjijk
-          jwk-set-uri: http://localhost:18080/realms/sanjijk/protocol/openid-connect/certs
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:18080/realms/sanjijk}
+          jwk-set-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:18080/realms/sanjijk}/protocol/openid-connect/certs
