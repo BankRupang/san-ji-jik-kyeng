@@ -2,7 +2,7 @@
 set -e
 
 REGION="ap-northeast-2"
-REPO_DIR=/home/ec2-user/sanji-jk
+REPO_DIR=/home/ec2-user/san-ji-jik-kyeng
 
 cd "${REPO_DIR}"
 
