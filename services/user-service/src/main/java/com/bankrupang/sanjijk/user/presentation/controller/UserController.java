@@ -41,7 +41,7 @@ public class UserController {
     @PostMapping("/api/v1/auth/login")
     public ResponseEntity<ApiResponse<UserLoginResponse>> login(
             @RequestBody @Valid UserLoginRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED)
+        return ResponseEntity.status(HttpStatus.OK)
                 .body(ApiResponse.ok(userService.login(request)));
     }
 

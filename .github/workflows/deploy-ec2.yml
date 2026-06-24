@@ -49,19 +49,10 @@ jobs:
             git -C "${REPO_DIR}" fetch origin main
             git -C "${REPO_DIR}" reset --hard origin/main
           else
+            rm -rf "${REPO_DIR}"
             git clone https://github.com/BankRupang/san-ji-jik-kyeng.git "${REPO_DIR}"
           fi
-          cd "${REPO_DIR}"
-          IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
-          KAFKA_PRIVATE_IP=$(curl -s -H "X-aws-ec2-metadata-token: ${IMDS_TOKEN}" http://169.254.169.254/latest/meta-data/local-ipv4)
-          KAFKA_CLUSTER_ID=$(aws ssm get-parameter --name /sanji/prod/kafka/cluster-id --with-decryption --query Parameter.Value --output text --region ap-northeast-2)
-          cat > .env <<EOF
-          KAFKA_PRIVATE_IP=${KAFKA_PRIVATE_IP}
-          KAFKA_CLUSTER_ID=${KAFKA_CLUSTER_ID}
-          EOF
-          chmod 600 .env
-          docker compose -f docker-compose.kafka.yml pull
-          docker compose -f docker-compose.kafka.yml up -d
+          bash "${REPO_DIR}/scripts/deploy-kafka.sh"
           EOS
 
           read -r -d '' MONITORING_SCRIPT <<'EOS' || true
@@ -71,32 +62,10 @@ jobs:
             git -C "${REPO_DIR}" fetch origin main
             git -C "${REPO_DIR}" reset --hard origin/main
           else
+            rm -rf "${REPO_DIR}"
             git clone https://github.com/BankRupang/san-ji-jik-kyeng.git "${REPO_DIR}"
           fi
-          cd "${REPO_DIR}"
-          KAFKA_PRIVATE_IP=$(aws ssm get-parameter --name /sanji/prod/kafka/private-ip --query Parameter.Value --output text --region ap-northeast-2)
-          export KAFKA_PRIVATE_IP
-          GRAFANA_ADMIN_PASSWORD=$(aws ssm get-parameter --name /sanji/prod/monitoring/grafana-admin-password --with-decryption --query Parameter.Value --output text --region ap-northeast-2)
-          SLACK_WEBHOOK_URL=$(aws ssm get-parameter --name /sanji/prod/monitoring/slack-webhook-url --with-decryption --query Parameter.Value --output text --region ap-northeast-2)
-          cat > .env <<EOF
-          KAFKA_PRIVATE_IP=${KAFKA_PRIVATE_IP}
-          GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
-          SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
-          EOF
-          chmod 600 .env
-          envsubst '$KAFKA_PRIVATE_IP' < monitoring/prometheus/prometheus.prod.yml.template > monitoring/prometheus/prometheus.prod.yml
-          # ecs-targets.json이 없으면 빈 파일 생성 (ec2-user 소유여야 cron 스크립트가 덮어쓸 수 있음)
-          [ -f monitoring/prometheus/ecs-targets.json ] || sudo -u ec2-user sh -c 'echo "[]" > monitoring/prometheus/ecs-targets.json'
-          chown ec2-user:ec2-user monitoring/prometheus/ecs-targets.json
-          # ecs-discovery.sh 실행 권한 부여
-          chmod +x monitoring/prometheus/ecs-discovery.sh
-          # /etc/cron.d 에 등록해서 ec2-user 권한으로 5분마다 실행
-          sudo mkdir -p /etc/cron.d
-          echo "*/5 * * * * ec2-user /home/ec2-user/sanji-jk/monitoring/prometheus/ecs-discovery.sh >> /var/log/ecs-discovery.log 2>&1" | sudo tee /etc/cron.d/ecs-discovery > /dev/null
-          # 첫 배포 시 즉시 한 번 실행 (ec2-user로)
-          sudo -u ec2-user /home/ec2-user/sanji-jk/monitoring/prometheus/ecs-discovery.sh || true
-          docker compose -f docker-compose.monitoring.yml pull
-          docker compose -f docker-compose.monitoring.yml up -d
+          bash "${REPO_DIR}/scripts/deploy-monitoring.sh"
           EOS
 
           # 대상 EC2(Role 태그)와 실행할 스크립트를 짝지어 SSM으로 보내고 완료까지 기다립니다.

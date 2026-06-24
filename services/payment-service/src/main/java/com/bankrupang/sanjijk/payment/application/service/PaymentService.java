@@ -5,6 +5,7 @@ import com.bankrupang.sanjijk.payment.domian.entity.Payment;
 import com.bankrupang.sanjijk.payment.domian.entity.PaymentHistory;
 import com.bankrupang.sanjijk.payment.domian.enums.PaymentStatus;
 import com.bankrupang.sanjijk.payment.domian.enums.PaymentType;
+import com.bankrupang.sanjijk.payment.domian.exception.PaymentAlreadyProcessedException;
 import com.bankrupang.sanjijk.payment.domian.exception.PaymentNotFoundException;
 import com.bankrupang.sanjijk.payment.domian.exception.TossPaymentException;
 import com.bankrupang.sanjijk.payment.domian.repository.PaymentHistoryRepository;
@@ -213,6 +214,9 @@ public class PaymentService {
         MDC.put("traceId", UUID.randomUUID().toString());
         log.info("[REPAY] 잔금 재결제 요청 - orderId: {}, userId: {}", orderId, userId);
         try {
+            paymentRepository.findByOrderIdAndPaymentTypeAndStatus(orderId, PaymentType.NORMAL, PaymentStatus.READY)
+                    .ifPresent(p -> { throw new PaymentAlreadyProcessedException(); });
+
             Payment abortedPayment = paymentRepository
                     .findByOrderIdAndPaymentTypeAndStatus(orderId, PaymentType.NORMAL, PaymentStatus.ABORTED)
                     .orElseThrow(PaymentNotFoundException::new);
