@@ -49,7 +49,6 @@ jobs:
             git -C "${REPO_DIR}" fetch origin main
             git -C "${REPO_DIR}" reset --hard origin/main
           else
-            rm -rf "${REPO_DIR}"
             git clone --branch main --single-branch https://github.com/BankRupang/san-ji-jik-kyeng.git "${REPO_DIR}"
           fi
           bash "${REPO_DIR}/scripts/deploy-kafka.sh"
@@ -62,7 +61,6 @@ jobs:
             git -C "${REPO_DIR}" fetch origin main
             git -C "${REPO_DIR}" reset --hard origin/main
           else
-            rm -rf "${REPO_DIR}"
             git clone --branch main --single-branch https://github.com/BankRupang/san-ji-jik-kyeng.git "${REPO_DIR}"
           fi
           bash "${REPO_DIR}/scripts/deploy-monitoring.sh"

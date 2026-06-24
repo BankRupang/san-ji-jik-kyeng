@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-REGION="ap-northeast-2"
-REPO_DIR=/home/ec2-user/san-ji-jik-kyeng
+SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+source "${SCRIPT_DIR}/env.sh"
 
 cd "${REPO_DIR}"
 
