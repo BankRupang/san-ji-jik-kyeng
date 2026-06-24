@@ -21,6 +21,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -58,26 +60,13 @@ public class KeycloakService {
         user.setRequiredActions(Collections.emptyList());
 
         UsersResource usersResource = keycloak.realm(realm).users();
+        user.setAttributes(Map.of("role", List.of(role.name())));
         Response response = usersResource.create(user);
 
         if (response.getStatus() == 201) {
             String path = response.getLocation().getPath();
             String keycloakUserId = path.substring(path.lastIndexOf("/") + 1);
-
-            try {
-                // 유저 생성이 성공한 직후, 역할을 부여합니다.
-                assignRoleToUser(keycloakUserId, role.name());
-                return UUID.fromString(keycloakUserId);
-            } catch (Exception e) {
-                // 역할 부여 중 에러(403 등)가 발생시 만든 Keycloak 유저를 즉시 삭제(롤백)합니다.
-                log.error("Keycloak 유저 생성 후 역할 부여 실패. 생성된 유저 롤백 삭제 진행: userId={}", keycloakUserId, e);
-                try {
-                    usersResource.get(keycloakUserId).remove();
-                } catch (Exception rollbackEx) {
-                    log.error("Keycloak 롤백 삭제마저 실패. 수동 확인 필요: userId={}", keycloakUserId, rollbackEx);
-                }
-                throw new UserKeycloakCreationFailedException();
-            }
+            return UUID.fromString(keycloakUserId);
         } else {
             log.error("Keycloak 유저 생성 실패. status={}, username={}", response.getStatus(), username);
             throw new UserKeycloakCreationFailedException();
@@ -108,16 +97,6 @@ public class KeycloakService {
             throw new KeycloakLoginFailedException();
         }
 
-    }
-
-    private void assignRoleToUser(String userId, String roleName) {
-        RoleRepresentation roleToAssign = keycloak.realm(realm)
-                .roles()
-                .get(roleName)
-                .toRepresentation();
-
-        UserResource userResource = keycloak.realm(realm).users().get(userId);
-        userResource.roles().realmLevel().add(Collections.singletonList(roleToAssign));
     }
 
     public void deleteUser(UUID keycloakUserId) {
