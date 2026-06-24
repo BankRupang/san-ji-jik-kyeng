@@ -12,6 +12,8 @@ public record UserResponse (
         String name,
         String email,
         String phone,
+        String businessNumber,
+        String slackId,
         boolean notificationAllow,
         UserRole role,
         UserStatus status
@@ -23,6 +25,8 @@ public record UserResponse (
                 user.getName(),
                 user.getEmail(),
                 user.getPhone(),
+                user.getBusinessNumber(),
+                user.getSlackId(),
                 user.isNotificationAllow(),
                 user.getRole(),
                 user.getStatus()

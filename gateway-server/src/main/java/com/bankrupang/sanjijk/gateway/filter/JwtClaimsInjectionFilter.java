@@ -35,7 +35,7 @@ public class JwtClaimsInjectionFilter implements GlobalFilter, Ordered {
                 .flatMap(auth -> {
                     var jwt = auth.getToken();
                     String userId = jwt.getSubject();
-                    String role = extractRole(jwt.getClaimAsMap("realm_access"));
+                    String role = jwt.getClaimAsString("role");
 
                     ServerWebExchange mutated = exchange.mutate()
                             .request(r -> r.headers(headers -> {
@@ -63,16 +63,5 @@ public class JwtClaimsInjectionFilter implements GlobalFilter, Ordered {
         List.copyOf(headers.keySet()).stream()
                 .filter(name -> name.regionMatches(true, 0, "X-User-", 0, 7))
                 .forEach(headers::remove);
-    }
-
-    @SuppressWarnings("unchecked")
-    private String extractRole(Map<String, Object> realmAccess) {
-        if (realmAccess == null) return null;
-        List<String> roles = (List<String>) realmAccess.get("roles");
-        if (roles == null) return null;
-        return roles.stream()
-                .filter(r -> !r.startsWith("default-roles-") && !KEYCLOAK_SYSTEM_ROLES.contains(r))
-                .findFirst()
-                .orElse(null);
     }
 }

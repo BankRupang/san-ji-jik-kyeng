@@ -64,6 +64,14 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
+    // 내 프로필 조회
+    @GetMapping("/api/v1/users/me")
+    public ResponseEntity<ApiResponse<UserResponse>> getMe(
+            @RequestHeader("X-User-Id") UUID userId) {
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(ApiResponse.ok(userService.getUser(userId)));
+    }
+
     // 유저 프로필 수정
     @PatchMapping("/api/v1/users/me/profile")
     public ResponseEntity<ApiResponse<UserResponse>> updateProfile(

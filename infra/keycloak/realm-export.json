@@ -32,7 +32,22 @@
       "authorizationServicesEnabled": false,
       "standardFlowEnabled": false,
       "implicitFlowEnabled": false,
-      "directAccessGrantsEnabled": true
+      "directAccessGrantsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "role-attribute-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "role",
+            "claim.name": "role",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
     }
   ],
 
@@ -55,10 +70,23 @@
       "clientRoles": {
         "realm-management": [
           "manage-users",
-          "view-users",
-          "manage-realm"
+          "view-users"
           ]
       }
     }
-  ]
+  ],
+
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "subComponents": {},
+        "config": {
+          "kc.user.profile.config": [
+            "{\"attributes\":[{\"name\":\"username\"},{\"name\":\"email\"},{\"name\":\"firstName\"},{\"name\":\"lastName\"},{\"name\":\"role\",\"displayName\":\"Role\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]}}]}"
+          ]
+        }
+      }
+    ]
+  }
 }
