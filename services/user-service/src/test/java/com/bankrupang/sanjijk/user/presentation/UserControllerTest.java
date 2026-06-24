@@ -157,8 +157,8 @@ class UserControllerTest {
         }
 
         @Test
-        @DisplayName("정지된 유저 로그인 → 409 Conflict")
-        void login_suspendedUser_conflict() throws Exception {
+        @DisplayName("정지된 유저 로그인 → 403 Forbidden")
+        void login_suspendedUser_forbidden() throws Exception {
             given(userService.login(any())).willThrow(new UserSuspendedException());
 
             mockMvc.perform(post("/api/v1/auth/login")
@@ -166,7 +166,7 @@ class UserControllerTest {
                             .content("""
                                     {"username":"suspended","password":"pw"}
                                     """))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isForbidden());
         }
     }
 
