@@ -11,7 +11,6 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -59,15 +58,10 @@ public class JwtClaimsInjectionFilter implements GlobalFilter, Ordered {
         return Ordered.HIGHEST_PRECEDENCE;
     }
 
-    /**
-     * Keycloak attribute는 List로 저장되므로 JWT claim이 ["BUYER"] 형태로 올 수 있음.
-     * 단일 문자열 "BUYER" 또는 배열 표현 ["BUYER"] 모두 처리.
-     */
     private String parseRole(String raw) {
         if (raw == null) return null;
         String trimmed = raw.trim();
         if (trimmed.startsWith("[")) {
-            // ["BUYER"] -> BUYER
             trimmed = trimmed.substring(1, trimmed.length() - 1).replace("\"", "").trim();
             String[] parts = trimmed.split(",");
             return parts.length > 0 && !parts[0].isEmpty() ? parts[0].trim() : null;
