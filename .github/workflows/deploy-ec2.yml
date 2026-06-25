@@ -20,17 +20,66 @@ permissions:
 
 env:
   AWS_REGION: ap-northeast-2
+  JMX_VERSION: "1.0.1"
+  # 버전 변경 시: PowerShell로 새 해시 확인 후 JMX_SHA256 함께 업데이트
+  # Invoke-WebRequest <새버전 URL> -OutFile jmx.jar; (Get-FileHash jmx.jar -Algorithm SHA256).Hash.ToLower()
+  JMX_SHA256: "7d61f737fd661610ccc14aea79764faa1ea94a340cbc8f0029b3d2edea3d80c1"
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Cache JMX Exporter JAR
+        id: cache-jmx
+        if: ${{ inputs.target == 'kafka' || inputs.target == 'both' }}
+        uses: actions/cache@v4
+        with:
+          path: jmx/jmx_prometheus_javaagent-${{ env.JMX_VERSION }}.jar
+          key: jmx-exporter-${{ env.JMX_VERSION }}
+
+      - name: Download JMX Exporter JAR
+        if: ${{ (inputs.target == 'kafka' || inputs.target == 'both') && steps.cache-jmx.outputs.cache-hit != 'true' }}
+        run: |
+          set -euo pipefail
+          mkdir -p jmx
+          wget -q -O jmx/jmx_prometheus_javaagent-${JMX_VERSION}.jar \
+            "https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/${JMX_VERSION}/jmx_prometheus_javaagent-${JMX_VERSION}.jar"
+          echo "${JMX_SHA256}  jmx/jmx_prometheus_javaagent-${JMX_VERSION}.jar" | sha256sum -c
+
+      - name: Upload deploy configs to S3
+        env:
+          TARGET: ${{ inputs.target || 'monitoring' }}
+        run: |
+          set -euo pipefail
+          if [ "${TARGET}" = "kafka" ] || [ "${TARGET}" = "both" ]; then
+            aws s3 sync . s3://sanji-terraform-state/deploy/kafka/ \
+              --exclude "*" \
+              --include "docker-compose.kafka.yml" \
+              --include "jmx/kafka.yml" \
+              --include "jmx/jmx_prometheus_javaagent-${JMX_VERSION}.jar" \
+              --include "scripts/deploy-kafka.sh" \
+              --include "scripts/env.sh" \
+              --delete
+          fi
+          if [ "${TARGET}" = "monitoring" ] || [ "${TARGET}" = "both" ]; then
+            aws s3 sync . s3://sanji-terraform-state/deploy/monitoring/ \
+              --exclude "*" \
+              --include "docker-compose.monitoring.yml" \
+              --include "monitoring/*" \
+              --include "scripts/deploy-monitoring.sh" \
+              --include "scripts/env.sh" \
+              --delete
+          fi
 
       - name: Send deploy command via SSM
         env:
@@ -44,26 +93,18 @@ jobs:
 
           read -r -d '' KAFKA_SCRIPT <<'EOS' || true
           set -e
-          REPO_DIR=/home/ec2-user/san-ji-jik-kyeng
-          if [ -d "${REPO_DIR}/.git" ]; then
-            git -C "${REPO_DIR}" fetch origin main
-            git -C "${REPO_DIR}" reset --hard origin/main
-          else
-            git clone --branch main --single-branch https://github.com/BankRupang/san-ji-jik-kyeng.git "${REPO_DIR}"
-          fi
-          bash "${REPO_DIR}/scripts/deploy-kafka.sh"
+          mkdir -p /home/ec2-user/deploy/jmx /home/ec2-user/deploy/scripts
+          aws s3 sync s3://sanji-terraform-state/deploy/kafka/ /home/ec2-user/deploy/ --region ap-northeast-2
+          chmod +x /home/ec2-user/deploy/scripts/deploy-kafka.sh
+          bash /home/ec2-user/deploy/scripts/deploy-kafka.sh
           EOS
 
           read -r -d '' MONITORING_SCRIPT <<'EOS' || true
           set -e
-          REPO_DIR=/home/ec2-user/san-ji-jik-kyeng
-          if [ -d "${REPO_DIR}/.git" ]; then
-            git -C "${REPO_DIR}" fetch origin main
-            git -C "${REPO_DIR}" reset --hard origin/main
-          else
-            git clone --branch main --single-branch https://github.com/BankRupang/san-ji-jik-kyeng.git "${REPO_DIR}"
-          fi
-          bash "${REPO_DIR}/scripts/deploy-monitoring.sh"
+          mkdir -p /home/ec2-user/deploy/scripts
+          aws s3 sync s3://sanji-terraform-state/deploy/monitoring/ /home/ec2-user/deploy/ --region ap-northeast-2
+          chmod +x /home/ec2-user/deploy/scripts/deploy-monitoring.sh
+          bash /home/ec2-user/deploy/scripts/deploy-monitoring.sh
           EOS
 
           # 대상 EC2(Role 태그)와 실행할 스크립트를 짝지어 SSM으로 보내고 완료까지 기다립니다.
