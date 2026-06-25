@@ -36,9 +36,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws-bid")
+        registry.addEndpoint("/ws/bid")
                 .setAllowedOriginPatterns("*")
                 .withSockJS();
+        // native WebSocket (SockJS 없이 직접 연결용)
+        registry.addEndpoint("/ws/bid-native")
+                .setAllowedOriginPatterns("*");
     }
 
     @Override

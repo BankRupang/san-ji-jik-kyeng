@@ -63,7 +63,7 @@ class UserControllerTest {
                     "slack-id", true, UserRole.BUYER
             );
             var response = new UserResponse(USER_ID, "testuser", "테스트유저",
-                    "test@test.com", "010-1234-5678", true, UserRole.BUYER, UserStatus.ACTIVE);
+                    "test@test.com", "010-1234-5678", null, null, true, UserRole.BUYER, UserStatus.ACTIVE);
             given(userService.signup(any())).willReturn(response);
 
             mockMvc.perform(post("/api/v1/auth/signup")
@@ -123,7 +123,7 @@ class UserControllerTest {
                     true, UserRole.MANAGER, "manager-secret"
             );
             var response = new UserResponse(USER_ID, "adminuser", "관리자",
-                    "admin@test.com", "010-9999-8888", true, UserRole.MANAGER, UserStatus.ACTIVE);
+                    "admin@test.com", "010-9999-8888", null, null, true, UserRole.MANAGER, UserStatus.ACTIVE);
             given(userService.adminSignup(any())).willReturn(response);
 
             mockMvc.perform(post("/api/v1/auth/admin/signup")
@@ -180,9 +180,9 @@ class UserControllerTest {
         @Test
         @DisplayName("MASTER 권한으로 조회 성공 - 200 OK")
         void getUser_asMaster_success() throws Exception {
-            var response = new UserResponse(USER_ID, "testuser", "테스트유저",
-                    "test@test.com", "010-1234-5678", true, UserRole.BUYER, UserStatus.ACTIVE);
-            given(userService.getUser(any())).willReturn(response);
+            var response = new AdminUserDetailResponse(USER_ID, "testuser", "테스트유저",
+                    "test@test.com", "010-1234-5678", UserRole.BUYER, UserStatus.ACTIVE);
+            given(userService.getAdminUserDetail(any())).willReturn(response);
 
             mockMvc.perform(get("/api/v1/user/one")
                             .param("userId", USER_ID.toString())
@@ -213,7 +213,7 @@ class UserControllerTest {
         @Test
         @DisplayName("존재하지 않는 유저 → 404 Not Found")
         void getUser_notFound_404() throws Exception {
-            given(userService.getUser(any())).willThrow(new UserNotFoundException());
+            given(userService.getAdminUserDetail(any())).willThrow(new UserNotFoundException());
 
             mockMvc.perform(get("/api/v1/user/one")
                             .param("userId", USER_ID.toString())
@@ -234,7 +234,7 @@ class UserControllerTest {
         @DisplayName("성공 - 200 OK")
         void updateProfile_success() throws Exception {
             var response = new UserResponse(USER_ID, "testuser", "새이름",
-                    "test@test.com", "010-9999-9999", true, UserRole.BUYER, UserStatus.ACTIVE);
+                    "test@test.com", "010-9999-9999", null, null, true, UserRole.BUYER, UserStatus.ACTIVE);
             given(userService.updateUserInfo(any(), any())).willReturn(response);
 
             mockMvc.perform(patch("/api/v1/users/me/profile")
