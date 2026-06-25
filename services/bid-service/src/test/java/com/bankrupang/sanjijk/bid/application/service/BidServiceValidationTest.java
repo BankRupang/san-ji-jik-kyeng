@@ -78,7 +78,7 @@ class BidServiceValidationTest {
         info.put("endAt", LocalDateTime.now().plusHours(1).toString());
         info.put("currentPrice", "10000");
         info.put("bidUnit", "1000");
-        info.put("highestBidderId", "none");
+        info.put("highestBidderId", "");
         info.put("productName", "테스트상품");
         return info;
     }

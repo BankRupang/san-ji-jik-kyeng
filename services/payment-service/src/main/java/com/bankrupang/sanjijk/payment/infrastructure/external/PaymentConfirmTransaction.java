@@ -101,8 +101,12 @@ public class PaymentConfirmTransaction {
             } else {
                 String redisKey = "auction:" + payment.getAuctionId() + ":deposit:" + payment.getUserId();
                 long ttlSeconds = Duration.between(LocalDateTime.now(), payment.getEndAt().plusHours(2)).getSeconds();
-                redisTemplate.opsForValue().set(redisKey, "true", Duration.ofSeconds(Math.max(ttlSeconds, 1)));
-                log.info("[CONFIRM] Redis 보증금 키 등록 - key: {}, ttl: {}s", redisKey, ttlSeconds);
+                if (ttlSeconds <= 0) {
+                    log.warn("[CONFIRM] 보증금 만료 시각 이미 경과 - Redis 키 등록 생략 - paymentId: {}, endAt: {}", paymentId, payment.getEndAt());
+                } else {
+                    redisTemplate.opsForValue().set(redisKey, "true", Duration.ofSeconds(ttlSeconds));
+                    log.info("[CONFIRM] Redis 보증금 키 등록 - key: {}, ttl: {}s", redisKey, ttlSeconds);
+                }
             }
         } else {
             log.debug("[CONFIRM] NORMAL 결제 - Redis write 스킵 - paymentId: {}", paymentId);

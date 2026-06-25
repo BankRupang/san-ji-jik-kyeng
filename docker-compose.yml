@@ -123,6 +123,7 @@ services:
       dockerfile: ./gateway-server/Dockerfile
     ports: ["8000:8000"]
     environment:
+      TZ: Asia/Seoul
       SPRING_PROFILES_ACTIVE: dev
       SPRING_CLOUD_CONFIG_URI: http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
@@ -147,6 +148,7 @@ services:
       dockerfile: ./services/user-service/Dockerfile
     ports: ["19091:19091"]
     environment:
+      TZ: Asia/Seoul
       SPRING_PROFILES_ACTIVE: dev
       SPRING_CLOUD_CONFIG_URI: http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
@@ -176,6 +178,7 @@ services:
       dockerfile: ./services/auction-service/Dockerfile
     ports: ["19092:19092"]
     environment:
+      TZ: Asia/Seoul
       SPRING_PROFILES_ACTIVE: dev
       SPRING_CLOUD_CONFIG_URI: http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
@@ -198,6 +201,7 @@ services:
       dockerfile: ./services/bid-service/Dockerfile
     ports: ["19093:19093"]
     environment:
+      TZ: Asia/Seoul
       SPRING_PROFILES_ACTIVE: dev
       SPRING_CLOUD_CONFIG_URI: http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
@@ -221,6 +225,7 @@ services:
       dockerfile: ./services/order-service/Dockerfile
     ports: ["19094:19094"]
     environment:
+      TZ: Asia/Seoul
       SPRING_PROFILES_ACTIVE: dev
       SPRING_CLOUD_CONFIG_URI: http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
@@ -242,6 +247,7 @@ services:
       dockerfile: ./services/payment-service/Dockerfile
     ports: ["19095:19095"]
     environment:
+      TZ: Asia/Seoul
       SPRING_PROFILES_ACTIVE: dev
       SPRING_CLOUD_CONFIG_URI: http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
@@ -267,6 +273,7 @@ services:
       dockerfile: ./services/notification-service/Dockerfile
     ports: ["19096:19096"]
     environment:
+      TZ: Asia/Seoul
       SPRING_PROFILES_ACTIVE: dev
       SPRING_CLOUD_CONFIG_URI: http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
@@ -291,6 +298,7 @@ services:
       dockerfile: ./services/ai-service/Dockerfile
     ports: ["19097:19097"]
     environment:
+      TZ: Asia/Seoul
       SPRING_PROFILES_ACTIVE: dev
       SPRING_CLOUD_CONFIG_URI: http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/

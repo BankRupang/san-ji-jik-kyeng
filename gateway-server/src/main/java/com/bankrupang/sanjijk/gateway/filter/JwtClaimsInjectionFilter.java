@@ -1,8 +1,11 @@
 package com.bankrupang.sanjijk.gateway.filter;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -11,13 +14,13 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 /**
  * JWT 검증 후 claims를 X-User-Id, X-User-Role 헤더로 변환해 내부 서비스에 전달.
  * 클라이언트가 직접 심은 X-User-* 헤더는 제거해 스푸핑을 방지한다.
  */
+@Slf4j
 @Component
 public class JwtClaimsInjectionFilter implements GlobalFilter, Ordered {
 
@@ -28,6 +31,10 @@ public class JwtClaimsInjectionFilter implements GlobalFilter, Ordered {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        ServerHttpRequest req = exchange.getRequest();
+        String method = req.getMethod().name();
+        String path   = req.getURI().getRawPath();
+
         return ReactiveSecurityContextHolder.getContext()
                 .map(SecurityContext::getAuthentication)
                 .filter(auth -> auth instanceof JwtAuthenticationToken)
@@ -35,7 +42,14 @@ public class JwtClaimsInjectionFilter implements GlobalFilter, Ordered {
                 .flatMap(auth -> {
                     var jwt = auth.getToken();
                     String userId = jwt.getSubject();
-                    String role = extractRole(jwt.getClaimAsMap("realm_access"));
+                    List<String> roles = jwt.getClaimAsStringList("role");
+                    String role = (roles != null && !roles.isEmpty()) ? roles.get(0) : null;
+
+                    log.debug("[GW] {} {} | userId={} role={}", method, path, userId, role);
+
+                    if (role == null) {
+                        log.warn("[GW] JWT에 role 클레임 없음 — userId={} path={}", userId, path);
+                    }
 
                     ServerWebExchange mutated = exchange.mutate()
                             .request(r -> r.headers(headers -> {
@@ -44,13 +58,34 @@ public class JwtClaimsInjectionFilter implements GlobalFilter, Ordered {
                                 if (role != null)   headers.set("X-User-Role", role);
                             }))
                             .build();
-                    return chain.filter(mutated);
+
+                    return chain.filter(mutated)
+                            .doOnSuccess(v -> {
+                                ServerHttpResponse res = mutated.getResponse();
+                                int status = res.getStatusCode() != null ? res.getStatusCode().value() : 0;
+                                if (status >= 400) {
+                                    log.warn("[GW] {} {} → {} | userId={} role={}", method, path, status, userId, role);
+                                } else {
+                                    log.debug("[GW] {} {} → {} | userId={} role={}", method, path, status, userId, role);
+                                }
+                            });
                 })
                 .switchIfEmpty(
                         // 비인증 요청(공개 엔드포인트)은 X-User-* 헤더만 제거 후 통과
-                        chain.filter(exchange.mutate()
-                                .request(r -> r.headers(this::removeUserHeaders))
-                                .build())
+                        Mono.defer(() -> {
+                            log.debug("[GW] {} {} | 비인증 요청", method, path);
+                            ServerWebExchange mutated = exchange.mutate()
+                                    .request(r -> r.headers(this::removeUserHeaders))
+                                    .build();
+                            return chain.filter(mutated)
+                                    .doOnSuccess(v -> {
+                                        ServerHttpResponse res = mutated.getResponse();
+                                        int status = res.getStatusCode() != null ? res.getStatusCode().value() : 0;
+                                        if (status >= 400) {
+                                            log.warn("[GW] {} {} → {} | 비인증", method, path, status);
+                                        }
+                                    });
+                        })
                 );
     }
 
@@ -63,16 +98,5 @@ public class JwtClaimsInjectionFilter implements GlobalFilter, Ordered {
         List.copyOf(headers.keySet()).stream()
                 .filter(name -> name.regionMatches(true, 0, "X-User-", 0, 7))
                 .forEach(headers::remove);
-    }
-
-    @SuppressWarnings("unchecked")
-    private String extractRole(Map<String, Object> realmAccess) {
-        if (realmAccess == null) return null;
-        List<String> roles = (List<String>) realmAccess.get("roles");
-        if (roles == null) return null;
-        return roles.stream()
-                .filter(r -> !r.startsWith("default-roles-") && !KEYCLOAK_SYSTEM_ROLES.contains(r))
-                .findFirst()
-                .orElse(null);
     }
 }
