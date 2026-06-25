@@ -441,6 +441,7 @@ public class AuctionService {
         Product product = getExistingProduct(auction.getProductId());
 
         return new AuctionDepositInfoResponse(
+                auction.getId(),
                 auction.getStartPrice(),
                 product.getName(),
                 auction.getEndAt()
