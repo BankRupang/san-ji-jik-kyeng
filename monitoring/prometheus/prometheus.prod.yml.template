@@ -22,3 +22,10 @@ scrape_configs:
       - targets:
           - "${KAFKA_PRIVATE_IP}:7071"
           - "${KAFKA_PRIVATE_IP}:9100"
+
+  # 모니터링 EC2: Node Exporter(9100)
+  # Prometheus/Loki/Grafana가 돌아가는 서버의 디스크·CPU 지표 수집
+  - job_name: "monitoring"
+    static_configs:
+      - targets:
+          - "${MONITORING_PRIVATE_IP}:9100"
