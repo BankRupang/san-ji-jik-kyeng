@@ -1,20 +1,22 @@
-﻿server:
+server:
   port: 19091
 
 spring:
   application:
     name: user-service
 
+  config:
+    import: "optional:configserver:"
+
   data:
     redis:
       host: ${REDIS_HOST}
       port: 6379
-
-  config:
-    import: "optional:configserver:http://localhost:8888"
+  
   cloud:
     config:
       enabled: true
+      fail-fast: true
 
 
   jpa:
