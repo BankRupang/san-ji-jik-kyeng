@@ -1,0 +1,381 @@
+{
+  "title": "AWS 인프라 모니터링",
+  "uid": "sanji-cloudwatch",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "1m",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "ECS CPU 사용률 (%)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "ap-northeast-2",
+          "namespace": "ECS/ContainerInsights",
+          "metricName": "CpuUtilized",
+          "dimensions": {
+            "ClusterName": [
+              "sanji-prod-cluster"
+            ]
+          },
+          "statistic": "Average",
+          "period": "60",
+          "matchExact": false,
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "ECS 메모리 사용률 (%)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "ap-northeast-2",
+          "namespace": "ECS/ContainerInsights",
+          "metricName": "MemoryUtilized",
+          "dimensions": {
+            "ClusterName": [
+              "sanji-prod-cluster"
+            ]
+          },
+          "statistic": "Average",
+          "period": "60",
+          "matchExact": false,
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "RDS CPU 사용률 (%)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "ap-northeast-2",
+          "namespace": "AWS/RDS",
+          "metricName": "CPUUtilization",
+          "dimensions": {},
+          "statistic": "Average",
+          "period": "60",
+          "matchExact": false,
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "RDS DB 연결 수",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 8,
+        "y": 8,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "ap-northeast-2",
+          "namespace": "AWS/RDS",
+          "metricName": "DatabaseConnections",
+          "dimensions": {},
+          "statistic": "Average",
+          "period": "60",
+          "matchExact": false,
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "RDS 여유 스토리지 (GB)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 16,
+        "y": 8,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "ap-northeast-2",
+          "namespace": "AWS/RDS",
+          "metricName": "FreeStorageSpace",
+          "dimensions": {},
+          "statistic": "Average",
+          "period": "60",
+          "matchExact": false,
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decbytes"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Redis CPU 사용률 (%)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "ap-northeast-2",
+          "namespace": "AWS/ElastiCache",
+          "metricName": "CPUUtilization",
+          "dimensions": {},
+          "statistic": "Average",
+          "period": "60",
+          "matchExact": false,
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Redis 캐시 히트율 (%)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 8,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "ap-northeast-2",
+          "namespace": "AWS/ElastiCache",
+          "metricName": "CacheHitRate",
+          "dimensions": {},
+          "statistic": "Average",
+          "period": "60",
+          "matchExact": false,
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Redis 메모리 사용량 (bytes)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 16,
+        "y": 16,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "ap-northeast-2",
+          "namespace": "AWS/ElastiCache",
+          "metricName": "BytesUsedForCache",
+          "dimensions": {},
+          "statistic": "Average",
+          "period": "60",
+          "matchExact": false,
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decbytes"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "ALB 요청 수 (5분 합계)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "ap-northeast-2",
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "RequestCount",
+          "dimensions": {},
+          "statistic": "Sum",
+          "period": "300",
+          "matchExact": false,
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "ALB 응답시간 p95 (ms)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "cloudwatch"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "region": "ap-northeast-2",
+          "namespace": "AWS/ApplicationELB",
+          "metricName": "TargetResponseTime",
+          "dimensions": {},
+          "statistic": "p95",
+          "period": "60",
+          "matchExact": false,
+          "queryMode": "Metrics",
+          "metricQueryType": 0,
+          "metricEditorMode": 0
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    }
+  ]
+}

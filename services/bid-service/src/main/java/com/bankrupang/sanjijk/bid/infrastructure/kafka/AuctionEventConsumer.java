@@ -1,6 +1,7 @@
 package com.bankrupang.sanjijk.bid.infrastructure.kafka;
 
 import com.bankrupang.sanjijk.bid.domain.event.AuctionStartedEvent;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -18,9 +19,17 @@ import java.util.Map;
 public class AuctionEventConsumer {
 
     private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
 
     @KafkaListener(topics = "auction-start", groupId = "bid-service")
-    public void handleAuctionStarted(AuctionStartedEvent event) {
+    public void handleAuctionStarted(String message) {
+        AuctionStartedEvent event;
+        try {
+            event = objectMapper.readValue(message, AuctionStartedEvent.class);
+        } catch (Exception e) {
+            log.error("auction-start 이벤트 역직렬화 실패: {}", e.getMessage());
+            return;
+        }
         log.info("경매 시작 이벤트 수신 - auctionId: {}", event.getAuctionId());
 
         String auctionId = event.getAuctionId().toString();

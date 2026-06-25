@@ -17,6 +17,11 @@ Please focus on the following aspects:
 - Unnecessary code comments
 - Styling or formatting issues (e.g., spaces, indentation)
 
+**Full file context**:
+- If `<full file content>` is provided, use it to cross-reference the diff
+- Do **not** suggest adding code that already exists in the full file
+- If you cannot confirm whether something exists without the full file, state so explicitly
+
 **Requirements**:
 - Write your review in **Korean**
 - Use **Markdown** format
