@@ -133,7 +133,7 @@ S3에 올라가는 파일 목록은 다음과 같습니다.
 
 | 대상 | S3 경로 | 파일 |
 |---|---|---|
-| Kafka EC2 | `deploy/kafka/` | `docker-compose.kafka.yml`, `jmx/kafka.yml`, `scripts/deploy-kafka.sh`, `scripts/env.sh` |
+| Kafka EC2 | `deploy/kafka/` | `docker-compose.kafka.yml`, `jmx/kafka.yml`, `jmx/jmx_prometheus_javaagent-1.0.1.jar`, `scripts/deploy-kafka.sh`, `scripts/env.sh` |
 | 모니터링 EC2 | `deploy/monitoring/` | `docker-compose.monitoring.yml`, `monitoring/` 전체, `scripts/deploy-monitoring.sh`, `scripts/env.sh` |
 
 ### Kafka EC2 환경변수
