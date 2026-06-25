@@ -36,6 +36,11 @@ public class AuctionEventConsumer {
         LocalDateTime endAt = event.getStartAt().plusHours(1);
         long ttlSeconds = Duration.between(LocalDateTime.now(), endAt).getSeconds();
 
+        if (ttlSeconds <= 0) {
+            log.warn("경매가 이미 종료됨, Redis 저장 스킵 - auctionId: {}, endAt: {}", auctionId, endAt);
+            return;
+        }
+
         String hashKey = "auction:" + auctionId + ":info";
 
         Map<String, String> auctionInfo = new HashMap<>();
@@ -47,12 +52,16 @@ public class AuctionEventConsumer {
         auctionInfo.put("status", event.getStatus());
         auctionInfo.put("highestBidderId", "");
 
-        redisTemplate.opsForHash().putAll(hashKey, auctionInfo);
-        redisTemplate.expire(hashKey, Duration.ofSeconds(ttlSeconds));
+        try {
+            redisTemplate.opsForHash().putAll(hashKey, auctionInfo);
+            redisTemplate.expire(hashKey, Duration.ofSeconds(ttlSeconds));
 
-        // 경매 종료 스케줄링을 위해 Sorted Set에 등록 (score = endAt Unix timestamp)
-        redisTemplate.opsForZSet().add("auction:endings", auctionId, endAt.toEpochSecond(java.time.ZoneOffset.UTC));
+            // 경매 종료 스케줄링을 위해 Sorted Set에 등록 (score = endAt Unix timestamp)
+            redisTemplate.opsForZSet().add("auction:endings", auctionId, endAt.toEpochSecond(java.time.ZoneOffset.UTC));
 
-        log.info("Redis 경매 정보 저장 완료 - auctionId: {}, endAt: {}", auctionId, endAt);
+            log.info("Redis 경매 정보 저장 완료 - auctionId: {}, endAt: {}", auctionId, endAt);
+        } catch (Exception e) {
+            log.error("auction-start Redis 저장 실패 - auctionId: {}, 메시지를 스킵합니다. error: {}", auctionId, e.getMessage());
+        }
     }
 }
