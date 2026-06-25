@@ -71,6 +71,10 @@ public class BidService {
                 throw new BidException(BidErrorCode.BID_PRICE_OUTDATED);
             }
 
+            if (request.getBidPrice() <= currentPrice) {
+                throw new BidException(BidErrorCode.BID_PRICE_TOO_LOW);
+            }
+
             String highestBidderId = (String) info.get("highestBidderId");
 
             if (userId.toString().equals(highestBidderId)) {
