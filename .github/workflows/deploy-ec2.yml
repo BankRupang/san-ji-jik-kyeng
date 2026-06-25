@@ -35,6 +35,13 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Download JMX Exporter JAR
+        if: ${{ inputs.target == 'kafka' || inputs.target == 'both' }}
+        run: |
+          mkdir -p jmx
+          wget -q -O jmx/jmx_prometheus_javaagent-1.0.1.jar \
+            https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/1.0.1/jmx_prometheus_javaagent-1.0.1.jar
+
       - name: Upload deploy configs to S3
         env:
           TARGET: ${{ inputs.target || 'monitoring' }}
@@ -45,6 +52,7 @@ jobs:
               --exclude "*" \
               --include "docker-compose.kafka.yml" \
               --include "jmx/kafka.yml" \
+              --include "jmx/jmx_prometheus_javaagent-1.0.1.jar" \
               --include "scripts/deploy-kafka.sh" \
               --include "scripts/env.sh" \
               --delete
@@ -74,10 +82,6 @@ jobs:
           mkdir -p /home/ec2-user/deploy/jmx /home/ec2-user/deploy/scripts
           aws s3 sync s3://sanji-terraform-state/deploy/kafka/ /home/ec2-user/deploy/ --region ap-northeast-2
           chmod +x /home/ec2-user/deploy/scripts/deploy-kafka.sh
-          JAR=/home/ec2-user/deploy/jmx/jmx_prometheus_javaagent-1.0.1.jar
-          if [ ! -f "$JAR" ]; then
-            wget -O "$JAR" https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/1.0.1/jmx_prometheus_javaagent-1.0.1.jar
-          fi
           bash /home/ec2-user/deploy/scripts/deploy-kafka.sh
           EOS
 
