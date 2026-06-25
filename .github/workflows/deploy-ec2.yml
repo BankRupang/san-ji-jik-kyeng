@@ -21,6 +21,9 @@ permissions:
 env:
   AWS_REGION: ap-northeast-2
   JMX_VERSION: "1.0.1"
+  # 버전 변경 시: PowerShell로 새 해시 확인 후 JMX_SHA256 함께 업데이트
+  # Invoke-WebRequest <새버전 URL> -OutFile jmx.jar; (Get-FileHash jmx.jar -Algorithm SHA256).Hash.ToLower()
+  JMX_SHA256: "7d61f737fd661610ccc14aea79764faa1ea94a340cbc8f0029b3d2edea3d80c1"
 
 jobs:
   deploy:
@@ -47,11 +50,11 @@ jobs:
       - name: Download JMX Exporter JAR
         if: ${{ (inputs.target == 'kafka' || inputs.target == 'both') && steps.cache-jmx.outputs.cache-hit != 'true' }}
         run: |
+          set -euo pipefail
           mkdir -p jmx
           wget -q -O jmx/jmx_prometheus_javaagent-${JMX_VERSION}.jar \
             "https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/${JMX_VERSION}/jmx_prometheus_javaagent-${JMX_VERSION}.jar"
-          EXPECTED=$(wget -qO- "https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/${JMX_VERSION}/jmx_prometheus_javaagent-${JMX_VERSION}.jar.sha256")
-          echo "${EXPECTED}  jmx/jmx_prometheus_javaagent-${JMX_VERSION}.jar" | sha256sum -c
+          echo "${JMX_SHA256}  jmx/jmx_prometheus_javaagent-${JMX_VERSION}.jar" | sha256sum -c
 
       - name: Upload deploy configs to S3
         env:

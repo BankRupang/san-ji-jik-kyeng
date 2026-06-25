@@ -136,7 +136,9 @@ S3에 올라가는 파일 목록은 다음과 같습니다.
 | Kafka EC2 | `deploy/kafka/` | `docker-compose.kafka.yml`, `jmx/kafka.yml`, `jmx/jmx_prometheus_javaagent-1.0.1.jar`, `scripts/deploy-kafka.sh`, `scripts/env.sh` |
 | 모니터링 EC2 | `deploy/monitoring/` | `docker-compose.monitoring.yml`, `monitoring/` 전체, `scripts/deploy-monitoring.sh`, `scripts/env.sh` |
 
-JMX Exporter JAR는 레포에 포함되어 있지 않습니다. GHA 러너가 S3 업로드 전에 Maven Central에서 다운로드하고 `.sha256` 파일로 무결성을 검증한 뒤 S3에 올립니다. 버전은 워크플로우 상단 `env.JMX_VERSION`으로 한 곳에서 관리합니다. 버전을 올릴 때는 `JMX_VERSION` 값만 바꾸면 됩니다.
+JMX Exporter JAR는 레포에 포함되어 있지 않습니다. GHA 러너가 S3 업로드 전에 Maven Central에서 다운로드하고, 워크플로우에 하드코딩된 SHA-256(`env.JMX_SHA256`)과 대조해 무결성을 검증한 뒤 S3에 올립니다. 동일한 버전은 `actions/cache`로 캐시되어 재다운로드하지 않습니다.
+
+버전을 올릴 때는 `JMX_VERSION`과 `JMX_SHA256` 두 값을 함께 변경해야 합니다. 새 버전의 JAR를 직접 다운로드한 뒤 해시를 구해서 채워야 합니다. 워크플로우 주석에 명령어가 있습니다.
 
 ### Kafka EC2 환경변수
 
