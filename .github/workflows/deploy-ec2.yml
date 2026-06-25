@@ -44,36 +44,26 @@ jobs:
 
           read -r -d '' KAFKA_SCRIPT <<'EOS' || true
           set -e
-          REPO_DIR=/home/ec2-user/sanji-jk
+          REPO_DIR=/home/ec2-user/san-ji-jik-kyeng
           if [ -d "${REPO_DIR}/.git" ]; then
             git -C "${REPO_DIR}" fetch origin main
             git -C "${REPO_DIR}" reset --hard origin/main
           else
-            git clone https://github.com/BankRupang/san-ji-jik-kyeng.git "${REPO_DIR}"
+            git clone --branch main --single-branch https://github.com/BankRupang/san-ji-jik-kyeng.git "${REPO_DIR}"
           fi
-          cd "${REPO_DIR}"
-          IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
-          KAFKA_PRIVATE_IP=$(curl -s -H "X-aws-ec2-metadata-token: ${IMDS_TOKEN}" http://169.254.169.254/latest/meta-data/local-ipv4)
-          KAFKA_CLUSTER_ID=$(aws ssm get-parameter --name /sanji/prod/kafka/cluster-id --with-decryption --query Parameter.Value --output text --region ap-northeast-2)
-          KAFKA_PRIVATE_IP="${KAFKA_PRIVATE_IP}" KAFKA_CLUSTER_ID="${KAFKA_CLUSTER_ID}" docker compose -f docker-compose.kafka.yml pull
-          KAFKA_PRIVATE_IP="${KAFKA_PRIVATE_IP}" KAFKA_CLUSTER_ID="${KAFKA_CLUSTER_ID}" docker compose -f docker-compose.kafka.yml up -d
+          bash "${REPO_DIR}/scripts/deploy-kafka.sh"
           EOS
 
           read -r -d '' MONITORING_SCRIPT <<'EOS' || true
           set -e
-          REPO_DIR=/home/ec2-user/sanji-jk
+          REPO_DIR=/home/ec2-user/san-ji-jik-kyeng
           if [ -d "${REPO_DIR}/.git" ]; then
             git -C "${REPO_DIR}" fetch origin main
             git -C "${REPO_DIR}" reset --hard origin/main
           else
-            git clone https://github.com/BankRupang/san-ji-jik-kyeng.git "${REPO_DIR}"
+            git clone --branch main --single-branch https://github.com/BankRupang/san-ji-jik-kyeng.git "${REPO_DIR}"
           fi
-          cd "${REPO_DIR}"
-          KAFKA_PRIVATE_IP=$(aws ssm get-parameter --name /sanji/prod/kafka/private-ip --query Parameter.Value --output text --region ap-northeast-2)
-          GRAFANA_ADMIN_PASSWORD=$(aws ssm get-parameter --name /sanji/prod/monitoring/grafana-admin-password --with-decryption --query Parameter.Value --output text --region ap-northeast-2)
-          envsubst '$KAFKA_PRIVATE_IP' < monitoring/prometheus/prometheus.prod.yml.template > monitoring/prometheus/prometheus.prod.yml
-          KAFKA_PRIVATE_IP="${KAFKA_PRIVATE_IP}" GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD}" docker compose -f docker-compose.monitoring.yml pull
-          KAFKA_PRIVATE_IP="${KAFKA_PRIVATE_IP}" GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD}" docker compose -f docker-compose.monitoring.yml up -d
+          bash "${REPO_DIR}/scripts/deploy-monitoring.sh"
           EOS
 
           # 대상 EC2(Role 태그)와 실행할 스크립트를 짝지어 SSM으로 보내고 완료까지 기다립니다.

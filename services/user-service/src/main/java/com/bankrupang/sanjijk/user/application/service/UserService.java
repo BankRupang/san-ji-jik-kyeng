@@ -67,6 +67,7 @@ public class UserService {
             ));
             return UserResponse.from(savedUser);
         } catch (Exception e) {
+            log.error("DB 저장 실패", e);
             rollbackKeycloak(keycloakId);
             throw new UserKeycloakCreationFailedException();
         }
@@ -100,6 +101,7 @@ public class UserService {
             ));
             return UserResponse.from(savedUser);
         } catch (Exception e) {
+            log.error("DB 저장 실패", e);
             rollbackKeycloak(keycloakId);
             throw new UserKeycloakCreationFailedException();
         }
@@ -126,6 +128,11 @@ public class UserService {
     public UserResponse getUser(UUID userId) {
         User user = findUserByIdOrElseThrow(userId);
         return UserResponse.from(user);
+    }
+
+    public AdminUserDetailResponse getAdminUserDetail(UUID userId) {
+        User user = findUserByIdOrElseThrow(userId);
+        return AdminUserDetailResponse.from(user);
     }
 
     @Transactional(readOnly = true)

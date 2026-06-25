@@ -9,7 +9,7 @@ main 브랜치에 merge
         │
         ├─── [deploy-ecs.yml] 자동 실행
         │          JAR 빌드 -> Docker 이미지 빌드 -> ECR push
-        │          -> ECS 롤링 배포 -> 안정화 대기
+        │          -> Wave 1(인프라) -> Wave 2(앱1) -> Wave 3(앱2)
         │
         └─── [deploy-ec2.yml] 자동 실행 (모니터링 EC2만)
                    SSM으로 EC2에 명령 전송
@@ -61,20 +61,34 @@ Gradle 캐시를 복원한 뒤 `./gradlew bootJar -x test --parallel`로 전체 
 | notification-service | `services/notification-service/Dockerfile` |
 | ai-service | `services/ai-service/Dockerfile` |
 
-**3. ECS 롤링 배포 & 안정화 대기**
+**3. Wave 배포**
 
 task definition은 건드리지 않고, `--force-new-deployment`로 ECS가 `:latest` 이미지를 다시 pull하게 만듭니다.
-배포 명령을 모두 보낸 뒤, 각 서비스의 안정화 대기를 백그라운드로 동시에 실행합니다. 하나라도 실패하면 즉시 워크플로우가 실패합니다.
+10개 서비스를 한꺼번에 롤링하지 않고 wave 단위로 나눠 순서대로 배포합니다.
+
+**wave로 나누는 이유**: 계정의 Fargate On-Demand vCPU 한도가 30이고, 정상 운영 시 19.5 vCPU를 사용합니다.
+롤링 배포 중에는 기존(old) 태스크와 신규(new) 태스크가 잠깐 함께 뜨기 때문에, 10개를 동시에 롤링하면 최대 ~39 vCPU가 필요해 한도를 초과해서 배포를 실패합니다.
+wave로 나누면 한 wave 안에서만 겹치므로 최대 27.5 vCPU로 유지됩니다.
+
+**wave 구성**
+
+| Wave | 서비스 |
+|---|---|
+| Wave 1 (인프라) | config-server, discovery-server, gateway-server |
+| Wave 2 (앱1) | user-service, auction-service, order-service, payment-service |
+| Wave 3 (앱2) | bid-service, notification-service, ai-service |
 
 ```
-force-new-deployment 10개 서비스 순차 전송
-           ↓
-안정화 대기 10개 서비스 병렬 실행 (O(1) 지연)
-           ↓
-모두 통과해야 워크플로우 성공
+build job: JAR 빌드 -> 이미지 빌드 -> ECR push
+      ↓
+Wave 1: config / discovery / gateway 동시 배포 + 완료 대기
+      ↓
+Wave 2: user / auction / order / payment 동시 배포 + 완료 대기
+      ↓
+Wave 3: bid / notification / ai 동시 배포 + 완료 대기
 ```
 
-> `aws ecs wait services-stable`은 한 번에 최대 10개까지만 받습니다. 서비스를 1개씩 넘기되 백그라운드(`&`)로 동시에 실행해 대기 시간이 서비스 수에 비례해 늘어나는 것을 방지합니다.
+각 wave 안에서는 서비스마다 `update-service`와 `aws ecs wait services-stable`을 하나의 백그라운드 작업으로 묶어 동시에 실행합니다. `aws ecs wait services-stable`은 ECS 서비스가 배포 완료(안정 상태)가 될 때까지 주기적으로 상태를 확인하는 AWS CLI 명령입니다. wave 안의 모든 서비스가 완료되어야 다음 wave로 넘어갑니다. 하나라도 실패하면 워크플로우가 실패합니다.
 
 ### 롤백
 
@@ -94,7 +108,7 @@ force-new-deployment 10개 서비스 순차 전송
 | `main` 브랜치 push | 모니터링 EC2 | 자동 실행 |
 | GitHub Actions 수동 실행 | kafka / monitoring / both 선택 | 선택한 대상 배포 |
 
-Kafka EC2는 수동 실행에서만 선택할 수 있습니다.
+Kafka 배포는 경매 금지 기간(자정)에만 실행한다는 정책에 따라 Kafka EC2는 수동 실행에서만 선택할 수 있습니다.
 
 ### 동작 방식
 
@@ -104,9 +118,10 @@ EC2에서 실행되는 내용은 다음과 같습니다.
 
 ```
 1. 레포가 없으면 git clone, 있으면 git fetch & reset --hard
-2. AWS SSM Parameter Store에서 환경변수 값 조회
-3. .env 파일 생성 (권한 600)
-4. docker compose pull & up -d
+2. 서버 유형별 스크립트 실행 (scripts/deploy-kafka.sh 또는 scripts/deploy-monitoring.sh)
+   - SSM / IMDS / RDS API에서 환경변수 값 조회
+   - .env 파일 생성 (권한 600)
+   - docker compose pull & up -d
 ```
 
 ### Kafka EC2 환경변수
@@ -114,18 +129,30 @@ EC2에서 실행되는 내용은 다음과 같습니다.
 | 변수 | SSM 파라미터 경로 |
 |---|---|
 | `KAFKA_PRIVATE_IP` | IMDS(EC2 메타데이터)에서 직접 조회 |
-| `KAFKA_CLUSTER_ID` | `/sanji/kafka/cluster-id` |
+| `KAFKA_CLUSTER_ID` | `/sanji/prod/kafka/cluster-id` |
 
 `KAFKA_PRIVATE_IP`는 Kafka가 자기 자신의 IP를 광고해야 하기 때문에 EC2 메타데이터 서버(IMDSv2)에서 직접 읽습니다.
 
 ### 모니터링 EC2 환경변수
 
-| 변수 | SSM 파라미터 경로 |
+| 변수 | 조회 방식 |
 |---|---|
-| `KAFKA_PRIVATE_IP` | `/sanji/kafka/private-ip` |
-| `GRAFANA_ADMIN_PASSWORD` | `/sanji/monitoring/grafana-admin-password` |
+| `KAFKA_PRIVATE_IP` | SSM `/sanji/prod/kafka/private-ip` |
+| `GRAFANA_ADMIN_PASSWORD` | SSM `/sanji/prod/monitoring/grafana-admin-password` |
+| `SLACK_WEBHOOK_URL` | SSM `/sanji/prod/monitoring/slack-webhook-url` |
+| `LANGFUSE_NEXTAUTH_SECRET` | SSM `/sanji/prod/langfuse/nextauth-secret` |
+| `LANGFUSE_SALT` | SSM `/sanji/prod/langfuse/salt` |
+| `DB_PASSWORD` | SSM `/sanji/prod/db/password` |
+| `RDS_HOST` | RDS API (`describe-db-instances`)에서 직접 조회 |
+| `MONITORING_PUBLIC_IP` | IMDS(EC2 메타데이터)에서 직접 조회 |
+
+`LANGFUSE_DATABASE_URL`과 `LANGFUSE_NEXTAUTH_URL`은 위 값들을 조합해서 .env에 씁니다.
 
 환경변수를 채운 뒤 `envsubst '$KAFKA_PRIVATE_IP'`로 Prometheus 설정 템플릿(`prometheus.prod.yml.template`)을 실제 설정 파일로 변환합니다. 치환 대상을 `$KAFKA_PRIVATE_IP`로 명시해 PromQL의 `$job`, `$__interval` 같은 표현이 빈 값으로 바뀌는 것을 방지합니다.
+
+ECS 디스커버리 스크립트(`ecs-discovery.sh`)를 크론에 등록해 5분마다 실행합니다. Prometheus가 Fargate 태스크 IP를 동적으로 파악하기 위한 용도입니다. `ecs-targets.json`이 없으면 빈 파일로 초기화합니다.
+
+`docker compose up -d` 이후 `prometheus` 컨테이너를 한 번 재시작해 새 설정을 반영합니다.
 
 ### 배포 완료 확인
 
