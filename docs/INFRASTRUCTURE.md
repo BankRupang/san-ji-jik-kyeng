@@ -586,10 +586,12 @@ flowchart TD
 
     subgraph GHA_EC2["deploy-ec2.yml"]
         ec2_target{트리거}
-        ec2_target -->|자동: main push| mon_ssm["SSM Run Command<br>모니터링 EC2"]
-        ec2_target -->|수동 only| kafka_ssm["SSM Run Command<br>Kafka EC2"]
-        mon_ssm & kafka_ssm --> git_pull["git pull로 compose 파일 최신화<br>+ SSM Parameter Store에서 환경변수 조회"]
-        git_pull --> compose["docker compose pull && up -d<br>Docker Hub / ghcr.io 퍼블릭 이미지"]
+        ec2_target -->|자동: main push| mon_s3["S3 업로드<br>(deploy/monitoring/)"]
+        ec2_target -->|수동 only| kafka_s3["S3 업로드<br>(deploy/kafka/)"]
+        mon_s3 --> mon_ssm["SSM Run Command<br>모니터링 EC2"]
+        kafka_s3 --> kafka_ssm["SSM Run Command<br>Kafka EC2"]
+        mon_ssm & kafka_ssm --> s3_sync["S3 sync로 파일 수신<br>+ SSM Parameter Store에서 환경변수 조회"]
+        s3_sync --> compose["docker compose pull && up -d<br>Docker Hub / ghcr.io 퍼블릭 이미지"]
     end
 ```
 
