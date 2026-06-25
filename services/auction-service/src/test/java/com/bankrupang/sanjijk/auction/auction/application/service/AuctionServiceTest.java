@@ -1266,6 +1266,7 @@ class AuctionServiceTest {
             AuctionDepositInfoResponse response = auctionService.getAuctionDepositInfo(auctionId);
 
             // then
+            assertThat(response.auctionId()).isEqualTo(auction.getId());
             assertThat(response.depositAmount()).isEqualTo(auction.getStartPrice());
             assertThat(response.auctionTitle()).isEqualTo(product.getName());
             assertThat(response.endAt()).isEqualTo(auction.getEndAt());
