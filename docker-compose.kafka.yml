@@ -1,0 +1,41 @@
+# Kafka EC2 배포용
+# SSM Run Command로 실행: docker compose -f docker-compose.kafka.yml pull && up -d
+# 배포 타이밍: 진행 중인 경매가 없을 때(자정)만 배포 (재기동 중 브로커 중단 감수)
+# 사전 준비: jmx/jmx_prometheus_javaagent-1.0.1.jar 다운로드 필요 (git 미포함)
+#   wget -O jmx/jmx_prometheus_javaagent-1.0.1.jar \
+#     https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/1.0.1/jmx_prometheus_javaagent-1.0.1.jar
+
+name: sanji-kafka
+
+services:
+  kafka:
+    image: apache/kafka:3.7.0
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+      - "7071:7071"  # JMX Exporter 메트릭 (Prometheus scrape 대상)
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller  # KRaft 모드: Zookeeper 없음
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${KAFKA_PRIVATE_IP}:9092 # SSM Run Command 스크립트에서 .env로 주입
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093  # 단일 브로커
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID} # SSM Parameter Store /sanji/kafka/cluster-id 에서 주입
+      # JMX Exporter 에이전트: 7071 포트로 Kafka 내부 메트릭 노출
+      KAFKA_OPTS: "-javaagent:/opt/jmx/jmx_prometheus_javaagent-1.0.1.jar=7071:/opt/jmx/kafka.yml"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+      - ./jmx:/opt/jmx:ro  # JMX Exporter JAR + 설정 파일 마운트
+
+  # EC2 CPU, 메모리, 디스크 메트릭을 Prometheus에 노출
+  node-exporter:
+    image: prom/node-exporter:latest
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+
+volumes:
+  kafka-data:

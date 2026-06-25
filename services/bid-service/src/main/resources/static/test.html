@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Bid Service WebSocket Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+        h2 { color: #4fc3f7; }
+        label { display: block; margin-top: 10px; color: #888; }
+        input { background: #2d2d2d; color: #fff; border: 1px solid #444; padding: 6px; width: 300px; }
+        button { margin: 6px 4px; padding: 8px 16px; background: #0078d4; color: #fff; border: none; cursor: pointer; }
+        button:hover { background: #005a9e; }
+        button.red { background: #c0392b; }
+        button.green { background: #27ae60; }
+        #log { margin-top: 20px; background: #2d2d2d; padding: 16px; height: 400px; overflow-y: auto; border: 1px solid #444; }
+        .msg-in  { color: #4fc3f7; }
+        .msg-out { color: #a8e6cf; }
+        .msg-err { color: #ff6b6b; }
+        .msg-sys { color: #ffd93d; }
+    </style>
+</head>
+<body>
+    <h2>🏷️ Bid Service WebSocket Tester</h2>
+
+    <label>서버 URL</label>
+    <input id="serverUrl" value="http://localhost:19093/ws-bid" />
+
+    <label>경매 ID (auctionId)</label>
+    <input id="auctionId" value="" placeholder="UUID 입력" />
+
+    <label>유저 ID (userId, X-User-Id 헤더)</label>
+    <input id="userId" value="" placeholder="UUID 입력" />
+
+    <br>
+    <button class="green" onclick="connect()">🔌 연결</button>
+    <button class="red" onclick="disconnect()">❌ 연결 해제</button>
+    <button onclick="subscribe()">📡 구독</button>
+
+    <hr style="border-color:#444; margin-top:20px;">
+    <h2>📤 입찰 전송</h2>
+
+    <label>입찰가 (bidPrice)</label>
+    <input id="bidPrice" value="11000" type="number" />
+
+    <label>클라이언트 현재가 (clientSeenPrice)</label>
+    <input id="clientSeenPrice" value="10000" type="number" />
+
+    <br>
+    <button class="green" onclick="sendBid()">💰 입찰하기</button>
+
+    <div id="log"></div>
+
+    <script>
+        let stompClient = null;
+
+        function log(msg, type = 'sys') {
+            const div = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            div.innerHTML += `<div class="msg-${type}">[${time}] ${msg}</div>`;
+            div.scrollTop = div.scrollHeight;
+        }
+
+        function connect() {
+            const url = document.getElementById('serverUrl').value;
+            const userId = document.getElementById('userId').value;
+            if (!userId) {
+                log('⚠️ userId를 입력하세요', 'err');
+                return;
+            }
+            const socket = new SockJS(url + '?userId=' + userId);
+            stompClient = Stomp.over(socket);
+            stompClient.debug = null;
+
+            stompClient.connect({'X-User-Id': userId}, () => {
+                log('✅ 연결 성공', 'sys');
+                stompClient.subscribe('/user/queue/errors', (message) => {
+                    const data = JSON.parse(message.body);
+                    log('🚨 입찰 실패: ' + data.message, 'err');
+                });
+                log('📡 개인 에러 채널 구독: /user/queue/errors', 'sys');
+            }, (error) => {
+                log('❌ 연결 실패: ' + error, 'err');
+            });
+        }
+
+        function disconnect() {
+            if (stompClient) {
+                stompClient.disconnect(() => log('🔌 연결 해제', 'sys'));
+                stompClient = null;
+            }
+        }
+
+        function subscribe() {
+            const auctionId = document.getElementById('auctionId').value;
+            if (!stompClient || !auctionId) {
+                log('⚠️ 연결 후 auctionId를 입력하세요', 'err');
+                return;
+            }
+            stompClient.subscribe(`/topic/auction/${auctionId}`, (message) => {
+                const data = JSON.parse(message.body);
+                if (data.type === 'BID_UPDATED') {
+                    log(`📨 입찰가 변경: 현재가: ${data.currentPrice}, 입찰자: ${data.highestBidderId}, 다음 입찰가: ${data.nextMinPrice}`, 'in');
+                } else {
+                    log('📨 수신: ' + message.body, 'in');
+                }
+            });
+            log(`📡 구독 시작: /topic/auction/${auctionId}`, 'sys');
+        }
+
+        function sendBid() {
+            const auctionId = document.getElementById('auctionId').value;
+            const userId = document.getElementById('userId').value;
+            const bidPrice = document.getElementById('bidPrice').value;
+            const clientSeenPrice = document.getElementById('clientSeenPrice').value;
+
+            if (!stompClient || !auctionId || !userId) {
+                log('⚠️ 연결 후 auctionId, userId를 입력하세요', 'err');
+                return;
+            }
+
+            const body = JSON.stringify({
+                bidPrice: Number(bidPrice),
+                clientSeenPrice: Number(clientSeenPrice),
+                actionType: 'BID'
+            });
+
+            stompClient.send(
+                `/app/auction/${auctionId}/bid`,
+                { 'X-User-Id': userId },
+                body
+            );
+
+            log(`📤 입찰 전송: ${body}`, 'out');
+        }
+    </script>
+</body>
+</html>

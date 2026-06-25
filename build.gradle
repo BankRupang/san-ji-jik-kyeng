@@ -47,7 +47,9 @@ subprojects {
     }
 
     tasks.named('test') {
-        useJUnitPlatform()
+        useJUnitPlatform {
+            excludeTags 'integration'
+        }
         systemProperty 'spring.autoconfigure.exclude',
             'org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,' +
             'org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration,' +
@@ -61,16 +63,16 @@ subprojects {
 
 configure(subprojects.findAll { it.name != 'common' }) {
     apply plugin: 'org.springframework.boot'
-
-    dependencies {
-        implementation project(':common')
-    }
 }
 
 configure(subprojects.findAll { businessServices.contains(it.name) }) {
     dependencies {
+        implementation project(':common')
         implementation 'org.springframework.boot:spring-boot-starter-web'
         implementation 'org.springframework.cloud:spring-cloud-starter-config'
         implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+        implementation 'org.springframework.boot:spring-boot-starter-actuator'
+        implementation 'io.micrometer:micrometer-registry-prometheus'
+        implementation 'com.github.loki4j:loki-logback-appender:1.5.2'
     }
 }

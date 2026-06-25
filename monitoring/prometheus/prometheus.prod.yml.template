@@ -1,0 +1,27 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Kafka EC2: JMX Exporter(7071) + Node Exporter(9100)
+  # 배포 전 envsubst로 실제 IP로 치환됨
+  - job_name: "kafka"
+    static_configs:
+      - targets:
+          - "${KAFKA_PRIVATE_IP}:7071"
+          - "${KAFKA_PRIVATE_IP}:9100"
+
+  # ECS Fargate 앱: ecs-discovery.sh(cron 5분)가 주기적으로 태스크 IP를 JSON 파일에 기록
+  # Spring Boot Actuator /actuator/prometheus 엔드포인트에서 지표 수집
+  - job_name: "ecs-apps"
+    metrics_path: "/actuator/prometheus"
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/ecs-targets.json
+        refresh_interval: 5m
+  # 모니터링 EC2: Node Exporter(9100)
+  # Prometheus/Loki/Grafana가 돌아가는 서버의 디스크·CPU 지표 수집
+  - job_name: "monitoring"
+    static_configs:
+      - targets:
+          - "${MONITORING_PRIVATE_IP}:9100"

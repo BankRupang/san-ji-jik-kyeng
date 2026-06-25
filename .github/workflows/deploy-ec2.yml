@@ -1,0 +1,131 @@
+name: Deploy EC2 (Kafka / Monitoring)
+
+# 모니터링 EC2: main push 시 ECS와 동시에 자동 배포
+# Kafka EC2: 재기동 시 입찰 이벤트가 끊기므로 수동 전용 (경매 없는 시간에 담당자가 직접 실행)
+# push로 트리거될 때는 monitoring만, 수동 실행 시에는 대상을 선택합니다.
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 배포 대상 EC2
+        type: choice
+        options: [ kafka, monitoring, both ]
+        default: kafka
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Send deploy command via SSM
+        env:
+          # push 트리거: inputs.target이 없으므로 monitoring 고정
+          # 수동 실행: 선택한 값(kafka / monitoring / both) 사용
+          TARGET: ${{ inputs.target || 'monitoring' }}
+        run: |
+          set -euo pipefail
+
+          # --- 대상별 배포 스크립트 (EC2 위에서 실행됨) ---
+
+          read -r -d '' KAFKA_SCRIPT <<'EOS' || true
+          set -e
+          REPO_DIR=/home/ec2-user/san-ji-jik-kyeng
+          if [ -d "${REPO_DIR}/.git" ]; then
+            git -C "${REPO_DIR}" fetch origin main
+            git -C "${REPO_DIR}" reset --hard origin/main
+          else
+            git clone --branch main --single-branch https://github.com/BankRupang/san-ji-jik-kyeng.git "${REPO_DIR}"
+          fi
+          bash "${REPO_DIR}/scripts/deploy-kafka.sh"
+          EOS
+
+          read -r -d '' MONITORING_SCRIPT <<'EOS' || true
+          set -e
+          REPO_DIR=/home/ec2-user/san-ji-jik-kyeng
+          if [ -d "${REPO_DIR}/.git" ]; then
+            git -C "${REPO_DIR}" fetch origin main
+            git -C "${REPO_DIR}" reset --hard origin/main
+          else
+            git clone --branch main --single-branch https://github.com/BankRupang/san-ji-jik-kyeng.git "${REPO_DIR}"
+          fi
+          bash "${REPO_DIR}/scripts/deploy-monitoring.sh"
+          EOS
+
+          # 대상 EC2(Role 태그)와 실행할 스크립트를 짝지어 SSM으로 보내고 완료까지 기다립니다.
+          send_and_wait() {
+            local role="$1" script="$2"
+            echo "::group::deploy ${role}"
+
+            # 멀티라인 스크립트를 SSM Parameters JSON으로 안전하게 변환
+            jq -Rs '{commands: [.]}' <<< "${script}" > /tmp/ssm-params.json
+
+            local command_id
+            command_id=$(aws ssm send-command \
+              --document-name "AWS-RunShellScript" \
+              --targets "Key=tag:Role,Values=${role}" \
+              --parameters "file:///tmp/ssm-params.json" \
+              --timeout-seconds 600 \
+              --region "${AWS_REGION}" \
+              --query "Command.CommandId" --output text)
+            echo "CommandId: ${command_id}"
+
+            # 대상 인스턴스 ID 조회 (Role 태그로 실행 중인 인스턴스)
+            local instance_id
+            instance_id=$(aws ec2 describe-instances \
+              --filters "Name=tag:Role,Values=${role}" "Name=instance-state-name,Values=running" \
+              --query "Reservations[].Instances[].InstanceId" --output text --region "${AWS_REGION}")
+            echo "InstanceId: ${instance_id}"
+
+            aws ssm wait command-executed \
+              --command-id "${command_id}" \
+              --instance-id "${instance_id}" \
+              --region "${AWS_REGION}" || true
+
+            local status
+            status=$(aws ssm get-command-invocation \
+              --command-id "${command_id}" \
+              --instance-id "${instance_id}" \
+              --region "${AWS_REGION}" \
+              --query "Status" --output text)
+            echo "Status: ${status}"
+
+            # 실행 로그 출력
+            aws ssm get-command-invocation \
+              --command-id "${command_id}" \
+              --instance-id "${instance_id}" \
+              --region "${AWS_REGION}" \
+              --query "StandardOutputContent" --output text || true
+            echo "::endgroup::"
+
+            if [ "${status}" != "Success" ]; then
+              echo "::error::${role} 배포 실패 (status=${status})"
+              aws ssm get-command-invocation \
+                --command-id "${command_id}" \
+                --instance-id "${instance_id}" \
+                --region "${AWS_REGION}" \
+                --query "StandardErrorContent" --output text || true
+              return 1
+            fi
+          }
+
+          if [ "${TARGET}" = "kafka" ] || [ "${TARGET}" = "both" ]; then
+            send_and_wait "kafka" "${KAFKA_SCRIPT}"
+          fi
+          if [ "${TARGET}" = "monitoring" ] || [ "${TARGET}" = "both" ]; then
+            send_and_wait "monitoring" "${MONITORING_SCRIPT}"
+          fi

@@ -1,5 +1,58 @@
-﻿spring:
+﻿server:
+  port: 19096
+
+spring:
   application:
     name: notification-service
   config:
-    import: "optional:configserver:http://localhost:8888"
+    import: "optional:configserver:"
+  datasource:
+    url: jdbc:postgresql://localhost:5432/postgres?currentSchema=notification_schema
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create
+    properties:
+      hibernate:
+        default_schema: notification_schema
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: true
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: notification-service
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+slack:
+  bot:
+    token: ${SLACK_BOT_TOKEN}
+
+notification:
+  scheduler:
+    fixed-delay-ms: 60000
+  cache:
+    notification-enabled-ttl-minutes: 5
+  feign:
+    fallback:
+      slack-id: ${FALLBACK_SLACK_ID:}
+      notification-allow: ${FALLBACK_NOTIFICATION_ALLOW:false}

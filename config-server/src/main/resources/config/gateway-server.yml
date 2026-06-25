@@ -6,6 +6,13 @@ spring:
     gateway:
       server:
         webflux:
+          globalcors:
+            corsConfigurations:
+              '[/**]':
+                allowedOriginPatterns: "*"
+                allowedMethods: "*"
+                allowedHeaders: "*"
+                allowCredentials: false
           discovery:
             locator:
               enabled: false
@@ -13,15 +20,15 @@ spring:
             - id: user-service
               uri: lb://user-service
               predicates:
-                - Path=/api/users/**, /api/auth/**
+                - Path=/api/v1/users/**, /api/v1/auth/**
             - id: auction-service
               uri: lb://auction-service
               predicates:
-                - Path=/api/auctions/**, /api/products/**
+                - Path=/api/v1/auctions/**, /api/v1/products/**
             - id: bid-service
               uri: lb://bid-service
               predicates:
-                - Path=/api/bids/**
+                - Path=/api/v1/bids/**
             - id: bid-service-ws
               uri: lb:ws://bid-service
               predicates:
@@ -29,16 +36,16 @@ spring:
             - id: order-service
               uri: lb://order-service
               predicates:
-                - Path=/api/orders/**
+                - Path=/api/v1/orders/**
             - id: payment-service
               uri: lb://payment-service
               predicates:
-                - Path=/api/payments/**
+                - Path=/api/v1/payments/**
             - id: notification-service
               uri: lb://notification-service
               predicates:
-                - Path=/api/notifications/**
+                - Path=/api/v1/notifications/**
             - id: ai-service
               uri: lb://ai-service
               predicates:
-                - Path=/api/ai/**
+                - Path=/api/v1/ai/**

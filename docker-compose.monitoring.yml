@@ -1,0 +1,70 @@
+# 모니터링 EC2 배포용 (Prometheus + Loki + Grafana)
+# SSM Run Command로 실행: docker compose -f docker-compose.monitoring.yml pull && up -d
+# 사전 준비: envsubst로 prometheus.prod.yml.template의 IP 치환 후 실행
+#   KAFKA_PRIVATE_IP=$(aws ssm get-parameter --name /sanji/kafka/private-ip --query Parameter.Value --output text)
+#   envsubst < monitoring/prometheus/prometheus.prod.yml.template > monitoring/prometheus/prometheus.prod.yml
+
+name: sanji-monitoring
+
+services:
+  # Kafka EC2(정적 타깃) 메트릭 수집 (ECS 앱 지표는 Grafana CloudWatch datasource로 수집)
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus/prometheus.prod.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus/ecs-targets.json:/etc/prometheus/ecs-targets.json
+      - prom-data:/prometheus
+    ports: ["9090:9090"]
+
+  # ECS Fargate 앱의 Loki appender가 로그를 push
+  loki:
+    image: grafana/loki:latest
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/local-config.yaml
+      - loki-data:/loki
+    ports: ["3100:3100"]
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    environment:
+      # EC2 Instance Role로 CloudWatch datasource 인증 (RDS, ElastiCache, ALB 지표)
+      GF_AWS_default_REGION: ap-northeast-2
+      # SSM Parameter Store /sanji/monitoring/grafana-admin-password 에서 주입
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      # SSM Parameter Store /sanji/monitoring/slack-webhook-url 에서 주입 (contact-points.yml 환경변수 치환)
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana-data:/var/lib/grafana
+    ports: ["3000:3000"]
+    depends_on: [prometheus, loki]
+
+  # LLM 트레이싱 (Langfuse v2 self-hosted)
+  langfuse:
+    image: ghcr.io/langfuse/langfuse:2
+    restart: unless-stopped
+    ports: ["3001:3000"]
+    environment:
+      DATABASE_URL: ${LANGFUSE_DATABASE_URL}
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET}
+      NEXTAUTH_URL: ${LANGFUSE_URL}
+      SALT: ${LANGFUSE_SALT}
+
+  # Kafka EC2 브로커 상태 확인용 UI
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    restart: unless-stopped
+    environment:
+      KAFKA_CLUSTERS_0_NAME: prod
+      # SSM Run Command 스크립트에서 .env로 주입
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${KAFKA_PRIVATE_IP}:9092
+    ports: ["8080:8080"]
+
+volumes:
+  prom-data:
+  loki-data:
+  grafana-data:
