@@ -52,7 +52,7 @@ eureka:
     prefer-ip-address: true
 
 resilience4j:
-  circuit breaker:
+  circuitbreaker:
     configs:
       default:
         failureRateThreshold: 50

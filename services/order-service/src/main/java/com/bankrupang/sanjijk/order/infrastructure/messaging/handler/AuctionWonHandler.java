@@ -28,7 +28,7 @@ public class AuctionWonHandler {
         }
 
         // user-service에서 name, slackId 조회
-        UserInfoResponse userInfo = userClient.getUserInfo(event.winnerId());
+        UserInfoResponse userInfo = userClient.getUserInfo(event.winnerId()).getData();
 
         // 낙찰 주문 생성
         orderService.createWinningOrder(event, userInfo);
