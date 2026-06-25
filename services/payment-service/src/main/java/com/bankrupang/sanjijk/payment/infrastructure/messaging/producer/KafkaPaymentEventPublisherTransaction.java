@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class KafkaPaymentEventPublisherTransaction {
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
     private final PaymentOutboxJpaRepository paymentOutboxJpaRepository;
     private final ObjectMapper objectMapper;
 
@@ -57,7 +57,8 @@ public class KafkaPaymentEventPublisherTransaction {
         try {
             String topic = resolveTopic(outbox.getEventType());
 
-            kafkaTemplate.send(topic, outbox.getAggregateId().toString(), outbox.getPayload())
+            Object payload = objectMapper.readValue(outbox.getPayload(), Object.class);
+            kafkaTemplate.send(topic, outbox.getAggregateId().toString(), payload)
                     .get(5, TimeUnit.SECONDS);
 
             outbox.markPublished();

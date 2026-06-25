@@ -10,6 +10,7 @@ import com.bankrupang.sanjijk.order.infrastructure.feign.UserClient;
 import com.bankrupang.sanjijk.order.infrastructure.feign.dto.AuctionInfoResponse;
 import com.bankrupang.sanjijk.order.infrastructure.feign.dto.UserInfoResponse;
 import com.bankrupang.sanjijk.order.infrastructure.messaging.consumer.dto.*;
+import com.bankrupang.sanjijk.common.response.ApiResponse;
 import com.bankrupang.sanjijk.order.presentation.dto.request.OrderDepositCreateRequest;
 import com.bankrupang.sanjijk.order.presentation.dto.response.OrderResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,7 +64,7 @@ class OrderServiceTest {
         void setUp() {
             userId = UUID.randomUUID();
             request = new OrderDepositCreateRequest(UUID.randomUUID());
-            auctionInfo = new AuctionInfoResponse(request.auctionId(), "싱싱한 광어", 10000, LocalDateTime.now().plusDays(1));
+            auctionInfo = new AuctionInfoResponse("싱싱한 광어", 10000, LocalDateTime.now().plusDays(1));
             userInfoResp = new UserInfoResponse("사람", "UI123456");
         }
 
@@ -75,7 +76,7 @@ class OrderServiceTest {
                     userId, request.auctionId(), OrderType.DEPOSIT))
                     .willReturn(Optional.empty());
             given(auctionClient.getAuction(request.auctionId())).willReturn(auctionInfo);
-            given(userClient.getUserInfo(userId)).willReturn(userInfoResp);
+            given(userClient.getUserInfo(userId)).willReturn(ApiResponse.ok(userInfoResp));
 
             // when
             OrderResponse response = orderService.createDepositOrder(userId, request);
@@ -223,7 +224,7 @@ class OrderServiceTest {
             PaymentCompletedEvent event = new PaymentCompletedEvent(
                     winningOrder.getId(), UUID.randomUUID(), "싱싱한 광어",
                     winningOrder.getUserId(), UUID.randomUUID(),
-                    50000, 40000, "REPAY", LocalDateTime.now());
+                    50000, 40000, "WINNING_REPAY", LocalDateTime.now());
 
             given(orderRepository.findById(event.orderId())).willReturn(Optional.of(winningOrder));
 

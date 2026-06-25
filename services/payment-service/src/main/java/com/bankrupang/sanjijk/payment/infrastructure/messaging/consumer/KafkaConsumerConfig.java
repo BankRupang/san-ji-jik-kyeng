@@ -19,7 +19,7 @@ public class KafkaConsumerConfig {
     private static final long MAX_RETRY_COUNT = 3L;
 
     @Bean
-    public DefaultErrorHandler errorHandler(KafkaTemplate<String, String> kafkaTemplate) {
+    public DefaultErrorHandler errorHandler(KafkaTemplate<String, Object> kafkaTemplate) {
         // 처리 실패 시 {topic}.DLT 토픽으로 발행
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate);
 

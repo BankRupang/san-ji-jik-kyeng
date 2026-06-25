@@ -46,14 +46,14 @@ public class OrderService {
 
         // 2. auction-service / user-service에서 신뢰할 수 있는 데이터 조회
         AuctionInfoResponse auction = auctionClient.getAuction(request.auctionId());
-        UserInfoResponse userInfo = userClient.getUserInfo(userId);
+        UserInfoResponse userInfo = userClient.getUserInfo(userId).getData();
 
         // 3. 보증금 주문 생성 및 저장
         Order order = Order.createDepositOrder(
                 userId,
                 userInfo.name(),
                 userInfo.slackId(),
-                auction.auctionId(),
+                request.auctionId(),
                 auction.auctionTitle(),
                 auction.depositAmount()
         );
@@ -140,7 +140,7 @@ public class OrderService {
                 log.warn("[ORDER] PAYMENT_COMPLETED 중복 수신 - orderId: {}", event.orderId());
                 return;
             }
-            if ("REPAY".equals(event.paymentType())) {
+            if ("WINNING_REPAY".equals(event.paymentType())) {
                 order.markPenaltyCompleted();
                 log.info("[ORDER] 낙찰 재결제 완료 - orderId: {}, userId: {}, auctionId: {}, orderType: {}, PENALTY_PENDING → COMPLETED",
                         order.getId(), order.getUserId(), event.auctionId(), order.getOrderType());

@@ -233,7 +233,7 @@ public class PaymentService {
             Payment newPayment = Payment.create(
                     abortedPayment.getOrderId(), abortedPayment.getUserId(), abortedPayment.getSellerId(),
                     abortedPayment.getAuctionId(), abortedPayment.getAuctionTitle(), newTossOrderId,
-                    PaymentType.NORMAL, abortedPayment.getAmount(), abortedPayment.getOriginalAmount(), null
+                    PaymentType.WINNING_REPAY, abortedPayment.getAmount(), abortedPayment.getOriginalAmount(), null
             );
             paymentRepository.save(newPayment);
 
