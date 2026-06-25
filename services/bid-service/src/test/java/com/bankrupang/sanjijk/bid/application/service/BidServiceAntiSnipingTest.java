@@ -84,7 +84,7 @@ class BidServiceAntiSnipingTest {
         info.put("endAt", nearEndAt.toString());
         info.put("currentPrice", "10000");
         info.put("bidUnit", "1000");
-        info.put("highestBidderId", "none");
+        info.put("highestBidderId", "");
         info.put("productName", "테스트상품");
         when(hashOperations.entries(anyString())).thenReturn(info);
 
@@ -113,7 +113,7 @@ class BidServiceAntiSnipingTest {
         info.put("endAt", LocalDateTime.now().plusMinutes(5).toString());
         info.put("currentPrice", "10000");
         info.put("bidUnit", "1000");
-        info.put("highestBidderId", "none");
+        info.put("highestBidderId", "");
         info.put("productName", "테스트상품");
         when(hashOperations.entries(anyString())).thenReturn(info);
 
