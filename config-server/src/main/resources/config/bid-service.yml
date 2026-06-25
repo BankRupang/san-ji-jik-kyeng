@@ -21,7 +21,5 @@ spring:
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
-      properties:
-        spring.json.use.type.headers: false
-        spring.json.value.default.type: com.bankrupang.sanjijk.bid.domain.event.AuctionStartedEvent
+      auto-offset-reset: earliest
 
