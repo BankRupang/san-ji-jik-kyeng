@@ -56,9 +56,18 @@ services:
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
     volumes:
       - kafka-data:/var/lib/kafka/data
     networks: [sanji]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
 
   # prod에서는 ECS Fargate로 실행. 로컬에서만 컨테이너로 띄움
   keycloak:
@@ -191,7 +200,7 @@ services:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
       postgres: { condition: service_healthy }
-      kafka: { condition: service_started }
+      kafka: { condition: service_healthy }
 
   # prod에서는 Auto Scaling(2~6 태스크). 로컬은 단일 컨테이너
   bid-service:
@@ -216,7 +225,7 @@ services:
       discovery-server: { condition: service_started }
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-      kafka: { condition: service_started }
+      kafka: { condition: service_healthy }
 
   order-service:
     <<: *spring-common
@@ -238,7 +247,7 @@ services:
       config-server: { condition: service_healthy }
       discovery-server: { condition: service_started }
       postgres: { condition: service_healthy }
-      kafka: { condition: service_started }
+      kafka: { condition: service_healthy }
 
   payment-service:
     <<: *spring-common
@@ -264,7 +273,7 @@ services:
       discovery-server: { condition: service_started }
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-      kafka: { condition: service_started }
+      kafka: { condition: service_healthy }
 
   notification-service:
     <<: *spring-common
@@ -289,7 +298,7 @@ services:
       discovery-server: { condition: service_started }
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-      kafka: { condition: service_started }
+      kafka: { condition: service_healthy }
 
   ai-service:
     <<: *spring-common
@@ -370,7 +379,8 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
     ports: ["8080:8080"]
     networks: [sanji]
-    depends_on: [kafka]
+    depends_on:
+      kafka: { condition: service_healthy }
 
 volumes:
   pg-data:

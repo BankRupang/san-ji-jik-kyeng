@@ -67,10 +67,10 @@ class PaymentServiceTest {
         void success() {
             // given
             DepositCreatedEvent event = new DepositCreatedEvent(
-                    UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                    UUID.randomUUID(), "ORD-12345678", UUID.randomUUID(), UUID.randomUUID(),
                     "테스트 경매", 100_000, LocalDateTime.now().plusHours(2), LocalDateTime.now()
             );
-            given(paymentRepository.findByTossOrderId(event.orderId().toString()))
+            given(paymentRepository.findByTossOrderId(event.orderNumber()))
                     .willReturn(Optional.empty());
 
             // when
@@ -86,11 +86,11 @@ class PaymentServiceTest {
         void duplicate_skip() {
             // given
             DepositCreatedEvent event = new DepositCreatedEvent(
-                    UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                    UUID.randomUUID(), "ORD-12345678", UUID.randomUUID(), UUID.randomUUID(),
                     "테스트 경매", 100_000, LocalDateTime.now().plusHours(2), LocalDateTime.now()
             );
             Payment existing = mock(Payment.class);
-            given(paymentRepository.findByTossOrderId(event.orderId().toString()))
+            given(paymentRepository.findByTossOrderId(event.orderNumber()))
                     .willReturn(Optional.of(existing));
 
             // when
@@ -116,11 +116,11 @@ class PaymentServiceTest {
             UUID auctionId = UUID.randomUUID();
             UUID winnerId = UUID.randomUUID();
             WinningCreatedEvent event = new WinningCreatedEvent(
-                    UUID.randomUUID(), winnerId, auctionId,
+                    UUID.randomUUID(), "ORD-12345678", winnerId, auctionId,
                     "테스트 경매", UUID.randomUUID(), 1_000_000,
                     100_000, 900_000, LocalDateTime.now().plusMinutes(15), LocalDateTime.now()
             );
-            given(paymentRepository.findByTossOrderId(event.orderId().toString()))
+            given(paymentRepository.findByTossOrderId(event.orderNumber()))
                     .willReturn(Optional.empty());
 
             Payment loserPayment = mock(Payment.class);
@@ -148,11 +148,11 @@ class PaymentServiceTest {
             UUID auctionId = UUID.randomUUID();
             UUID winnerId = UUID.randomUUID();
             WinningCreatedEvent event = new WinningCreatedEvent(
-                    UUID.randomUUID(), winnerId, auctionId,
+                    UUID.randomUUID(), "ORD-12345678", winnerId, auctionId,
                     "테스트 경매", UUID.randomUUID(), 1_000_000,
                     100_000, 900_000, LocalDateTime.now().plusMinutes(15), LocalDateTime.now()
             );
-            given(paymentRepository.findByTossOrderId(event.orderId().toString()))
+            given(paymentRepository.findByTossOrderId(event.orderNumber()))
                     .willReturn(Optional.empty());
             given(paymentRepository.findByAuctionIdAndPaymentTypeAndStatusAndUserIdNot(
                     any(), any(), any(), any()))
@@ -170,11 +170,11 @@ class PaymentServiceTest {
         void duplicate_skip() {
             // given
             WinningCreatedEvent event = new WinningCreatedEvent(
-                    UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                    UUID.randomUUID(), "ORD-12345678", UUID.randomUUID(), UUID.randomUUID(),
                     "테스트 경매", UUID.randomUUID(), 1_000_000,
                     100_000, 900_000, LocalDateTime.now().plusMinutes(15), LocalDateTime.now()
             );
-            given(paymentRepository.findByTossOrderId(event.orderId().toString()))
+            given(paymentRepository.findByTossOrderId(event.orderNumber()))
                     .willReturn(Optional.of(mock(Payment.class)));
 
             // when

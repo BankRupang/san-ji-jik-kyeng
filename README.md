@@ -19,22 +19,56 @@
 
 `.env.example`을 복사해서 `.env` 파일을 만들고 값을 채웁니다.
 
+**Postgres**
+
 | 변수 | 설명 |
 |---|---|
 | `POSTGRES_DB` | PostgreSQL 데이터베이스 이름 |
+| `POSTGRES_DB_URL` | PostgreSQL JDBC URL (예: `jdbc:postgresql://localhost:5432/postgres`) |
 | `POSTGRES_USER` | PostgreSQL 사용자 이름 |
 | `POSTGRES_PASSWORD` | PostgreSQL 비밀번호 |
-| `KEYCLOAK_SERVER_URL` | Keycloak 서버 주소 (로컬: `http://localhost:18080`) |
+
+**Keycloak**
+
+| 변수 | 설명 |
+|---|---|
+| `KEYCLOAK_SERVER_URL` | Keycloak 서버 주소 (예: `http://keycloak:18080`) |
 | `KEYCLOAK_REALM` | Keycloak realm 이름 |
 | `KEYCLOAK_CLIENT_ID` | Keycloak 클라이언트 ID |
 | `KEYCLOAK_CLIENT_SECRET` | Keycloak 클라이언트 시크릿 |
-| `MANAGER_KEY` | 매니저 계정 등록 시크릿 키 |
-| `MASTER_KEY` | 마스터 계정 등록 시크릿 키 |
+| `KEYCLOAK_ADMIN` | Keycloak 관리자 계정 이름 |
+| `KEYCLOAK_ADMIN_PASSWORD` | Keycloak 관리자 비밀번호 |
+| `KEYCLOAK_ISSUER_URI` | Keycloak 토큰 발급 URI (예: `http://keycloak:18080/realms/{realm}`) |
+| `KC_DB` | Keycloak 연결 DB 종류 (예: `postgres`) |
+| `KC_DB_URL` | Keycloak DB JDBC URL |
+| `KC_DB_USERNAME` | Keycloak DB 사용자 이름 |
+| `KC_DB_PASSWORD` | Keycloak DB 비밀번호 |
+| `KC_HOSTNAME_STRICT` | Keycloak 호스트명 엄격 검사 여부 (`false` 권장) |
+| `KC_HTTP_ENABLED` | Keycloak HTTP 활성화 여부 (`true` 권장) |
+
+**외부 SaaS**
+
+| 변수 | 설명 |
+|---|---|
 | `TOSS_CLIENT_KEY` | 토스페이먼츠 클라이언트 키 |
 | `TOSS_SECRET_KEY` | 토스페이먼츠 시크릿 키 |
 | `SLACK_WEBHOOK_URL` | Slack Webhook URL |
 | `SLACK_BOT_TOKEN` | Slack Bot Token |
+| `FALLBACK_SLACK_ID` | 알림 실패 시 폴백으로 DM을 보낼 Slack 유저 ID |
+| `FALLBACK_NOTIFICATION_ALLOW` | 폴백 알림 허용 여부 (`true` / `false`) |
 | `GEMINI_API_KEY` | Google Gemini API 키 |
+
+**시크릿 키**
+
+| 변수 | 설명 |
+|---|---|
+| `MASTER_KEY` | 마스터 계정 등록 시크릿 키 |
+| `MANAGER_KEY` | 매니저 계정 등록 시크릿 키 |
+
+**Langfuse**
+
+| 변수 | 설명 |
+|---|---|
 | `LANGFUSE_NEXTAUTH_SECRET` | Langfuse 세션 암호화 키 (`openssl rand -base64 32`) |
 | `LANGFUSE_SALT` | Langfuse 해시 솔트 (`openssl rand -base64 32`) |
 | `LANGFUSE_AUTH_HEADER` | Langfuse OTLP 인증 헤더 |
