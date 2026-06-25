@@ -70,7 +70,7 @@ class BidConcurrencyTest {
         redisTemplate.opsForHash().put(HASH_KEY, "endAt", LocalDateTime.now().plusHours(1).toString());
         redisTemplate.opsForHash().put(HASH_KEY, "currentPrice", "10000");
         redisTemplate.opsForHash().put(HASH_KEY, "bidUnit", "1000");
-        redisTemplate.opsForHash().put(HASH_KEY, "highestBidderId", "none");
+        redisTemplate.opsForHash().put(HASH_KEY, "highestBidderId", "");
         redisTemplate.opsForHash().put(HASH_KEY, "productName", "테스트상품");
     }
 
@@ -128,6 +128,6 @@ class BidConcurrencyTest {
 
         // highestBidderId가 정상적으로 1명만 설정되었는지
         String highestBidderId = (String) redisTemplate.opsForHash().get(HASH_KEY, "highestBidderId");
-        assertThat(highestBidderId).isNotBlank().isNotEqualTo("none");
+        assertThat(highestBidderId).isNotBlank();
     }
 }
