@@ -115,7 +115,7 @@ public class BidService {
             }
 
             String productName = (String) info.get("productName");
-            String previousBidderId = (highestBidderId == null || highestBidderId.isBlank() || highestBidderId.equals("none"))
+            String previousBidderId = (highestBidderId == null || highestBidderId.isBlank())
                     ? "" : highestBidderId;
             BidOvertakenEvent overtakenEvent = new BidOvertakenEvent(
                     auctionId.toString(),
@@ -151,9 +151,7 @@ public class BidService {
         String highestBidderId = (String) info.get("highestBidderId");
         String currentPrice = (String) info.get("currentPrice");
 
-        boolean hasBid = highestBidderId != null
-                && !highestBidderId.isBlank()
-                && !highestBidderId.equals("none");
+        boolean hasBid = highestBidderId != null && !highestBidderId.isBlank();
 
         if (!hasBid) {
             log.info("입찰자 없음 - auctionId: {}", auctionId);
