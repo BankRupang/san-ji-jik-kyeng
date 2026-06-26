@@ -619,6 +619,8 @@ ws://localhost:8000/ws/bid
 
 ### 4.1 입찰 (WebSocket)
 
+** SockJs 연결** : /ws/bid
+
 **발행 주소**: `/app/auction/{auctionId}/bid`
 
 **메시지 본문**
