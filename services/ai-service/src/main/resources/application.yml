@@ -6,6 +6,10 @@ spring:
     name: ai-service
   config:
     import: "optional:configserver:"
+  cloud:
+    inetutils:
+      preferred-networks:
+        - 10.0
   servlet:
     multipart:
       max-file-size: 10MB
