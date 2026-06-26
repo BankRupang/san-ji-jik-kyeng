@@ -116,4 +116,11 @@ public class UserController {
         userService.unsuspendUser(request);
         return ResponseEntity.ok(ApiResponse.ok());
     }
+    // Refresh Token으로 Access Token 재발급
+    @PostMapping("/api/v1/auth/refresh")
+    public ResponseEntity<ApiResponse<UserLoginResponse>> refresh(
+            @RequestBody @Valid RefreshTokenRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok(userService.refreshToken(request.refreshToken())));
+    }
+
 }

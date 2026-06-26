@@ -52,4 +52,7 @@ MEMORY.md
 monitoring/prometheus/prometheus.prod.yml
 
 ### Local test frontend ###
-*.html
+api-test.html
+user-api-test.html
+
+.DS_Store

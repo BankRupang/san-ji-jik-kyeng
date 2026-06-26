@@ -28,6 +28,7 @@ public class OrderEventService implements OrderEventPublisher {
     public void publishDepositCreated(Order order, LocalDateTime endAt) {
         DepositCreatedEvent event = new DepositCreatedEvent(
                 order.getId(),
+                order.getOrderNumber(),
                 order.getUserId(),
                 order.getAuctionId(),
                 order.getAuctionTitle(),
@@ -43,6 +44,7 @@ public class OrderEventService implements OrderEventPublisher {
     public void publishWinningCreated(Order order, int depositAmount) {
         WinningCreatedEvent event = new WinningCreatedEvent(
                 order.getId(),
+                order.getOrderNumber(),
                 order.getUserId(),
                 order.getAuctionId(),
                 order.getAuctionTitle(),
