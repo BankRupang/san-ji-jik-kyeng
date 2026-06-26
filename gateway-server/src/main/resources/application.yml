@@ -7,6 +7,9 @@ spring:
   config:
     import: "configserver:"
   cloud:
+    inetutils:
+      preferred-networks:
+        - 10.0
     config:
       fail-fast: true
       retry:

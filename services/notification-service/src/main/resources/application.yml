@@ -34,6 +34,9 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
   cloud:
+    inetutils:
+      preferred-networks:
+        - 10.0
     openfeign:
       circuitbreaker:
         enabled: true
