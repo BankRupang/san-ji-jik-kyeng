@@ -9,11 +9,11 @@ public class UserSpecification {
 
     public static Specification<User> hasRole(UserRole role) {
         return (root, query, cb) ->
-                cb.equal(root.get("role"), role);
+                role == null ? null : cb.equal(root.get("role"), role);
     }
 
     public static Specification<User> hasStatus(UserStatus status) {
         return (root, query, cb) ->
-                cb.equal(root.get("status"), status);
+                status == null ? null : cb.equal(root.get("status"), status);
     }
 }

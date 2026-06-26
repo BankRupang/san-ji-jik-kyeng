@@ -18,6 +18,12 @@ import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
@@ -101,5 +107,48 @@ public class KeycloakService {
 
     public void deleteUser(UUID keycloakUserId) {
         keycloak.realm(realm).users().get(keycloakUserId.toString()).remove();
+    }
+
+    // 기존 세션 전체 폐기 (중복 로그인 방지 - 새 로그인 시 호출)
+    public void revokeUserSessions(UUID keycloakUserId) {
+        try {
+            keycloak.realm(realm).users().get(keycloakUserId.toString()).logout();
+            log.info("[Keycloak] 기존 세션 폐기 완료 - userId: {}", keycloakUserId);
+        } catch (Exception e) {
+            // 세션이 없는 경우 등 무시
+            log.debug("[Keycloak] 세션 폐기 시도 - userId: {}, msg: {}", keycloakUserId, e.getMessage());
+        }
+    }
+
+    // Refresh Token으로 새 Access Token 발급
+    public KeycloakTokenResponse refreshToken(String refreshToken) {
+        try {
+            MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+            params.add("grant_type", "refresh_token");
+            params.add("client_id", clientId);
+            params.add("client_secret", clientSecret);
+            params.add("refresh_token", refreshToken);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+            String tokenUrl = serverUrl + "/realms/" + realm + "/protocol/openid-connect/token";
+            var response = new RestTemplate().postForEntity(
+                    tokenUrl,
+                    new HttpEntity<>(params, headers),
+                    java.util.Map.class
+            );
+
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                throw new KeycloakLoginFailedException();
+            }
+
+            String newAccessToken = (String) response.getBody().get("access_token");
+            String newRefreshToken = (String) response.getBody().get("refresh_token");
+            return new KeycloakTokenResponse(newAccessToken, newRefreshToken);
+        } catch (Exception e) {
+            log.warn("[Keycloak] 토큰 갱신 실패: {}", e.getMessage());
+            throw new KeycloakLoginFailedException();
+        }
     }
 }

@@ -22,6 +22,9 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.List;
+import jakarta.persistence.criteria.Predicate;
 import java.util.UUID;
 
 @Slf4j
@@ -116,10 +119,13 @@ public class UserService {
 
         user.validateStatusForLogin();
 
-        // 2. Keycloak에 로그인 요청 → 토큰 받기
+        // 2. 기존 세션 폐기 (중복 로그인 방지 — 새 기기 로그인 시 이전 토큰 만료)
+        keycloakService.revokeUserSessions(user.getId());
+
+        // 3. Keycloak에 로그인 요청 → 새 토큰 발급
         KeycloakTokenResponse token = keycloakService.login(request.username(), request.password());
 
-        // 3. UserLoginResponse로 변환해서 반환
+        // 4. UserLoginResponse로 변환해서 반환
         return new UserLoginResponse(token.accessToken(), token.refreshToken());
 
     }
@@ -139,8 +145,12 @@ public class UserService {
     public PageResponse<UserListResponse> getUsers(UserRole role, UserStatus status, int page, int size) {
         Pageable pageable = PageableUtils.ofDefault(page, size);
 
-        Specification<User> spec = UserSpecification.hasRole(role)
-                .and(UserSpecification.hasStatus(status));
+        Specification<User> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (role != null) predicates.add(cb.equal(root.get("role"), role));
+            if (status != null) predicates.add(cb.equal(root.get("status"), status));
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
 
         Page<User> users = userRepository.findAll(spec, pageable);
 
@@ -248,4 +258,10 @@ public class UserService {
     private User findUserByIdOrElseThrow(UUID userId) {
         return userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
     }
+    // Refresh Token으로 Access Token 재발급
+    public UserLoginResponse refreshToken(String refreshToken) {
+        KeycloakTokenResponse token = keycloakService.refreshToken(refreshToken);
+        return new UserLoginResponse(token.accessToken(), token.refreshToken());
+    }
+
 }
