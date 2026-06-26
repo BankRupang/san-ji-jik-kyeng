@@ -5,6 +5,7 @@ import java.util.UUID;
 
 public record WinningCreatedEvent(
         UUID orderId,
+        String orderNumber,
         UUID userId,
         UUID auctionId,
         String auctionTitle,

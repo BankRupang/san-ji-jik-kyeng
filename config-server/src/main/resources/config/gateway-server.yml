@@ -49,3 +49,8 @@ spring:
               uri: lb://ai-service
               predicates:
                 - Path=/api/v1/ai/**
+
+logging:
+  level:
+    com.bankrupang.sanjijk.gateway: DEBUG
+    org.springframework.cloud.gateway: INFO

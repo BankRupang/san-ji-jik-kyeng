@@ -1,16 +1,12 @@
-package com.bankrupang.sanjijk.payment.infrastructure.messaging.consumer;
+package com.bankrupang.sanjijk.bid.infrastructure.kafka;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
-import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
-import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
-import org.springframework.kafka.support.converter.StringJsonMessageConverter;
 import org.springframework.util.backoff.FixedBackOff;
 
 @Slf4j
@@ -24,7 +20,7 @@ public class KafkaConsumerConfig {
 
     @Bean
     public DefaultErrorHandler errorHandler(KafkaTemplate<String, Object> kafkaTemplate) {
-        // 처리 실패 시 {topic}.DLT 토픽으로 발행
+        // 처리 실패 시 {topic}.DLT 토픽으로 발행 후 컨슈머 스레드 유지
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate);
 
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(
@@ -32,26 +28,11 @@ public class KafkaConsumerConfig {
                 new FixedBackOff(RETRY_INTERVAL_MS, MAX_RETRY_COUNT)
         );
 
-        // 재시도 시작 로그
         errorHandler.setRetryListeners((record, ex, deliveryAttempt) ->
-                log.warn("[KAFKA] 메시지 처리 재시도 - topic: {}, attempt: {}, error: {}",
+                log.warn("[BID-KAFKA] 메시지 처리 재시도 - topic: {}, attempt: {}, error: {}",
                         record.topic(), deliveryAttempt, ex.getMessage())
         );
 
         return errorHandler;
-    }
-
-    @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(
-            ConsumerFactory<String, String> consumerFactory,
-            DefaultErrorHandler errorHandler,
-            ObjectMapper objectMapper
-    ) {
-        ConcurrentKafkaListenerContainerFactory<String, String> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(consumerFactory);
-        factory.setCommonErrorHandler(errorHandler);
-        factory.setRecordMessageConverter(new StringJsonMessageConverter(objectMapper));
-        return factory;
     }
 }
