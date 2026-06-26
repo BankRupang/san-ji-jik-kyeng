@@ -3,10 +3,6 @@ spring:
     name: bid-service
   config:
     import: "optional:configserver:"
-  cloud:
-    inetutils:
-      preferred-networks:
-        - 10.0
   kafka:
     bootstrap-servers: localhost:9092
     producer:
