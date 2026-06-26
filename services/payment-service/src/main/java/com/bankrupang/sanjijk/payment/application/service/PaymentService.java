@@ -48,14 +48,14 @@ public class PaymentService {
         log.info("[PAYMENT] 보증금 Payment 생성 시작 - orderId: {}, userId: {}, auctionId: {}",
                 event.orderId(), event.userId(), event.auctionId());
         try {
-            if (paymentRepository.findByTossOrderId(event.orderId().toString()).isPresent()) {
+            if (paymentRepository.findByTossOrderId(event.orderNumber()).isPresent()) {
                 log.warn("[PAYMENT] 이미 처리된 보증금 Payment - orderId: {}", event.orderId());
                 return;
             }
 
             Payment payment = Payment.create(
                     event.orderId(), event.userId(), null,
-                    event.auctionId(), event.auctionTitle(), event.orderId().toString(),
+                    event.auctionId(), event.auctionTitle(), event.orderNumber(),
                     PaymentType.REPAY, event.depositAmount(), null,
                     event.endAt()
             );
@@ -84,14 +84,14 @@ public class PaymentService {
         log.info("[PAYMENT] 낙찰 잔금 Payment 생성 시작 - orderId: {}, userId: {}, auctionId: {}",
                 event.orderId(), event.userId(), event.auctionId());
         try {
-            if (paymentRepository.findByTossOrderId(event.orderId().toString()).isPresent()) {
+            if (paymentRepository.findByTossOrderId(event.orderNumber()).isPresent()) {
                 log.warn("[PAYMENT] 이미 처리된 낙찰 Payment - orderId: {}", event.orderId());
                 return;
             }
 
             Payment payment = Payment.create(
                     event.orderId(), event.userId(), event.sellerId(),
-                    event.auctionId(), event.auctionTitle(), event.orderId().toString(),
+                    event.auctionId(), event.auctionTitle(), event.orderNumber(),
                     PaymentType.NORMAL, event.remainingAmount(), event.finalPrice(),
                     null
             );
