@@ -1,12 +1,13 @@
 #!/bin/bash
 # ECS Fargate 태스크의 private IP를 조회해서 Prometheus file_sd_configs 형식 JSON으로 저장
 # 포트는 서비스 이름 기준으로 매핑 (portMappings가 신뢰할 수 없는 경우 대비)
-# cron: */5 * * * * ec2-user /home/ec2-user/san-ji-jik-kyeng/monitoring/prometheus/ecs-discovery.sh >> /var/log/ecs-discovery.log 2>&1
 PATH=/usr/local/bin:/usr/bin:/bin
 
 CLUSTER="sanji-prod-cluster"
 REGION="ap-northeast-2"
-OUTPUT="/home/ec2-user/san-ji-jik-kyeng/monitoring/prometheus/ecs-targets.json"
+# 스크립트 위치 기준으로 OUTPUT 경로를 결정 (REPO_DIR 하드코딩 방지)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OUTPUT="${SCRIPT_DIR}/ecs-targets.json"
 
 TASK_ARNS=$(aws ecs list-tasks \
   --cluster "$CLUSTER" \

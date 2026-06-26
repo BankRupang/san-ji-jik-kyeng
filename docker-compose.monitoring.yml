@@ -51,8 +51,25 @@ services:
     environment:
       DATABASE_URL: ${LANGFUSE_DATABASE_URL}
       NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET}
-      NEXTAUTH_URL: ${LANGFUSE_URL}
+      NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL}
       SALT: ${LANGFUSE_SALT}
+
+  # 모니터링 EC2 자체 지표 수집 (CPU, 디스크, 메모리)
+  # Prometheus monitoring job이 9100 포트를 스크레이프
+  node-exporter:
+    image: prom/node-exporter:latest
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
 
   # Kafka EC2 브로커 상태 확인용 UI
   kafka-ui:
