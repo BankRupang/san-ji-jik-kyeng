@@ -78,6 +78,8 @@ jobs:
               --include "monitoring/*" \
               --include "scripts/deploy-monitoring.sh" \
               --include "scripts/env.sh" \
+              --include "db/init/*" \
+              --include "infra/keycloak/realm-export.json" \
               --delete
           fi
 
