@@ -485,26 +485,29 @@ blue-green은 무중단 요구가 생기고 WS 드레이닝이 필요할 때 재
 
 ### **이미지 태그 전략**
 
-**현재 방식: `:latest` 가변 태그 + `--force-new-delpoyment`**
+**현재 방식: SHA 태그 + Task Definition 리비전 교체** ✅
 
-ECS 롤링 배포를 `aws ecs update-service --force-new-deployment`로 트리거하므로, 이미지 태그도 여기에 맞춰 `:latest`로 둡니다. task definition이 `:latest`를 고정으로 가리키고, 배포할 때마다 같은 task def로 새 태스크를 강제 기동해 `:latest`를 다시 pull합니다. task definition을 바꾸지 않으므로 배포 명령이 한 줄로 끝납니다.
+빌드할 때 Git 커밋 SHA 앞 7자리를 이미지 태그로 씁니다(예: `a1b2c3d`). 배포할 때는 그 SHA를 이미지에 박은 새 Task Definition 리비전을 등록하고, ECS 서비스가 그 리비전을 바라보게 교체합니다. 태그가 커밋마다 고정(불변)이라 어느 커밋이 운영 중인지 바로 알 수 있고, 직전 리비전 번호로 `update-service`를 한 번만 실행하면 즉시 롤백됩니다.
+
+`:latest` 태그도 동시에 push해 수동 식별을 돕습니다.
 
 | 방식 | 배포 명령 | 태그 | task def 갱신 |
 | --- | --- | --- | --- |
-| **`:latest` + force-new-deployment** (MVP) | `update-service --force-new-deployment` | `:latest` (가변) | 안 함 |
-| SHA 태그 + task def 리비전 | `update-service --task-definition <새 리비전>` | 커밋 SHA (불변) | 매번 등록 |
+| `:latest` + force-new-deployment (구 방식) | `update-service --force-new-deployment` | `:latest` (가변) | 안 함 |
+| **SHA 태그 + task def 리비전** ✅ | `update-service --task-definition <새 리비전>` | 커밋 SHA (불변) | 매번 등록 |
 
-`--force-new-deployment`는 task def를 바꾸지 않기 때문에 새 태스크가 달라지려면 태그가 가변(`:latest`)이어야 하고, SHA 태그 방식은 task def 리비전을 새로 등록해 교체하므로 force-new-deployment가 필요 없습니다.
+**SHA 태그 방식의 흐름**
 
-**현재 방식의 문제점**
+1. GitHub Actions 빌드 잡: 이미지를 `:{SHA}`와 `:latest` 두 태그로 빌드해 ECR에 push합니다.
+2. 각 wave 배포 잡: 현재 Task Definition을 읽어 이미지 태그를 `:{SHA}`로 교체한 새 리비전을 등록합니다.
+3. `aws ecs update-service --task-definition <새 리비전>`으로 서비스를 교체합니다. `--force-new-deployment`는 더 이상 쓰지 않습니다.
+4. Terraform은 ECS 서비스의 `task_definition`을 `ignore_changes`로 제외해 CI/CD와 충돌하지 않습니다.
 
-- **즉각적인 롤백 불가**: 배포 직후 치명적인 버그를 발견했을 때, 가장 빠른 복구 방법은 ECS 작업 정의를 이전 리비전으로 되돌리는 것입니다. 하지만 이 방식을 사용하면 항상 같은 리비전을 바라보고 있기 때문에, 이전 이미지를 찾아 다시 빌드하거나 수동으로 태그를 수정해 다시 force-new-deployment를 실행해야 합니다.
-- **버전 추적의 어려움** (`:latest` 가변 태그의 한계): 운영 서버에 문제가 생겼을 때 지금 떠 있는 컨테이너가 정확히 Git의 어느 커밋 버전인가를 파악하기 어렵습니다. 이미지가 계속 덮어씌워지기 때문입니다.
-- **버전 skew**: Bid는 Auto Scaling(2~6 태스크)이라, 배포 후 한참 뒤 마감 피크에 scale-out된 태스크가 그 시점의 `:latest`를 pull합니다. 그 사이 새 배포가 있었으면 기존 태스크와 버전이 섞일 수 있습니다. SHA 태그 방식은 task def가 불변 태그를 가리켜 스큐가 없습니다.
+**구 방식(`:latest`)의 문제점**
 
-MVP에서는 빠른 구축과 단순성을 우선해 `:latest`를 택하고 위 한계를 감수합니다.
-
-롤백 빈도가 높아지거나 Bid 버전 스큐가 실제로 관측되면 SHA 태그 + task def 리비전 방식으로 전환합니다. 배포 시 `:latest`와 커밋 SHA 태그를 함께 push해두면 전환 전에도 수동 롤백 대상 이미지를 식별할 수 있습니다.
+- **즉각적인 롤백 불가**: 이전 이미지를 찾아 다시 빌드하거나 태그를 수동으로 수정해야 했습니다.
+- **버전 추적의 어려움**: 이미지가 계속 덮어씌워져 지금 떠 있는 컨테이너가 어느 커밋인지 알기 어려웠습니다.
+- **버전 skew**: Bid Auto Scaling이 scale-out할 때 그 시점의 `:latest`를 pull해 기존 태스크와 버전이 섞일 수 있었습니다. SHA 태그는 Task Definition이 불변 태그를 가리켜 스큐가 없습니다.
 
 ## 재배포 시 서비스별 영향과 대비책
 
