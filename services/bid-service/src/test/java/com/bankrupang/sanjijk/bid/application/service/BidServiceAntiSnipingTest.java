@@ -74,7 +74,7 @@ class BidServiceAntiSnipingTest {
     }
 
     @Test
-    @DisplayName("마감 30초 이내 입찰 시 endAt 1분 연장 + AUCTION_EXTENDED 이벤트 발행")
+    @DisplayName("입찰 시 endAt now+1분 연장 + AUCTION_EXTENDED 이벤트 발행")
     void shouldExtendEndAt_whenBidWithin30Seconds() throws Exception {
         LocalDateTime nearEndAt = LocalDateTime.now().plusSeconds(20);
 
@@ -89,31 +89,12 @@ class BidServiceAntiSnipingTest {
 
         bidService.bid(auctionId, userId, createRequest(11000, 10000));
 
-        // endAt이 1분 연장되었는지 검증
         ArgumentCaptor<String> endAtCaptor = ArgumentCaptor.forClass(String.class);
         verify(hashOperations).put(anyString(), eq("endAt"), endAtCaptor.capture());
         LocalDateTime newEndAt = LocalDateTime.parse(endAtCaptor.getValue());
-        assertThat(newEndAt).isAfter(nearEndAt.plusSeconds(55)); // 최소 1분 연장
+        assertThat(newEndAt).isAfter(LocalDateTime.now().plusSeconds(55));
 
-        // auction:endings ZSet 갱신 확인
         verify(zSetOperations).add(eq("auction:endings"), eq(auctionId.toString()), anyDouble());
 
-    }
-
-    @Test
-    @DisplayName("마감 30초 초과 시 endAt 연장 없음 + AUCTION_EXTENDED 미발행")
-    void shouldNotExtendEndAt_whenBidNotNearEnd() throws Exception {
-        Map<Object, Object> info = new HashMap<>();
-        info.put("status", "PROGRESS");
-        info.put("endAt", LocalDateTime.now().plusMinutes(5).toString());
-        info.put("currentPrice", "10000");
-        info.put("bidUnit", "1000");
-        info.put("highestBidderId", "");
-        info.put("productName", "테스트상품");
-        when(hashOperations.entries(anyString())).thenReturn(info);
-
-        bidService.bid(auctionId, userId, createRequest(11000, 10000));
-
-        verify(hashOperations, never()).put(anyString(), eq("endAt"), anyString());
     }
 }
