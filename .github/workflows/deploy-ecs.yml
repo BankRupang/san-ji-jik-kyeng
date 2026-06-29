@@ -100,6 +100,7 @@ jobs:
   # 계정 Fargate On-Demand vCPU 한도가 30이고, 정상 운영 시 19.5 vCPU를 씁니다.
   # 10개 서비스를 동시에 롤링하면 old + new 태스크가 겹쳐 ~39 vCPU가 필요해 한도 초과됩니다.
   # wave로 나눠 배포하면 한 wave 안에서만 겹치므로 최대 27.5 vCPU로 유지됩니다.
+  # 배포 로직은 _deploy-wave.yml 에서 관리합니다.
 
   # -------------------------------------------------------------------------
   # 2) Wave 1: 인프라 서비스
@@ -107,69 +108,9 @@ jobs:
   wave-1:
     name: "Wave 1: config / discovery / gateway"
     needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Deploy
-        run: |
-          set -euo pipefail
-          export AWS_MAX_ATTEMPTS=80
-          IMAGE_TAG="${GITHUB_SHA::7}"
-
-          # 각 서비스를 SHA 태그 기반 새 Task Definition 리비전으로 배포합니다.
-          # 흐름: 현재 태스크 정의 조회 → 이미지 태그를 SHA로 교체 → 새 리비전 등록 → 서비스 교체
-          deploy_parallel() {
-            local pids=()
-            for SERVICE in "$@"; do
-              (
-                TASK_DEF_ARN=$(aws ecs describe-services \
-                  --cluster "${ECS_CLUSTER}" \
-                  --services "${SERVICE}" \
-                  --region "${AWS_REGION}" \
-                  --query 'services[0].taskDefinition' \
-                  --output text)
-
-                TASK_DEF=$(aws ecs describe-task-definition \
-                  --task-definition "${TASK_DEF_ARN}" \
-                  --region "${AWS_REGION}" \
-                  --query 'taskDefinition')
-
-                NEW_TASK_DEF=$(echo "${TASK_DEF}" | jq \
-                  --arg tag "${IMAGE_TAG}" \
-                  'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.placementConstraints,.compatibilities,.registeredAt,.registeredBy)
-                   | (.containerDefinitions[].image) |= (split(":")[0] + ":" + $tag)')
-
-                NEW_ARN=$(aws ecs register-task-definition \
-                  --cli-input-json "${NEW_TASK_DEF}" \
-                  --region "${AWS_REGION}" \
-                  --query 'taskDefinition.taskDefinitionArn' \
-                  --output text)
-
-                aws ecs update-service \
-                  --cluster "${ECS_CLUSTER}" \
-                  --service "${SERVICE}" \
-                  --task-definition "${NEW_ARN}" \
-                  --region "${AWS_REGION}" \
-                  --no-cli-pager > /dev/null
-                echo "배포 시작: ${SERVICE} → ${NEW_ARN##*/}"
-                aws ecs wait services-stable \
-                  --cluster "${ECS_CLUSTER}" \
-                  --region "${AWS_REGION}" \
-                  --services "${SERVICE}"
-                echo "배포 완료: ${SERVICE}"
-              ) &
-              pids+=($!)
-            done
-            for pid in "${pids[@]}"; do wait "$pid" || exit 1; done
-          }
-
-          deploy_parallel config-server discovery-server gateway-server
+    uses: ./.github/workflows/_deploy-wave.yml
+    with:
+      services: 'config-server discovery-server gateway-server'
 
   # -------------------------------------------------------------------------
   # 3) Wave 2: 앱 서비스 (1)
@@ -179,67 +120,9 @@ jobs:
   wave-2:
     name: "Wave 2: user / auction / order / payment"
     needs: wave-1
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Deploy
-        run: |
-          set -euo pipefail
-          export AWS_MAX_ATTEMPTS=80
-          IMAGE_TAG="${GITHUB_SHA::7}"
-
-          deploy_parallel() {
-            local pids=()
-            for SERVICE in "$@"; do
-              (
-                TASK_DEF_ARN=$(aws ecs describe-services \
-                  --cluster "${ECS_CLUSTER}" \
-                  --services "${SERVICE}" \
-                  --region "${AWS_REGION}" \
-                  --query 'services[0].taskDefinition' \
-                  --output text)
-
-                TASK_DEF=$(aws ecs describe-task-definition \
-                  --task-definition "${TASK_DEF_ARN}" \
-                  --region "${AWS_REGION}" \
-                  --query 'taskDefinition')
-
-                NEW_TASK_DEF=$(echo "${TASK_DEF}" | jq \
-                  --arg tag "${IMAGE_TAG}" \
-                  'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.placementConstraints,.compatibilities,.registeredAt,.registeredBy)
-                   | (.containerDefinitions[].image) |= (split(":")[0] + ":" + $tag)')
-
-                NEW_ARN=$(aws ecs register-task-definition \
-                  --cli-input-json "${NEW_TASK_DEF}" \
-                  --region "${AWS_REGION}" \
-                  --query 'taskDefinition.taskDefinitionArn' \
-                  --output text)
-
-                aws ecs update-service \
-                  --cluster "${ECS_CLUSTER}" \
-                  --service "${SERVICE}" \
-                  --task-definition "${NEW_ARN}" \
-                  --region "${AWS_REGION}" \
-                  --no-cli-pager > /dev/null
-                echo "배포 시작: ${SERVICE} → ${NEW_ARN##*/}"
-                aws ecs wait services-stable \
-                  --cluster "${ECS_CLUSTER}" \
-                  --region "${AWS_REGION}" \
-                  --services "${SERVICE}"
-                echo "배포 완료: ${SERVICE}"
-              ) &
-              pids+=($!)
-            done
-            for pid in "${pids[@]}"; do wait "$pid" || exit 1; done
-          }
-
-          deploy_parallel user-service auction-service order-service payment-service
+    uses: ./.github/workflows/_deploy-wave.yml
+    with:
+      services: 'user-service auction-service order-service payment-service'
 
   # -------------------------------------------------------------------------
   # 4) Wave 3: 앱 서비스 (2)
@@ -249,124 +132,20 @@ jobs:
   wave-3:
     name: "Wave 3: bid / notification"
     needs: wave-2
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Deploy
-        run: |
-          set -euo pipefail
-          export AWS_MAX_ATTEMPTS=80
-          IMAGE_TAG="${GITHUB_SHA::7}"
-
-          deploy_parallel() {
-            local pids=()
-            for SERVICE in "$@"; do
-              (
-                TASK_DEF_ARN=$(aws ecs describe-services \
-                  --cluster "${ECS_CLUSTER}" \
-                  --services "${SERVICE}" \
-                  --region "${AWS_REGION}" \
-                  --query 'services[0].taskDefinition' \
-                  --output text)
-
-                TASK_DEF=$(aws ecs describe-task-definition \
-                  --task-definition "${TASK_DEF_ARN}" \
-                  --region "${AWS_REGION}" \
-                  --query 'taskDefinition')
-
-                NEW_TASK_DEF=$(echo "${TASK_DEF}" | jq \
-                  --arg tag "${IMAGE_TAG}" \
-                  'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.placementConstraints,.compatibilities,.registeredAt,.registeredBy)
-                   | (.containerDefinitions[].image) |= (split(":")[0] + ":" + $tag)')
-
-                NEW_ARN=$(aws ecs register-task-definition \
-                  --cli-input-json "${NEW_TASK_DEF}" \
-                  --region "${AWS_REGION}" \
-                  --query 'taskDefinition.taskDefinitionArn' \
-                  --output text)
-
-                aws ecs update-service \
-                  --cluster "${ECS_CLUSTER}" \
-                  --service "${SERVICE}" \
-                  --task-definition "${NEW_ARN}" \
-                  --region "${AWS_REGION}" \
-                  --no-cli-pager > /dev/null
-                echo "배포 시작: ${SERVICE} → ${NEW_ARN##*/}"
-                aws ecs wait services-stable \
-                  --cluster "${ECS_CLUSTER}" \
-                  --region "${AWS_REGION}" \
-                  --services "${SERVICE}"
-                echo "배포 완료: ${SERVICE}"
-              ) &
-              pids+=($!)
-            done
-            for pid in "${pids[@]}"; do wait "$pid" || exit 1; done
-          }
-
-          deploy_parallel bid-service notification-service
+    uses: ./.github/workflows/_deploy-wave.yml
+    with:
+      services: 'bid-service notification-service'
 
   # -------------------------------------------------------------------------
   # 5) Wave 4: ai-service (단독)
   #    pgvector 스키마 초기화 + Gemini API 연결로 기동 시간이 길어
   #    다른 서비스와 묶으면 타임아웃 실패가 발생하므로 분리합니다.
-  #    AWS_MAX_ATTEMPTS=120 → 최대 30분(120 × 15초) 대기
+  #    max_attempts: 120 → 최대 30분(120 × 15초) 대기
   # -------------------------------------------------------------------------
   wave-4:
     name: "Wave 4: ai-service"
     needs: wave-3
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Deploy
-        run: |
-          set -euo pipefail
-          export AWS_MAX_ATTEMPTS=120
-          IMAGE_TAG="${GITHUB_SHA::7}"
-
-          TASK_DEF_ARN=$(aws ecs describe-services \
-            --cluster "${ECS_CLUSTER}" \
-            --services "ai-service" \
-            --region "${AWS_REGION}" \
-            --query 'services[0].taskDefinition' \
-            --output text)
-
-          TASK_DEF=$(aws ecs describe-task-definition \
-            --task-definition "${TASK_DEF_ARN}" \
-            --region "${AWS_REGION}" \
-            --query 'taskDefinition')
-
-          NEW_TASK_DEF=$(echo "${TASK_DEF}" | jq \
-            --arg tag "${IMAGE_TAG}" \
-            'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.placementConstraints,.compatibilities,.registeredAt,.registeredBy)
-             | (.containerDefinitions[].image) |= (split(":")[0] + ":" + $tag)')
-
-          NEW_ARN=$(aws ecs register-task-definition \
-            --cli-input-json "${NEW_TASK_DEF}" \
-            --region "${AWS_REGION}" \
-            --query 'taskDefinition.taskDefinitionArn' \
-            --output text)
-
-          aws ecs update-service \
-            --cluster "${ECS_CLUSTER}" \
-            --service "ai-service" \
-            --task-definition "${NEW_ARN}" \
-            --region "${AWS_REGION}" \
-            --no-cli-pager > /dev/null
-          echo "배포 시작: ai-service → ${NEW_ARN##*/}"
-          aws ecs wait services-stable \
-            --cluster "${ECS_CLUSTER}" \
-            --region "${AWS_REGION}" \
-            --services "ai-service"
-          echo "배포 완료: ai-service"
+    uses: ./.github/workflows/_deploy-wave.yml
+    with:
+      services: 'ai-service'
+      max_attempts: 120
