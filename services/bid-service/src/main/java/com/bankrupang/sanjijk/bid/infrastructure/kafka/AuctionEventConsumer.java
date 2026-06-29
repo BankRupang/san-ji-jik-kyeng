@@ -10,8 +10,12 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 
 @Slf4j
 @Component
@@ -55,8 +59,10 @@ public class AuctionEventConsumer {
             auctionInfo.put("highestBidderId", "");
 
         redisTemplate.opsForHash().putAll(hashKey, auctionInfo);
-        redisTemplate.expire(hashKey, Duration.ofSeconds(ttlSeconds));
-        redisTemplate.opsForZSet().add("auction:endings", auctionId, endAt.toEpochSecond(java.time.ZoneOffset.UTC));
+        DefaultRedisScript<Long> expireScript = new DefaultRedisScript<>(
+                "return redis.call('EXPIRE', KEYS[1], ARGV[1])", Long.class);
+        redisTemplate.execute(expireScript, Collections.singletonList(hashKey), String.valueOf(ttlSeconds));
+        redisTemplate.opsForZSet().add("auction:endings", auctionId, endAt.atZone(ZoneId.of("Asia/Seoul")).toEpochSecond());
 
         log.info("Redis 경매 정보 저장 완료 - auctionId: {}, endAt: {}", auctionId, endAt);
 
