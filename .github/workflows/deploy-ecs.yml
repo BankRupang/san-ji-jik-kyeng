@@ -59,12 +59,14 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # 서비스 10개 이미지를 빌드해서 :latest 태그로 push 합니다.
+      # 서비스 10개 이미지를 빌드해서 :<SHA> 와 :latest 두 태그로 push 합니다.
+      # :<SHA>는 불변 태그라 추적·롤백이 가능하고, :latest는 수동 식별용으로 같이 둡니다.
       - name: Build and push images
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           set -euo pipefail
+          IMAGE_TAG="${GITHUB_SHA::7}"
 
           # "서비스이름:Dockerfile경로" 매핑 (config/discovery/gateway는 루트, 나머지는 services/)
           SERVICES=(
@@ -85,7 +87,11 @@ jobs:
             DOCKERFILE="${entry#*:}"
             IMAGE="${ECR_REGISTRY}/sanji/${SERVICE}"
             echo "::group::build ${SERVICE}"
-            docker build -f "${DOCKERFILE}" -t "${IMAGE}:latest" .
+            docker build -f "${DOCKERFILE}" \
+              -t "${IMAGE}:${IMAGE_TAG}" \
+              -t "${IMAGE}:latest" \
+              .
+            docker push "${IMAGE}:${IMAGE_TAG}"
             docker push "${IMAGE}:latest"
             echo "::endgroup::"
           done
@@ -114,19 +120,44 @@ jobs:
         run: |
           set -euo pipefail
           export AWS_MAX_ATTEMPTS=80
+          IMAGE_TAG="${GITHUB_SHA::7}"
 
-          # 각 서비스의 update-service + wait를 백그라운드로 동시에 실행합니다.
+          # 각 서비스를 SHA 태그 기반 새 Task Definition 리비전으로 배포합니다.
+          # 흐름: 현재 태스크 정의 조회 → 이미지 태그를 SHA로 교체 → 새 리비전 등록 → 서비스 교체
           deploy_parallel() {
             local pids=()
             for SERVICE in "$@"; do
               (
+                TASK_DEF_ARN=$(aws ecs describe-services \
+                  --cluster "${ECS_CLUSTER}" \
+                  --services "${SERVICE}" \
+                  --region "${AWS_REGION}" \
+                  --query 'services[0].taskDefinition' \
+                  --output text)
+
+                TASK_DEF=$(aws ecs describe-task-definition \
+                  --task-definition "${TASK_DEF_ARN}" \
+                  --region "${AWS_REGION}" \
+                  --query 'taskDefinition')
+
+                NEW_TASK_DEF=$(echo "${TASK_DEF}" | jq \
+                  --arg tag "${IMAGE_TAG}" \
+                  'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.placementConstraints,.compatibilities,.registeredAt,.registeredBy)
+                   | (.containerDefinitions[].image) |= (split(":")[0] + ":" + $tag)')
+
+                NEW_ARN=$(aws ecs register-task-definition \
+                  --cli-input-json "${NEW_TASK_DEF}" \
+                  --region "${AWS_REGION}" \
+                  --query 'taskDefinition.taskDefinitionArn' \
+                  --output text)
+
                 aws ecs update-service \
                   --cluster "${ECS_CLUSTER}" \
                   --service "${SERVICE}" \
-                  --force-new-deployment \
+                  --task-definition "${NEW_ARN}" \
                   --region "${AWS_REGION}" \
                   --no-cli-pager > /dev/null
-                echo "배포 시작: ${SERVICE}"
+                echo "배포 시작: ${SERVICE} → ${NEW_ARN##*/}"
                 aws ecs wait services-stable \
                   --cluster "${ECS_CLUSTER}" \
                   --region "${AWS_REGION}" \
@@ -161,18 +192,42 @@ jobs:
         run: |
           set -euo pipefail
           export AWS_MAX_ATTEMPTS=80
+          IMAGE_TAG="${GITHUB_SHA::7}"
 
           deploy_parallel() {
             local pids=()
             for SERVICE in "$@"; do
               (
+                TASK_DEF_ARN=$(aws ecs describe-services \
+                  --cluster "${ECS_CLUSTER}" \
+                  --services "${SERVICE}" \
+                  --region "${AWS_REGION}" \
+                  --query 'services[0].taskDefinition' \
+                  --output text)
+
+                TASK_DEF=$(aws ecs describe-task-definition \
+                  --task-definition "${TASK_DEF_ARN}" \
+                  --region "${AWS_REGION}" \
+                  --query 'taskDefinition')
+
+                NEW_TASK_DEF=$(echo "${TASK_DEF}" | jq \
+                  --arg tag "${IMAGE_TAG}" \
+                  'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.placementConstraints,.compatibilities,.registeredAt,.registeredBy)
+                   | (.containerDefinitions[].image) |= (split(":")[0] + ":" + $tag)')
+
+                NEW_ARN=$(aws ecs register-task-definition \
+                  --cli-input-json "${NEW_TASK_DEF}" \
+                  --region "${AWS_REGION}" \
+                  --query 'taskDefinition.taskDefinitionArn' \
+                  --output text)
+
                 aws ecs update-service \
                   --cluster "${ECS_CLUSTER}" \
                   --service "${SERVICE}" \
-                  --force-new-deployment \
+                  --task-definition "${NEW_ARN}" \
                   --region "${AWS_REGION}" \
                   --no-cli-pager > /dev/null
-                echo "배포 시작: ${SERVICE}"
+                echo "배포 시작: ${SERVICE} → ${NEW_ARN##*/}"
                 aws ecs wait services-stable \
                   --cluster "${ECS_CLUSTER}" \
                   --region "${AWS_REGION}" \
@@ -207,18 +262,42 @@ jobs:
         run: |
           set -euo pipefail
           export AWS_MAX_ATTEMPTS=80
+          IMAGE_TAG="${GITHUB_SHA::7}"
 
           deploy_parallel() {
             local pids=()
             for SERVICE in "$@"; do
               (
+                TASK_DEF_ARN=$(aws ecs describe-services \
+                  --cluster "${ECS_CLUSTER}" \
+                  --services "${SERVICE}" \
+                  --region "${AWS_REGION}" \
+                  --query 'services[0].taskDefinition' \
+                  --output text)
+
+                TASK_DEF=$(aws ecs describe-task-definition \
+                  --task-definition "${TASK_DEF_ARN}" \
+                  --region "${AWS_REGION}" \
+                  --query 'taskDefinition')
+
+                NEW_TASK_DEF=$(echo "${TASK_DEF}" | jq \
+                  --arg tag "${IMAGE_TAG}" \
+                  'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.placementConstraints,.compatibilities,.registeredAt,.registeredBy)
+                   | (.containerDefinitions[].image) |= (split(":")[0] + ":" + $tag)')
+
+                NEW_ARN=$(aws ecs register-task-definition \
+                  --cli-input-json "${NEW_TASK_DEF}" \
+                  --region "${AWS_REGION}" \
+                  --query 'taskDefinition.taskDefinitionArn' \
+                  --output text)
+
                 aws ecs update-service \
                   --cluster "${ECS_CLUSTER}" \
                   --service "${SERVICE}" \
-                  --force-new-deployment \
+                  --task-definition "${NEW_ARN}" \
                   --region "${AWS_REGION}" \
                   --no-cli-pager > /dev/null
-                echo "배포 시작: ${SERVICE}"
+                echo "배포 시작: ${SERVICE} → ${NEW_ARN##*/}"
                 aws ecs wait services-stable \
                   --cluster "${ECS_CLUSTER}" \
                   --region "${AWS_REGION}" \
@@ -254,14 +333,38 @@ jobs:
         run: |
           set -euo pipefail
           export AWS_MAX_ATTEMPTS=120
+          IMAGE_TAG="${GITHUB_SHA::7}"
+
+          TASK_DEF_ARN=$(aws ecs describe-services \
+            --cluster "${ECS_CLUSTER}" \
+            --services "ai-service" \
+            --region "${AWS_REGION}" \
+            --query 'services[0].taskDefinition' \
+            --output text)
+
+          TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition "${TASK_DEF_ARN}" \
+            --region "${AWS_REGION}" \
+            --query 'taskDefinition')
+
+          NEW_TASK_DEF=$(echo "${TASK_DEF}" | jq \
+            --arg tag "${IMAGE_TAG}" \
+            'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.placementConstraints,.compatibilities,.registeredAt,.registeredBy)
+             | (.containerDefinitions[].image) |= (split(":")[0] + ":" + $tag)')
+
+          NEW_ARN=$(aws ecs register-task-definition \
+            --cli-input-json "${NEW_TASK_DEF}" \
+            --region "${AWS_REGION}" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
 
           aws ecs update-service \
             --cluster "${ECS_CLUSTER}" \
             --service "ai-service" \
-            --force-new-deployment \
+            --task-definition "${NEW_ARN}" \
             --region "${AWS_REGION}" \
             --no-cli-pager > /dev/null
-          echo "배포 시작: ai-service"
+          echo "배포 시작: ai-service → ${NEW_ARN##*/}"
           aws ecs wait services-stable \
             --cluster "${ECS_CLUSTER}" \
             --region "${AWS_REGION}" \
