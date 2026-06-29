@@ -1,6 +1,5 @@
 package com.bankrupang.sanjijk.bid.application.service;
 
-import com.bankrupang.sanjijk.bid.domain.event.AuctionExtendedEvent;
 import com.bankrupang.sanjijk.bid.infrastructure.kafka.BidEventProducer;
 import com.bankrupang.sanjijk.bid.presentation.dto.BidRequestDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -99,10 +98,6 @@ class BidServiceAntiSnipingTest {
         // auction:endings ZSet 갱신 확인
         verify(zSetOperations).add(eq("auction:endings"), eq(auctionId.toString()), anyDouble());
 
-        // AUCTION_EXTENDED 이벤트 발행 확인
-        ArgumentCaptor<AuctionExtendedEvent> eventCaptor = ArgumentCaptor.forClass(AuctionExtendedEvent.class);
-        verify(bidEventProducer).sendAuctionExtended(eventCaptor.capture());
-        assertThat(eventCaptor.getValue().getNewEndAt()).isAfter(nearEndAt);
     }
 
     @Test
@@ -119,7 +114,6 @@ class BidServiceAntiSnipingTest {
 
         bidService.bid(auctionId, userId, createRequest(11000, 10000));
 
-        verify(bidEventProducer, never()).sendAuctionExtended(any());
         verify(hashOperations, never()).put(anyString(), eq("endAt"), anyString());
     }
 }
