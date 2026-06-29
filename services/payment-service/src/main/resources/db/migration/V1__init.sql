@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS p_payments
     original_amount     INTEGER,
     end_at              TIMESTAMP,
     card_issuer_code    VARCHAR(2),
-    card_number         VARCHAR(20),
+    card_number         VARCHAR(20), -- Toss Payments에서 반환하는 마스킹된 번호만 저장 (평문 카드번호 저장 금지)
     card_type           VARCHAR(10),
     installment_months  INTEGER      DEFAULT 0,
     failure_code        VARCHAR(100),
@@ -67,3 +67,6 @@ CREATE TABLE IF NOT EXISTS p_outbox
     created_at     TIMESTAMP    NOT NULL,
     PRIMARY KEY (id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_payment_outbox_status_created_at
+    ON p_outbox (status, created_at);

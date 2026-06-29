@@ -27,3 +27,6 @@ CREATE TABLE IF NOT EXISTS p_chat_messages
     deleted_by UUID,
     PRIMARY KEY (id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id
+    ON p_chat_messages (session_id);

@@ -39,3 +39,6 @@ CREATE TABLE IF NOT EXISTS p_order_outbox
     created_at     TIMESTAMP    NOT NULL,
     PRIMARY KEY (id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_order_outbox_status_created_at
+    ON p_order_outbox (status, created_at);
