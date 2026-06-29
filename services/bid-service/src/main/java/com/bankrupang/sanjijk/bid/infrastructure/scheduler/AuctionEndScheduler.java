@@ -26,7 +26,7 @@ public class AuctionEndScheduler {
     private final SimpMessagingTemplate messagingTemplate;
     private final BidEventProducer bidEventProducer;
 
-    @Scheduled(fixedDelay = 10000)
+    @Scheduled(fixedDelay = 5000)
     public void checkAuctionEndings() {
         long now = Instant.now().getEpochSecond();
 
