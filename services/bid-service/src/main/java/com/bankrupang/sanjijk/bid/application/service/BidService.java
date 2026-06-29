@@ -1,6 +1,5 @@
 package com.bankrupang.sanjijk.bid.application.service;
 
-import com.bankrupang.sanjijk.bid.domain.event.AuctionExtendedEvent;
 import com.bankrupang.sanjijk.bid.domain.event.BidOvertakenEvent;
 import com.bankrupang.sanjijk.bid.domain.exception.BidErrorCode;
 import com.bankrupang.sanjijk.bid.domain.exception.BidException;
@@ -87,15 +86,13 @@ public class BidService {
                 throw new BidException(BidErrorCode.DEPOSIT_NOT_PAID);
             }
 
-            if (Duration.between(LocalDateTime.now(), endAt).getSeconds() <= 30) {
-                LocalDateTime newEndAt = endAt.plusMinutes(1);
-                long newTtl = Duration.between(LocalDateTime.now(), newEndAt).getSeconds();
-                redisTemplate.opsForHash().put(hashKey, "endAt", newEndAt.toString());
-                redisTemplate.expire(hashKey, Duration.ofSeconds(newTtl));
-                redisTemplate.opsForZSet().add("auction:endings", auctionId.toString(), newEndAt.toEpochSecond(ZoneOffset.UTC));
-                log.info("안티스나이핑 발동 - auctionId: {}, newEndAt: {}", auctionId, newEndAt);
-                bidEventProducer.sendAuctionExtended(new AuctionExtendedEvent(auctionId.toString(), newEndAt));
-            }
+
+            LocalDateTime newEndAt = LocalDateTime.now().plusMinutes(1);
+            long newTtl = Duration.between(LocalDateTime.now(), newEndAt).getSeconds();
+            redisTemplate.opsForHash().put(hashKey, "endAt", newEndAt.toString());
+            redisTemplate.expire(hashKey, Duration.ofSeconds(newTtl));
+            redisTemplate.opsForZSet().add("auction:endings", auctionId.toString(), newEndAt.toEpochSecond(ZoneOffset.UTC));
+            log.info("안티스나이핑 발동 - auctionId: {}, newEndAt: {}", auctionId, newEndAt);
 
             redisTemplate.opsForHash().put(hashKey, "currentPrice", String.valueOf(request.getBidPrice()));
             redisTemplate.opsForHash().put(hashKey, "highestBidderId", userId.toString());
