@@ -69,6 +69,7 @@ class AuctionOutboxServiceTest {
             assertThat(outbox.isPublished()).isFalse();
             assertThat(outbox.getPublishedAt()).isNull();
             assertThat(payload.get("auctionId").asText()).isEqualTo(auctionId.toString());
+            assertThat(payload.get("sellerId").asText()).isEqualTo(sellerId.toString());
             assertThat(payload.get("productName").asText()).isEqualTo(product.getName());
             assertThat(payload.get("startPrice").asInt()).isEqualTo(auction.getStartPrice());
             assertThat(payload.get("bidUnit").asInt()).isEqualTo(auction.getBidUnit());
