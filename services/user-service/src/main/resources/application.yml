@@ -7,16 +7,15 @@ spring:
 
   config:
     import: "optional:configserver:"
+  cloud:
+    config:
+      enabled: true
+      fail-fast: true
 
   data:
     redis:
       host: ${REDIS_HOST}
       port: 6379
-  
-  cloud:
-    config:
-      enabled: true
-      fail-fast: true
 
 
   jpa:
