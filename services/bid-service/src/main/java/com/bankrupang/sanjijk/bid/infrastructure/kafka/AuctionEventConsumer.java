@@ -28,7 +28,7 @@ public class AuctionEventConsumer {
             log.info("경매 시작 이벤트 수신 - auctionId: {}", event.getAuctionId());
 
             String auctionId = event.getAuctionId().toString();
-            LocalDateTime endAt = event.getStartAt().plusHours(1);
+            LocalDateTime endAt = event.getStartAt().plusMinutes(10);
             long ttlSeconds = Duration.between(LocalDateTime.now(), endAt).getSeconds();
 
             if (ttlSeconds <= 0) {
@@ -58,11 +58,9 @@ public class AuctionEventConsumer {
         redisTemplate.expire(hashKey, Duration.ofSeconds(ttlSeconds));
         redisTemplate.opsForZSet().add("auction:endings", auctionId, endAt.toEpochSecond(java.time.ZoneOffset.UTC));
 
-            log.info("Redis 경매 정보 저장 완료 - auctionId: {}, endAt: {}", auctionId, endAt);
+        log.info("Redis 경매 정보 저장 완료 - auctionId: {}, endAt: {}", auctionId, endAt);
 
         } catch (Exception e) {
-            // [수정됨] Throwable 대신 Exception만 잡도록 수정했습니다.
-            // 위에서 RedisConfig를 수정했으므로 더 이상 StackOverflowError는 나지 않을 것입니다.
             log.error("auction-start 처리 실패 - 메시지 스킵. error: {}, message: {}", e.getMessage(), message, e);
         }
     }
