@@ -11,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import com.bankrupang.sanjijk.auction.auction.application.service.AuctionService;
 import com.bankrupang.sanjijk.auction.auction.infrastructure.messaging.consumer.dto.AuctionEndedEvent;
-import com.bankrupang.sanjijk.auction.auction.infrastructure.messaging.consumer.dto.AuctionExtendedEvent;
 import com.bankrupang.sanjijk.auction.auction.infrastructure.messaging.consumer.dto.DepositForfeitedEvent;
 import com.bankrupang.sanjijk.auction.auction.infrastructure.messaging.consumer.dto.PaymentCompletedEvent;
 import com.bankrupang.sanjijk.auction.auction.infrastructure.messaging.consumer.dto.PaymentFailedEvent;
@@ -41,18 +40,6 @@ public class AuctionExternalEventConsumer {
                     event.winnerId(),
                     event.finalPrice()
             );
-        });
-    }
-
-    @KafkaListener(topics = "auction-extended", groupId = AUCTION_SERVICE_GROUP_ID)
-    public void consumeAuctionExtended(String payload) {
-        AuctionExtendedEvent event = readEvent(payload, AuctionExtendedEvent.class, "AUCTION_EXTENDED");
-
-        AuctionLogContext.runWithAuctionId(event.auctionId(), () -> {
-            log.info("[KAFKA][CONSUME] AUCTION_EXTENDED 수신 - auctionId: {}, newEndAt: {}",
-                    event.auctionId(), event.newEndAt());
-
-            auctionService.extendAuctionByExtendedEvent(event.auctionId(), event.newEndAt());
         });
     }
 
