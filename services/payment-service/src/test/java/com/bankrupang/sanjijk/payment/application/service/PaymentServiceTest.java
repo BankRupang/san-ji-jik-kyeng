@@ -336,6 +336,70 @@ class PaymentServiceTest {
     }
 
     // ================================
+    // getPaymentByOrderId
+    // ================================
+
+    @Nested
+    @DisplayName("getPaymentByOrderId - orderId로 결제 조회")
+    class GetPaymentByOrderId {
+
+        @Test
+        @DisplayName("정상 조회 - READY 상태 Payment 반환")
+        void success() {
+            // given
+            UUID orderId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            Payment payment = mock(Payment.class);
+            given(payment.getUserId()).willReturn(userId);
+            given(payment.getId()).willReturn(UUID.randomUUID());
+            given(payment.getOrderId()).willReturn(orderId);
+            given(payment.getAuctionId()).willReturn(UUID.randomUUID());
+            given(payment.getAuctionTitle()).willReturn("테스트 경매");
+            given(payment.getPaymentType()).willReturn(PaymentType.NORMAL);
+            given(payment.getStatus()).willReturn(PaymentStatus.READY);
+            given(payment.getAmount()).willReturn(90);
+            given(paymentRepository.findByOrderIdAndStatus(orderId, PaymentStatus.READY))
+                    .willReturn(Optional.of(payment));
+
+            // when
+            PaymentResponse response = paymentService.getPaymentByOrderId(orderId, userId);
+
+            // then
+            assertThat(response.orderId()).isEqualTo(orderId);
+            assertThat(response.amount()).isEqualTo(90);
+        }
+
+        @Test
+        @DisplayName("타인 주문 조회 - PaymentNotFoundException")
+        void unauthorized_throws() {
+            // given
+            UUID orderId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            Payment payment = mock(Payment.class);
+            given(payment.getUserId()).willReturn(UUID.randomUUID()); // 다른 사람
+            given(paymentRepository.findByOrderIdAndStatus(orderId, PaymentStatus.READY))
+                    .willReturn(Optional.of(payment));
+
+            // when & then
+            assertThatThrownBy(() -> paymentService.getPaymentByOrderId(orderId, userId))
+                    .isInstanceOf(PaymentNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("READY 상태 Payment 없음 - PaymentNotFoundException")
+        void not_found_throws() {
+            // given
+            UUID orderId = UUID.randomUUID();
+            given(paymentRepository.findByOrderIdAndStatus(orderId, PaymentStatus.READY))
+                    .willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> paymentService.getPaymentByOrderId(orderId, UUID.randomUUID()))
+                    .isInstanceOf(PaymentNotFoundException.class);
+        }
+    }
+
+    // ================================
     // repayPayment
     // ================================
 

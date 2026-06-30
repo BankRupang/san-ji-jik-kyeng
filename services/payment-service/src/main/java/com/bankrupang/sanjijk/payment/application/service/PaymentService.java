@@ -186,6 +186,28 @@ public class PaymentService {
     }
 
     // ================================
+    // GET /api/v1/payments/order/{orderId} → orderId로 결제 조회
+    // (remainingAmount=90): (낙찰금 - 보증금) 프론트로 전달할 API
+    // READY 상태만 조회 - 재결제 시 같은 orderId로 여러 Payment 레코드가 존재할 수 있어 status로 좁힘
+    // ================================
+    @Transactional(readOnly = true)
+    public PaymentResponse getPaymentByOrderId(UUID orderId, UUID userId) {
+        Payment payment = paymentRepository.findByOrderIdAndStatus(orderId, PaymentStatus.READY)
+                .orElseThrow(PaymentNotFoundException::new);
+
+        if (!payment.getUserId().equals(userId)) {
+            log.warn("[PAYMENT] 권한 없음 - orderId: {}, requestUserId: {}, ownerUserId: {}",
+                    orderId, userId, payment.getUserId());
+            throw new PaymentNotFoundException();
+        }
+
+        log.info("[PAYMENT] orderId로 조회 - orderId: {}, paymentId: {}, amount: {}",
+                orderId, payment.getId(), payment.getAmount());
+        return PaymentResponse.from(payment);
+    }
+
+
+    // ================================
     // GET /api/v1/payments/{paymentId} → 단건 조회
     // ================================
 
@@ -291,4 +313,5 @@ public class PaymentService {
         }
         return "UNKNOWN";
     }
+
 }

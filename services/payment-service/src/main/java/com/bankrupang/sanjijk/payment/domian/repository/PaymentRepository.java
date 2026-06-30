@@ -10,7 +10,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import jakarta.persistence.LockModeType;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -43,4 +42,7 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
             @Param("status") PaymentStatus status,
             @Param("expiredBefore") LocalDateTime expiredBefore,
             Pageable pageable);
+
+    // 프론트로 넘길 낙찰금-보증금 (REPAY 상태만 - 재결제 시 같은 orderId로 여러 레코드 존재 가능하므로 status로 좁힘)
+    Optional<Payment> findByOrderIdAndStatus(UUID orderId, PaymentStatus status);
 }
