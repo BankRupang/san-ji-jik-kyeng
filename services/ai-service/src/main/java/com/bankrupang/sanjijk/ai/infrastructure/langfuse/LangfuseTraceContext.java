@@ -15,12 +15,14 @@ public class LangfuseTraceContext {
 
     private static class TraceEntry {
         final Map<String, Object> data = new ConcurrentHashMap<>();
+        final List<TraceEvent> events = new CopyOnWriteArrayList<>();
         volatile long lastModified = System.currentTimeMillis();
     }
 
     private final ConcurrentHashMap<String, TraceEntry> store = new ConcurrentHashMap<>();
 
     public void put(String traceId, String key, Object value) {
+        if (key == null || value == null) return;
         TraceEntry entry = store.computeIfAbsent(traceId, k -> new TraceEntry());
         entry.data.put(key, value);
         entry.lastModified = System.currentTimeMillis();
@@ -29,19 +31,17 @@ public class LangfuseTraceContext {
     public void addEvent(String traceId, String eventName, Map<String, Object> data) {
         TraceEntry entry = store.computeIfAbsent(traceId, k -> new TraceEntry());
         entry.lastModified = System.currentTimeMillis();
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> events = (List<Map<String, Object>>)
-                entry.data.computeIfAbsent("_events", k -> new CopyOnWriteArrayList<>());
-        Map<String, Object> event = new LinkedHashMap<>();
-        event.put("name", eventName);
-        event.put("timestamp", Instant.now().toString());
-        event.put("input", data);
-        events.add(event);
+        entry.events.add(new TraceEvent(eventName, Instant.now().toString(), data));
     }
 
     public Map<String, Object> get(String traceId) {
         TraceEntry entry = store.get(traceId);
-        return entry != null ? entry.data : Collections.emptyMap();
+        return entry != null ? Collections.unmodifiableMap(entry.data) : Collections.emptyMap();
+    }
+
+    public List<TraceEvent> getEvents(String traceId) {
+        TraceEntry entry = store.get(traceId);
+        return entry != null ? entry.events : Collections.emptyList();
     }
 
     public void remove(String traceId) {
