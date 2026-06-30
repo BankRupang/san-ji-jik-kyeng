@@ -9,6 +9,7 @@ import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 
 public record AuctionStartEventPayload(
         UUID auctionId,
+        UUID sellerId,
         String productName,
         LocalDateTime startAt,
         int startPrice,
@@ -18,6 +19,7 @@ public record AuctionStartEventPayload(
     public static AuctionStartEventPayload of(Auction auction, Product product) {
         return new AuctionStartEventPayload(
                 auction.getId(),
+                product.getSellerId(),
                 product.getName(),
                 auction.getStartAt(),
                 auction.getStartPrice(),

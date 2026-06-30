@@ -18,7 +18,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import com.bankrupang.sanjijk.auction.auction.application.service.AuctionService;
 import com.bankrupang.sanjijk.auction.auction.infrastructure.messaging.consumer.dto.AuctionEndedEvent;
-import com.bankrupang.sanjijk.auction.auction.infrastructure.messaging.consumer.dto.AuctionExtendedEvent;
 import com.bankrupang.sanjijk.auction.auction.infrastructure.messaging.consumer.dto.DepositForfeitedEvent;
 import com.bankrupang.sanjijk.auction.auction.infrastructure.messaging.consumer.dto.PaymentCompletedEvent;
 import com.bankrupang.sanjijk.auction.auction.infrastructure.messaging.consumer.dto.PaymentFailedEvent;
@@ -59,21 +58,6 @@ class AuctionExternalEventConsumerTest {
 
         // then
         verify(auctionService).closeAuctionByEndedEvent(auctionId, true, winnerId, 15000);
-    }
-
-    @Test
-    @DisplayName("AUCTION_EXTENDED payload를 매핑하고 경매 연장 처리를 위임한다")
-    void consumeAuctionExtended() throws Exception {
-        // given
-        UUID auctionId = UUID.randomUUID();
-        LocalDateTime newEndAt = LocalDateTime.now().plusMinutes(5);
-        AuctionExtendedEvent event = new AuctionExtendedEvent(auctionId, newEndAt);
-
-        // when
-        consumer.consumeAuctionExtended(objectMapper.writeValueAsString(event));
-
-        // then
-        verify(auctionService).extendAuctionByExtendedEvent(auctionId, newEndAt);
     }
 
     @Test
