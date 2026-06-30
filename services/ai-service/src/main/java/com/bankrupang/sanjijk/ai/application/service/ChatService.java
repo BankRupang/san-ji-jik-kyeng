@@ -1,6 +1,7 @@
 package com.bankrupang.sanjijk.ai.application.service;
 
 import com.bankrupang.sanjijk.ai.infrastructure.config.ChatClientConfig;
+import com.bankrupang.sanjijk.ai.infrastructure.langfuse.LangfuseTraceContext;
 import com.bankrupang.sanjijk.ai.domain.entity.ChatMessage;
 import com.bankrupang.sanjijk.ai.domain.entity.ChatSession;
 import com.bankrupang.sanjijk.ai.domain.enums.ChatRole;
@@ -13,6 +14,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
+import io.opentelemetry.api.trace.Span;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -44,6 +46,7 @@ public class ChatService {
     private final HybridSearchService hybridSearchService;
     private final TransactionTemplate transactionTemplate;
     private final ObservationRegistry observationRegistry;
+    private final LangfuseTraceContext traceContext;
     private final Counter reformulationSuccessCounter;
     private final Counter reformulationFailCounter;
     private final Counter aiResponseFailCounter;
@@ -51,13 +54,15 @@ public class ChatService {
     public ChatService(ChatClient chatClient, ChatSessionRepository sessionRepository,
                        ChatMessageRepository messageRepository, HybridSearchService hybridSearchService,
                        TransactionTemplate transactionTemplate,
-                       ObservationRegistry observationRegistry, MeterRegistry meterRegistry) {
+                       ObservationRegistry observationRegistry, MeterRegistry meterRegistry,
+                       LangfuseTraceContext traceContext) {
         this.chatClient = chatClient;
         this.sessionRepository = sessionRepository;
         this.messageRepository = messageRepository;
         this.hybridSearchService = hybridSearchService;
         this.transactionTemplate = transactionTemplate;
         this.observationRegistry = observationRegistry;
+        this.traceContext = traceContext;
         this.reformulationSuccessCounter = Counter.builder("query.reformulation.success")
                 .description("쿼리 재작성 성공 횟수")
                 .register(meterRegistry);
@@ -94,6 +99,11 @@ public class ChatService {
                         List<ChatMessage> history = messageRepository
                                 .findBySessionIdOrderByIdDesc(sessionId, PageRequest.of(0, maxHistory))
                                 .reversed();
+
+                        String traceId = Span.current().getSpanContext().getTraceId();
+                        traceContext.put(traceId, "session_id", sessionId.toString());
+                        traceContext.put(traceId, "user_id", userId.toString());
+                        traceContext.put(traceId, "is_multi_turn", !history.isEmpty());
 
                         // 2단계: Query Reformulation - 대화 기록 기반 쿼리 재작성
                         String searchQuery = reformulateQuery(userMessage, history);
@@ -174,6 +184,7 @@ public class ChatService {
                     .system("""
                             대화 기록을 참고하여 마지막 질문을 독립적인 검색 쿼리로 재작성하세요.
                             대화 맥락이 반영된 단일 문장으로만 응답하고 부연 설명은 하지 마세요.
+                            플랫폼과 무관한 질문이면 원본 질문을 그대로 반환하세요.
                             """)
                     .user("대화 기록:\n" + historyText + "\n\n재작성할 질문: " + userMessage)
                     .call()
