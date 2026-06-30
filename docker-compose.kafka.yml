@@ -25,6 +25,11 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       CLUSTER_ID: ${KAFKA_CLUSTER_ID} # SSM Parameter Store /sanji/kafka/cluster-id 에서 주입
       # JMX Exporter 에이전트: 7071 포트로 Kafka 내부 메트릭 노출
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
       KAFKA_OPTS: "-javaagent:/opt/jmx/jmx_prometheus_javaagent-1.0.1.jar=7071:/opt/jmx/kafka.yml"
     volumes:
       - kafka-data:/var/lib/kafka/data
