@@ -67,8 +67,11 @@ public class LangfuseSpanExporter implements SpanExporter {
             String prompt = span.getAttributes().get(GEN_AI_PROMPT);
             String completion = span.getAttributes().get(GEN_AI_COMPLETION);
 
+            // prompt가 null이면 LLM 호출 정보 없는 스팬 → 스킵
+            if (prompt == null) continue;
+
             // 응답 생성 스팬은 [참고 문서] 마커 포함, reformulation은 미포함
-            boolean isReformulation = prompt == null || !prompt.contains(ChatClientConfig.DOCUMENT_CONTEXT_MARKER);
+            boolean isReformulation = !prompt.contains(ChatClientConfig.DOCUMENT_CONTEXT_MARKER);
             String generationName = isReformulation ? "query.reformulation" : "response.generation";
 
             Map<String, Object> ctx = traceContext.get(traceId);
@@ -79,7 +82,7 @@ public class LangfuseSpanExporter implements SpanExporter {
             traceBody.put("name", "chat.pipeline");
             if (ctx.containsKey("user_id")) traceBody.put("userId", ctx.get("user_id"));
             if (ctx.containsKey("session_id")) traceBody.put("sessionId", ctx.get("session_id"));
-            if (prompt != null) traceBody.put("input", prompt);
+            traceBody.put("input", prompt);
             if (completion != null) traceBody.put("output", completion);
             // response.generation 시점에만 metadata 추가 (이때 search 데이터 확보됨, Langfuse가 merge)
             if (!isReformulation && !ctx.isEmpty()) {
@@ -111,7 +114,9 @@ public class LangfuseSpanExporter implements SpanExporter {
                 try {
                     if (inputTokensStr != null) in = Long.parseLong(inputTokensStr);
                     if (outputTokensStr != null) out = Long.parseLong(outputTokensStr);
-                } catch (NumberFormatException ignored) {}
+                } catch (NumberFormatException e) {
+                    log.warn("토큰 수 파싱 실패 - input: {}, output: {}", inputTokensStr, outputTokensStr);
+                }
                 genBody.put("usage", Map.of("input", in, "output", out, "total", in + out));
             }
 
