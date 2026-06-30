@@ -32,6 +32,10 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     Optional<Payment> findByOrderIdAndPaymentTypeAndStatus(
             UUID orderId, PaymentType paymentType, PaymentStatus status);
 
+    // 재결제 멱등성 체크용 - 이미 생성된 WINNING_REPAY READY Payment가 있는지 확인
+    List<Payment> findAllByOrderIdAndPaymentTypeAndStatus(
+            UUID orderId, PaymentType paymentType, PaymentStatus status);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Payment p WHERE p.id = :id")
     Optional<Payment> findByIdWithLock(@Param("id") UUID id);
@@ -43,6 +47,8 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
             @Param("expiredBefore") LocalDateTime expiredBefore,
             Pageable pageable);
 
-    // 프론트로 넘길 낙찰금-보증금 (REPAY 상태만 - 재결제 시 같은 orderId로 여러 레코드 존재 가능하므로 status로 좁힘)
-    Optional<Payment> findByOrderIdAndStatus(UUID orderId, PaymentStatus status);
+    // 프론트로 넘길 낙찰금-보증금 (READY 상태만 - 같은 orderId라도 가장 최근 생성된 1건만 반환)
+    @Query("SELECT p FROM Payment p WHERE p.orderId = :orderId AND p.status = :status ORDER BY p.createdAt DESC")
+    List<Payment> findAllByOrderIdAndStatusOrderByCreatedAtDesc(
+            @Param("orderId") UUID orderId, @Param("status") PaymentStatus status, Pageable pageable);
 }

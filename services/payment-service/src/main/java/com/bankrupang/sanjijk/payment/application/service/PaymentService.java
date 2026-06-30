@@ -21,6 +21,7 @@ import com.bankrupang.sanjijk.payment.presentation.dto.response.PaymentResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -188,11 +189,15 @@ public class PaymentService {
     // ================================
     // GET /api/v1/payments/order/{orderId} → orderId로 결제 조회
     // (remainingAmount=90): (낙찰금 - 보증금) 프론트로 전달할 API
-    // READY 상태만 조회 - 재결제 시 같은 orderId로 여러 Payment 레코드가 존재할 수 있어 status로 좁힘
+    // READY 상태만 조회 - 같은 orderId로 NORMAL/WINNING_REPAY 등 여러 Payment가 존재할 수 있어
+    // 가장 최근 생성된 1건만 반환 (createdAt 내림차순 + limit 1)
     // ================================
     @Transactional(readOnly = true)
     public PaymentResponse getPaymentByOrderId(UUID orderId, UUID userId) {
-        Payment payment = paymentRepository.findByOrderIdAndStatus(orderId, PaymentStatus.READY)
+        List<Payment> payments = paymentRepository.findAllByOrderIdAndStatusOrderByCreatedAtDesc(
+                orderId, PaymentStatus.READY, PageRequest.of(0, 1));
+
+        Payment payment = payments.stream().findFirst()
                 .orElseThrow(PaymentNotFoundException::new);
 
         if (!payment.getUserId().equals(userId)) {
@@ -229,6 +234,7 @@ public class PaymentService {
     // ================================
     // POST /api/v1/payments/repay/{orderId} → 잔금 재결제
     // ⑦ 15분 제한 체크 추가
+    // 멱등성: 이미 생성된 WINNING_REPAY READY Payment가 있으면 새로 만들지 않고 그대로 반환
     // ================================
 
     @Transactional
@@ -238,6 +244,16 @@ public class PaymentService {
         try {
             paymentRepository.findByOrderIdAndPaymentTypeAndStatus(orderId, PaymentType.NORMAL, PaymentStatus.READY)
                     .ifPresent(p -> { throw new PaymentAlreadyProcessedException(); });
+
+            // 멱등성 체크 - 이미 생성된 WINNING_REPAY READY Payment가 있으면 그대로 반환
+            List<Payment> existingRepayPayments = paymentRepository
+                    .findAllByOrderIdAndPaymentTypeAndStatus(orderId, PaymentType.WINNING_REPAY, PaymentStatus.READY);
+            if (!existingRepayPayments.isEmpty()) {
+                Payment existing = existingRepayPayments.get(0);
+                log.warn("[REPAY] 이미 생성된 재결제 Payment 존재 - orderId: {}, paymentId: {}",
+                        orderId, existing.getId());
+                return PaymentResponse.from(existing);
+            }
 
             Payment abortedPayment = paymentRepository
                     .findByOrderIdAndPaymentTypeAndStatus(orderId, PaymentType.NORMAL, PaymentStatus.ABORTED)
