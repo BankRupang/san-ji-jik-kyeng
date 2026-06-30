@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 @Slf4j
 @Service
@@ -64,8 +63,8 @@ public class HybridSearchService {
             int searchLimit = topK * 2;
 
             SearchResult searchResult = vectorStoreRepository.hybridSearchWithStats(vectorStr, query, similarityThreshold, searchLimit, topK);
-            List<String> results = Objects.requireNonNullElse(searchResult, new SearchResult(Collections.emptyList(), 0.0)).contents();
-            double maxSimilarity = searchResult != null ? searchResult.maxSimilarity() : 0.0;
+            List<String> results = searchResult.contents();
+            double maxSimilarity = searchResult.maxSimilarity();
 
             traceContext.put(traceId, "search_query", query);
             traceContext.put(traceId, "search_result_count", results.size());

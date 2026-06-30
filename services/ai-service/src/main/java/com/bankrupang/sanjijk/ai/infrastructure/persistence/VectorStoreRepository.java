@@ -72,9 +72,12 @@ public class VectorStoreRepository {
                 rs -> {
                     List<String> contents = new ArrayList<>();
                     double maxSimilarity = 0.0;
-                    while (rs.next()) {
-                        contents.add(rs.getString("content"));
+                    if (rs.next()) {
                         maxSimilarity = rs.getDouble("max_similarity");
+                        contents.add(rs.getString("content"));
+                        while (rs.next()) {
+                            contents.add(rs.getString("content"));
+                        }
                     }
                     return new SearchResult(contents, maxSimilarity);
                 },
