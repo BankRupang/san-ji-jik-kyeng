@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 @Component
 public class LangfuseTraceContext {
@@ -25,7 +26,7 @@ public class LangfuseTraceContext {
         timestamps.put(traceId, System.currentTimeMillis());
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> events = (List<Map<String, Object>>)
-                ctx.computeIfAbsent("_events", k -> Collections.synchronizedList(new ArrayList<>()));
+                ctx.computeIfAbsent("_events", k -> new CopyOnWriteArrayList<>());
         Map<String, Object> event = new LinkedHashMap<>();
         event.put("name", eventName);
         event.put("timestamp", Instant.now().toString());
