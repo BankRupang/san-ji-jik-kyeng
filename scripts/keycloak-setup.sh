@@ -146,7 +146,7 @@ HTTP_CODE=\$(curl -s -o /dev/null -w "%{http_code}" -X POST "\${KEYCLOAK_BASE}/a
   -H "Authorization: Bearer \${TOKEN}" \
   -H "Content-Type: application/json" \
   --data-binary "@\${REALM_FILE}")
-if [ "\${HTTP_CODE}" != "201" ]; then
+if [ "\${HTTP_CODE}" -lt 200 ] || [ "\${HTTP_CODE}" -ge 300 ]; then
   echo "오류: realm import 실패 (HTTP \${HTTP_CODE})"
   exit 1
 fi
@@ -156,8 +156,18 @@ echo "  [5/5] ${KEYCLOAK_CLIENT_ID} client-secret 발급 및 SSM 저장..."
 CLIENT_UUID=\$(curl -s "\${KEYCLOAK_BASE}/admin/realms/${KEYCLOAK_REALM}/clients?clientId=${KEYCLOAK_CLIENT_ID}" \
   -H "Authorization: Bearer \${TOKEN}" | jq -r ".[0].id")
 
+if [ -z "\${CLIENT_UUID}" ] || [ "\${CLIENT_UUID}" = "null" ]; then
+  echo "오류: ${KEYCLOAK_CLIENT_ID} 클라이언트를 찾을 수 없습니다."
+  exit 1
+fi
+
 NEW_SECRET=\$(curl -s -X POST "\${KEYCLOAK_BASE}/admin/realms/${KEYCLOAK_REALM}/clients/\${CLIENT_UUID}/client-secret" \
   -H "Authorization: Bearer \${TOKEN}" | jq -r ".value")
+
+if [ -z "\${NEW_SECRET}" ] || [ "\${NEW_SECRET}" = "null" ]; then
+  echo "오류: client-secret 발급 실패."
+  exit 1
+fi
 
 aws ssm put-parameter \
   --name "${SSM_PARAM_CLIENT_SECRET}" \
@@ -185,10 +195,10 @@ CMD_ID=$(aws ssm send-command \
 echo "  CommandId: ${CMD_ID}"
 
 # ----------------------------------------
-# 4. 결과 대기 및 확인 (최대 5분)
+# 4. 결과 대기 및 확인 (최대 10분, send-command --timeout-seconds 600과 동기화)
 # ----------------------------------------
 echo "[4/4] 실행 결과 대기 중..."
-for i in $(seq 1 60); do
+for i in $(seq 1 120); do
   sleep 5
   STATUS=$(aws ssm get-command-invocation \
     --command-id "${CMD_ID}" \
@@ -237,5 +247,5 @@ for i in $(seq 1 60); do
   fi
 done
 
-echo "오류: 시간 초과 (300초). AWS 콘솔에서 확인하세요."
+echo "오류: 시간 초과 (600초). AWS 콘솔에서 확인하세요."
 exit 1
