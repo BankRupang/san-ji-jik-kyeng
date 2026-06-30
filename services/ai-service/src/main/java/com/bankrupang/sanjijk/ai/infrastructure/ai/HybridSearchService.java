@@ -1,5 +1,6 @@
 package com.bankrupang.sanjijk.ai.infrastructure.ai;
 
+import com.bankrupang.sanjijk.ai.infrastructure.persistence.SearchResult;
 import com.bankrupang.sanjijk.ai.infrastructure.persistence.VectorStoreRepository;
 import com.bankrupang.sanjijk.ai.infrastructure.langfuse.LangfuseTraceContext;
 import io.micrometer.core.instrument.Counter;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -61,11 +63,10 @@ public class HybridSearchService {
             String vectorStr = toVectorString(embedding);
             int searchLimit = topK * 2;
 
-            List<Double> similarities = vectorStoreRepository.queryVectorSimilarities(vectorStr, searchLimit);
+            SearchResult searchResult = vectorStoreRepository.hybridSearchWithStats(vectorStr, query, similarityThreshold, searchLimit, topK);
+            List<String> results = Objects.requireNonNullElse(searchResult, new SearchResult(Collections.emptyList(), 0.0)).contents();
+            double maxSimilarity = searchResult != null ? searchResult.maxSimilarity() : 0.0;
 
-            List<String> results = vectorStoreRepository.hybridSearch(vectorStr, query, similarityThreshold, searchLimit, topK);
-
-            double maxSimilarity = similarities.isEmpty() ? 0.0 : Collections.max(similarities);
             traceContext.put(traceId, "search_query", query);
             traceContext.put(traceId, "search_result_count", results.size());
             traceContext.put(traceId, "search_max_similarity", maxSimilarity);
