@@ -1,5 +1,6 @@
 package com.bankrupang.sanjijk.ai.infrastructure.langfuse;
 
+import com.bankrupang.sanjijk.ai.infrastructure.config.ChatClientConfig;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.sdk.common.CompletableResultCode;
 import io.opentelemetry.sdk.trace.data.SpanData;
@@ -66,8 +67,8 @@ public class LangfuseSpanExporter implements SpanExporter {
             String prompt = span.getAttributes().get(GEN_AI_PROMPT);
             String completion = span.getAttributes().get(GEN_AI_COMPLETION);
 
-            // Reformulation 구분: 시스템 프롬프트 내용으로 판별
-            boolean isReformulation = prompt != null && prompt.contains("대화 기록을 참고하여");
+            // 응답 생성 스팬은 [참고 문서] 마커 포함, reformulation은 미포함
+            boolean isReformulation = prompt == null || !prompt.contains(ChatClientConfig.DOCUMENT_CONTEXT_MARKER);
             String generationName = isReformulation ? "query.reformulation" : "response.generation";
 
             Map<String, Object> ctx = traceContext.get(traceId);
@@ -106,8 +107,11 @@ public class LangfuseSpanExporter implements SpanExporter {
             String inputTokensStr = span.getAttributes().get(GEN_AI_USAGE_INPUT_TOKENS);
             String outputTokensStr = span.getAttributes().get(GEN_AI_USAGE_OUTPUT_TOKENS);
             if (inputTokensStr != null || outputTokensStr != null) {
-                long in = inputTokensStr != null ? Long.parseLong(inputTokensStr) : 0L;
-                long out = outputTokensStr != null ? Long.parseLong(outputTokensStr) : 0L;
+                long in = 0L, out = 0L;
+                try {
+                    if (inputTokensStr != null) in = Long.parseLong(inputTokensStr);
+                    if (outputTokensStr != null) out = Long.parseLong(outputTokensStr);
+                } catch (NumberFormatException ignored) {}
                 genBody.put("usage", Map.of("input", in, "output", out, "total", in + out));
             }
 
