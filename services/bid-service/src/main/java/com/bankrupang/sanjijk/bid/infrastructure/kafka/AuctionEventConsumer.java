@@ -51,6 +51,7 @@ public class AuctionEventConsumer {
 
             Map<String, String> auctionInfo = new HashMap<>();
             auctionInfo.put("productName", event.getProductName());
+            auctionInfo.put("sellerId", String.valueOf(event.getSellerId()));
             auctionInfo.put("currentPrice", String.valueOf(event.getStartPrice()));
             auctionInfo.put("bidUnit", String.valueOf(event.getBidUnit()));
             auctionInfo.put("startAt", event.getStartAt().toString());

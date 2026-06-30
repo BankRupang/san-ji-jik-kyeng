@@ -14,6 +14,6 @@ public class UserHandshakeHandler extends DefaultHandshakeHandler {
                                       WebSocketHandler wsHandler,
                                       Map<String, Object> attributes) {
         String userId = (String) attributes.get("userId");
-        return userId != null ? new UserPrincipal(userId) : null;
+        return userId != null ? new UserPrincipal(userId, null) : null;
     }
 }

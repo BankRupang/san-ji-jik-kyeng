@@ -11,6 +11,7 @@ import java.util.UUID;
 public class AuctionStartedEvent {
 
     private UUID auctionId;
+    private UUID sellerId;
     private String productName;
     private String status;
     private LocalDateTime startAt;
