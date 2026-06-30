@@ -195,7 +195,7 @@ CMD_ID=$(aws ssm send-command \
 echo "  CommandId: ${CMD_ID}"
 
 # ----------------------------------------
-# 4. 결과 대기 및 확인 (최대 10분, send-command --timeout-seconds 600과 동기화)
+# 4. 결과 대기 및 확인 (최대 10분)
 # ----------------------------------------
 echo "[4/4] 실행 결과 대기 중..."
 for i in $(seq 1 120); do
@@ -207,7 +207,7 @@ for i in $(seq 1 120); do
     --query "Status" \
     --output text 2>/dev/null || echo "Pending")
 
-  echo "  상태: ${STATUS} (${i}/60)"
+  echo "  상태: ${STATUS} (${i}/120)"
 
   if [ "${STATUS}" = "Success" ]; then
     echo ""
@@ -247,5 +247,5 @@ for i in $(seq 1 120); do
   fi
 done
 
-echo "오류: 시간 초과 (600초). AWS 콘솔에서 확인하세요."
+echo "오류: 시간 초과. AWS 콘솔에서 확인하세요."
 exit 1
