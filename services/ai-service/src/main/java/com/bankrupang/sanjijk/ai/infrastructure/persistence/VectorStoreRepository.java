@@ -67,6 +67,15 @@ public class VectorStoreRepository {
                 topK);
     }
 
+    public List<Double> queryVectorSimilarities(String vectorStr, int limit) {
+        return jdbcTemplate.queryForList("""
+                SELECT 1 - (embedding <=> CAST(? AS vector)) AS similarity
+                FROM ai_schema.vector_store
+                ORDER BY embedding <=> CAST(? AS vector)
+                LIMIT ?
+                """, Double.class, vectorStr, vectorStr, limit);
+    }
+
     public List<DocumentInfoResponse> findDocuments(int limit, long offset) {
         return jdbcTemplate.query("""
                 SELECT metadata->>'title' AS title,

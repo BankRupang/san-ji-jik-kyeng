@@ -1,10 +1,12 @@
 package com.bankrupang.sanjijk.ai.infrastructure.ai;
 
 import com.bankrupang.sanjijk.ai.infrastructure.persistence.VectorStoreRepository;
+import com.bankrupang.sanjijk.ai.infrastructure.langfuse.LangfuseTraceContext;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
+import io.opentelemetry.api.trace.Span;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -20,14 +23,17 @@ public class HybridSearchService {
     private final VectorStoreRepository vectorStoreRepository;
     private final EmbeddingModel embeddingModel;
     private final ObservationRegistry observationRegistry;
+    private final LangfuseTraceContext traceContext;
     private final Counter emptySearchCounter;
     private final Counter searchFailCounter;
 
     public HybridSearchService(VectorStoreRepository vectorStoreRepository, EmbeddingModel embeddingModel,
-                                ObservationRegistry observationRegistry, MeterRegistry meterRegistry) {
+                                ObservationRegistry observationRegistry, MeterRegistry meterRegistry,
+                                LangfuseTraceContext traceContext) {
         this.vectorStoreRepository = vectorStoreRepository;
         this.embeddingModel = embeddingModel;
         this.observationRegistry = observationRegistry;
+        this.traceContext = traceContext;
         this.emptySearchCounter = Counter.builder("hybrid.search.empty")
                 .description("검색 결과 없음 발생 횟수")
                 .register(meterRegistry);
@@ -48,21 +54,32 @@ public class HybridSearchService {
     }
 
     private List<String> doSearch(String query) {
+        String traceId = Span.current().getSpanContext().getTraceId();
         try {
             String prefixedQuery = "task: question answering | query: " + query;
             float[] embedding = embeddingModel.embed(prefixedQuery);
             String vectorStr = toVectorString(embedding);
             int searchLimit = topK * 2;
 
+            List<Double> similarities = vectorStoreRepository.queryVectorSimilarities(vectorStr, searchLimit);
+
             List<String> results = vectorStoreRepository.hybridSearch(vectorStr, query, similarityThreshold, searchLimit, topK);
+
+            double maxSimilarity = similarities.isEmpty() ? 0.0 : Collections.max(similarities);
+            traceContext.put(traceId, "search_query", query);
+            traceContext.put(traceId, "search_result_count", results.size());
+            traceContext.put(traceId, "search_max_similarity", maxSimilarity);
 
             if (results.isEmpty()) {
                 emptySearchCounter.increment();
+                traceContext.addEvent(traceId, "search_empty",
+                        Map.of("query", query, "threshold", similarityThreshold));
             }
-            log.info("하이브리드 검색 결과 - query: {}, threshold: {}, 결과 수: {}", query, similarityThreshold, results.size());
             return results;
         } catch (Exception e) {
             searchFailCounter.increment();
+            traceContext.addEvent(traceId, "search_failed",
+                    Map.of("query", query, "error", e.getMessage() != null ? e.getMessage() : "unknown"));
             log.warn("하이브리드 검색 실패 - query: {}, error: {}", query, e.getMessage());
             return Collections.emptyList();
         }
