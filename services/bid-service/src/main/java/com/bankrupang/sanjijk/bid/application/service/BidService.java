@@ -50,7 +50,9 @@ public class BidService {
 
             String hashKey = "auction:" + auctionId + ":info";
             Map<Object, Object> info = redisTemplate.opsForHash().entries(hashKey);
-
+            if (userId.equals(info.get("sellerId"))) {
+                throw new BidException(BidErrorCode.SELLER_BID);
+            }
             if (info.isEmpty()) {
                 throw new BidException(BidErrorCode.AUCTION_NOT_FOUND);
             }
