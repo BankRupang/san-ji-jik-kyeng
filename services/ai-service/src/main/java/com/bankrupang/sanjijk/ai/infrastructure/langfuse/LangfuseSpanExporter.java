@@ -135,17 +135,20 @@ public class LangfuseSpanExporter implements SpanExporter {
 
             // 빈 검색 결과 / 검색 실패 이벤트 (response.generation 이후에만 emit 후 컨텍스트 정리)
             if (!isReformulation && !ctx.isEmpty()) {
-                List<TraceEvent> events = traceContext.getEvents(traceId);
-                for (TraceEvent event : events) {
-                    Map<String, Object> eventBody = new LinkedHashMap<>();
-                    eventBody.put("id", UUID.randomUUID().toString());
-                    eventBody.put("traceId", traceId);
-                    eventBody.put("name", event.name());
-                    eventBody.put("startTime", event.timestamp() != null ? event.timestamp() : endTime.toString());
-                    eventBody.put("input", event.input());
-                    batch.add(buildEvent("event-create", startTime, eventBody));
+                try {
+                    List<TraceEvent> events = traceContext.getEvents(traceId);
+                    for (TraceEvent event : events) {
+                        Map<String, Object> eventBody = new LinkedHashMap<>();
+                        eventBody.put("id", UUID.randomUUID().toString());
+                        eventBody.put("traceId", traceId);
+                        eventBody.put("name", event.name());
+                        eventBody.put("startTime", event.timestamp() != null ? event.timestamp() : endTime.toString());
+                        if (!event.input().isEmpty()) eventBody.put("input", event.input());
+                        batch.add(buildEvent("event-create", startTime, eventBody));
+                    }
+                } finally {
+                    traceContext.remove(traceId);
                 }
-                traceContext.remove(traceId);
             }
         }
 

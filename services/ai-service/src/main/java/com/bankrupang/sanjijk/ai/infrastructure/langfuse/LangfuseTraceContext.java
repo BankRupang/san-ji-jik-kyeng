@@ -41,7 +41,7 @@ public class LangfuseTraceContext {
 
     public List<TraceEvent> getEvents(String traceId) {
         TraceEntry entry = store.get(traceId);
-        return entry != null ? entry.events : Collections.emptyList();
+        return entry != null ? Collections.unmodifiableList(entry.events) : Collections.emptyList();
     }
 
     public void remove(String traceId) {
