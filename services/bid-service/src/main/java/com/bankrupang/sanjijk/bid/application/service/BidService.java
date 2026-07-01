@@ -31,6 +31,10 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 @RequiredArgsConstructor
 public class BidService {
 
+    // AuctionEndScheduler는 5초 간격 폴링이라, Redis TTL이 종료 판정 시각과 정확히 같으면
+    // 스케줄러가 읽기 전에 해시가 먼저 만료돼 유찰로 오판될 수 있어 버퍼를 둔다.
+    private static final long END_CHECK_TTL_BUFFER_SECONDS = 60;
+
     private final RedissonClient redissonClient;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -93,7 +97,7 @@ public class BidService {
 
 
             LocalDateTime newEndAt = LocalDateTime.now().plusMinutes(1);
-            long newTtl = Duration.between(LocalDateTime.now(), newEndAt).getSeconds();
+            long newTtl = Duration.between(LocalDateTime.now(), newEndAt).getSeconds() + END_CHECK_TTL_BUFFER_SECONDS;
             redisTemplate.opsForHash().put(hashKey, "endAt", newEndAt.toString());
             DefaultRedisScript<Long> expireScript = new DefaultRedisScript<>(
                     "return redis.call('EXPIRE', KEYS[1], ARGV[1])", Long.class);
