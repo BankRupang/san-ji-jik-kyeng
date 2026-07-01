@@ -56,6 +56,8 @@ RDS_HOST=$(aws rds describe-db-instances \
 
 IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
 MONITORING_PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: ${IMDS_TOKEN}" http://169.254.169.254/latest/meta-data/public-ipv4)
+MONITORING_PRIVATE_IP=$(curl -s -H "X-aws-ec2-metadata-token: ${IMDS_TOKEN}" http://169.254.169.254/latest/meta-data/local-ipv4)
+export MONITORING_PRIVATE_IP
 
 # .env 파일 생성
 cat > .env <<EOF
@@ -70,7 +72,7 @@ EOF
 chmod 600 .env
 
 # Prometheus 설정 파일 치환
-envsubst '$KAFKA_PRIVATE_IP' < monitoring/prometheus/prometheus.prod.yml.template > monitoring/prometheus/prometheus.prod.yml
+envsubst '$KAFKA_PRIVATE_IP $MONITORING_PRIVATE_IP' < monitoring/prometheus/prometheus.prod.yml.template > monitoring/prometheus/prometheus.prod.yml
 
 # ecs-targets.json 초기화 (없을 때만)
 [ -f monitoring/prometheus/ecs-targets.json ] || echo "[]" > monitoring/prometheus/ecs-targets.json

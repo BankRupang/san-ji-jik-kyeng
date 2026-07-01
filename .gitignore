@@ -43,8 +43,11 @@ out/
 .env.*.prod
 *.env
 
-### ETC ###
+### Terraform ###
 .terraform/
+sanji-infra/
+
+### ETC ###
 .notes/
 MEMORY.md
 

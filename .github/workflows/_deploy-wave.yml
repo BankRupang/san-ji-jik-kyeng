@@ -1,0 +1,93 @@
+name: "[internal] ECS wave 배포"
+
+# 다른 워크플로에서 uses: 로 불러 쓰는 재사용 가능 워크플로입니다.
+# 직접 실행하지 않습니다.
+on:
+  workflow_call:
+    inputs:
+      services:
+        description: "배포할 서비스 목록 (공백 구분, 예: 'config-server discovery-server')"
+        required: true
+        type: string
+      max_attempts:
+        description: "aws ecs wait 최대 시도 횟수 (기본 80 = 약 20분)"
+        required: false
+        type: number
+        default: 80
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECS_CLUSTER: sanji-prod-cluster
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy
+        env:
+          SERVICES: ${{ inputs.services }}
+          MAX_ATTEMPTS: ${{ inputs.max_attempts }}
+        run: |
+          set -euo pipefail
+          export AWS_MAX_ATTEMPTS="${MAX_ATTEMPTS}"
+          IMAGE_TAG="${GITHUB_SHA::7}"
+
+          # 서비스 하나를 SHA 태그 기반 새 Task Definition 리비전으로 배포합니다.
+          # 흐름: 현재 태스크 정의 조회 → 이미지 태그를 SHA로 교체 → 새 리비전 등록 → 서비스 교체
+          deploy_one() {
+            local SERVICE="$1"
+
+            TASK_DEF_ARN=$(aws ecs describe-services \
+              --cluster "${ECS_CLUSTER}" \
+              --services "${SERVICE}" \
+              --region "${AWS_REGION}" \
+              --query 'services[0].taskDefinition' \
+              --output text)
+
+            TASK_DEF=$(aws ecs describe-task-definition \
+              --task-definition "${TASK_DEF_ARN}" \
+              --region "${AWS_REGION}" \
+              --query 'taskDefinition')
+
+            NEW_TASK_DEF=$(echo "${TASK_DEF}" | jq \
+              --arg tag "${IMAGE_TAG}" \
+              'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.placementConstraints,.compatibilities,.registeredAt,.registeredBy)
+               | (.containerDefinitions[].image) |= (split(":")[0] + ":" + $tag)')
+
+            NEW_ARN=$(aws ecs register-task-definition \
+              --cli-input-json "${NEW_TASK_DEF}" \
+              --region "${AWS_REGION}" \
+              --query 'taskDefinition.taskDefinitionArn' \
+              --output text)
+
+            aws ecs update-service \
+              --cluster "${ECS_CLUSTER}" \
+              --service "${SERVICE}" \
+              --task-definition "${NEW_ARN}" \
+              --region "${AWS_REGION}" \
+              --no-cli-pager > /dev/null
+            echo "배포 시작: ${SERVICE} → ${NEW_ARN##*/}"
+            aws ecs wait services-stable \
+              --cluster "${ECS_CLUSTER}" \
+              --region "${AWS_REGION}" \
+              --services "${SERVICE}"
+            echo "배포 완료: ${SERVICE}"
+          }
+
+          # SERVICES 목록의 서비스를 모두 백그라운드로 동시에 배포합니다.
+          pids=()
+          for SERVICE in ${SERVICES}; do
+            deploy_one "${SERVICE}" &
+            pids+=($!)
+          done
+          for pid in "${pids[@]}"; do wait "$pid" || exit 1; done

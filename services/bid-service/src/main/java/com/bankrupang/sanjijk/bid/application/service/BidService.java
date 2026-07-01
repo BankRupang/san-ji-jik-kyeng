@@ -1,6 +1,5 @@
 package com.bankrupang.sanjijk.bid.application.service;
 
-import com.bankrupang.sanjijk.bid.domain.event.AuctionExtendedEvent;
 import com.bankrupang.sanjijk.bid.domain.event.BidOvertakenEvent;
 import com.bankrupang.sanjijk.bid.domain.exception.BidErrorCode;
 import com.bankrupang.sanjijk.bid.domain.exception.BidException;
@@ -19,10 +18,13 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
+import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 
 @Slf4j
 @Service
@@ -48,7 +50,9 @@ public class BidService {
 
             String hashKey = "auction:" + auctionId + ":info";
             Map<Object, Object> info = redisTemplate.opsForHash().entries(hashKey);
-
+            if (userId.equals(info.get("sellerId"))) {
+                throw new BidException(BidErrorCode.SELLER_BID);
+            }
             if (info.isEmpty()) {
                 throw new BidException(BidErrorCode.AUCTION_NOT_FOUND);
             }
@@ -87,15 +91,15 @@ public class BidService {
                 throw new BidException(BidErrorCode.DEPOSIT_NOT_PAID);
             }
 
-            if (Duration.between(LocalDateTime.now(), endAt).getSeconds() <= 30) {
-                LocalDateTime newEndAt = endAt.plusMinutes(1);
-                long newTtl = Duration.between(LocalDateTime.now(), newEndAt).getSeconds();
-                redisTemplate.opsForHash().put(hashKey, "endAt", newEndAt.toString());
-                redisTemplate.expire(hashKey, Duration.ofSeconds(newTtl));
-                redisTemplate.opsForZSet().add("auction:endings", auctionId.toString(), newEndAt.toEpochSecond(ZoneOffset.UTC));
-                log.info("안티스나이핑 발동 - auctionId: {}, newEndAt: {}", auctionId, newEndAt);
-                bidEventProducer.sendAuctionExtended(new AuctionExtendedEvent(auctionId.toString(), newEndAt));
-            }
+
+            LocalDateTime newEndAt = LocalDateTime.now().plusMinutes(1);
+            long newTtl = Duration.between(LocalDateTime.now(), newEndAt).getSeconds();
+            redisTemplate.opsForHash().put(hashKey, "endAt", newEndAt.toString());
+            DefaultRedisScript<Long> expireScript = new DefaultRedisScript<>(
+                    "return redis.call('EXPIRE', KEYS[1], ARGV[1])", Long.class);
+            redisTemplate.execute(expireScript, Collections.singletonList(hashKey), String.valueOf(newTtl));
+            redisTemplate.opsForZSet().add("auction:endings", auctionId.toString(), newEndAt.atZone(ZoneId.of("Asia/Seoul")).toEpochSecond());
+            log.info("입찰 처리 - auctionId: {}, newEndAt: {}", auctionId, newEndAt);
 
             redisTemplate.opsForHash().put(hashKey, "currentPrice", String.valueOf(request.getBidPrice()));
             redisTemplate.opsForHash().put(hashKey, "highestBidderId", userId.toString());
