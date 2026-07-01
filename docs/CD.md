@@ -15,6 +15,7 @@ main 브랜치에 merge
                    필요한 파일을 S3에 업로드
                    -> SSM으로 EC2에 명령 전송
                    -> S3 sync -> .env 구성 -> docker compose up
+                   -> Keycloak realm import + client-secret 발급 (멱등)
 ```
 
 Kafka EC2는 재기동 시 입찰 이벤트가 끊기기 때문에 자동 배포 대상에서 제외합니다. 경매가 없는 시간에 담당자가 GitHub Actions에서 수동으로 실행합니다.
@@ -134,7 +135,7 @@ S3에 올라가는 파일 목록은 다음과 같습니다.
 | 대상 | S3 경로 | 파일 |
 |---|---|---|
 | Kafka EC2 | `deploy/kafka/` | `docker-compose.kafka.yml`, `jmx/kafka.yml`, `jmx/jmx_prometheus_javaagent-1.0.1.jar`, `scripts/deploy-kafka.sh`, `scripts/env.sh` |
-| 모니터링 EC2 | `deploy/monitoring/` | `docker-compose.monitoring.yml`, `monitoring/` 전체, `scripts/deploy-monitoring.sh`, `scripts/env.sh` |
+| 모니터링 EC2 | `deploy/monitoring/` | `docker-compose.monitoring.yml`, `monitoring/` 전체, `scripts/deploy-monitoring.sh`, `scripts/env.sh`, `db/init/*`, `infra/keycloak/realm-export.json` |
 
 JMX Exporter JAR는 레포에 포함되어 있지 않습니다. GHA 러너가 S3 업로드 전에 Maven Central에서 다운로드하고, 워크플로우에 하드코딩된 SHA-256(`env.JMX_SHA256`)과 대조해 무결성을 검증한 뒤 S3에 올립니다. 동일한 버전은 `actions/cache`로 캐시되어 재다운로드하지 않습니다.
 
@@ -169,6 +170,27 @@ JMX Exporter JAR는 레포에 포함되어 있지 않습니다. GHA 러너가 S3
 ECS 디스커버리 스크립트(`ecs-discovery.sh`)를 크론에 등록해 5분마다 실행합니다. Prometheus가 Fargate 태스크 IP를 동적으로 파악하기 위한 용도입니다. `ecs-targets.json`이 없으면 빈 파일로 초기화합니다.
 
 `docker compose up -d` 이후 `prometheus` 컨테이너를 한 번 재시작해 새 설정을 반영합니다.
+
+### Keycloak 설정 자동화
+
+모니터링 EC2 배포 완료 직후, GitHub Actions 러너에서 `scripts/keycloak-setup.sh`를 실행합니다. 조건은 `inputs.target != 'kafka'`로, monitoring 또는 both 배포 시에만 실행됩니다.
+
+```
+모니터링 EC2 배포 완료
+      ↓
+keycloak-setup.sh 실행 (GHA 러너)
+      ↓
+모니터링 EC2에 SSM Run Command 전송
+      ↓
+모니터링 EC2 → Keycloak ECS (:18080) Keycloak API 호출
+      ↓
+realm 없으면: realm import + client-secret 발급 → SSM 저장
+realm 있으면: SKIP (이미 설정됨)
+```
+
+**멱등 처리**: Keycloak DB(RDS)에 sanjijk realm이 이미 있으면 아무것도 하지 않습니다. `terraform destroy` 후 재배포할 때만 실제로 동작합니다. 평소 main push 때는 빠르게 SKIP하고 종료합니다.
+
+**순서가 중요한 이유**: Keycloak은 퍼블릭 이미지를 쓰므로 `terraform apply` 시점에 바로 기동됩니다. keycloak-setup이 끝난 뒤 Deploy ECS가 실행되어야 user-service가 새 client-secret을 SSM에서 읽어 정상 기동할 수 있습니다.
 
 ### 배포 완료 확인
 
