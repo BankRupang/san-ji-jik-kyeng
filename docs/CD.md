@@ -119,6 +119,8 @@ Kafka 배포는 경매 금지 기간(자정)에만 실행한다는 정책에 따
 
 GitHub Actions 러너에서 AWS SSM Run Command로 EC2에 셸 스크립트를 전송합니다. EC2에 직접 SSH로 들어가지 않습니다.
 
+Kafka는 3대이므로 `--targets "Key=tag:Role,Values=kafka"`로 SSM 명령을 한 번에 모든 브로커에 전송한 뒤, 인스턴스 ID 목록을 배열로 받아 한 대씩 완료를 기다립니다. 한 대라도 실패하면 워크플로우가 실패로 끝납니다.
+
 EC2에서 실행되는 내용은 다음과 같습니다.
 
 ```
