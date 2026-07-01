@@ -65,7 +65,15 @@ Gradle 캐시를 복원한 뒤 `./gradlew bootJar -x test --parallel`로 전체 
 
 **3. Wave 배포**
 
-task definition은 건드리지 않고, `--force-new-deployment`로 ECS가 `:latest` 이미지를 다시 pull하게 만듭니다.
+`_deploy-wave.yml`(재사용 워크플로)이 서비스마다 새 Task Definition 리비전을 만들어 배포합니다.
+
+```
+1. family 이름(sanji-prod-{서비스명})으로 Terraform이 등록해둔 최신 리비전 조회
+2. 이미지 태그만 SHA(커밋 앞 7자)로 교체
+3. register-task-definition으로 새 리비전 등록
+4. update-service --task-definition <새 리비전>
+```
+
 10개 서비스를 한꺼번에 롤링하지 않고 wave 단위로 나눠 순서대로 배포합니다.
 
 **wave로 나누는 이유**: 계정의 Fargate On-Demand vCPU 한도가 30이고, 정상 운영 시 19.5 vCPU를 사용합니다.
