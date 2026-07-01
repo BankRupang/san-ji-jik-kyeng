@@ -8,4 +8,5 @@ public interface OrderEventPublisher {
 
     void publishDepositCreated(Order order, LocalDateTime endAt);
     void publishWinningCreated(Order order, int depositAmount);
+    void publishDepositForfeited(Order winningOrder, Order depositOrder);
 }
