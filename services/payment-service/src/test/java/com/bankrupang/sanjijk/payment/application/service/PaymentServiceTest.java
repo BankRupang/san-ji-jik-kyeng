@@ -461,9 +461,9 @@ class PaymentServiceTest {
             given(paymentRepository.findAllByOrderIdAndPaymentTypeAndStatus(
                     orderId, PaymentType.WINNING_REPAY, PaymentStatus.READY))
                     .willReturn(List.of());
-            given(paymentRepository.findByOrderIdAndPaymentTypeAndStatus(
-                    orderId, PaymentType.NORMAL, PaymentStatus.ABORTED))
-                    .willReturn(Optional.of(abortedPayment));
+            given(paymentRepository.findByOrderIdAndPaymentTypeAndStatusIn(
+                    orderId, PaymentType.NORMAL, List.of(PaymentStatus.ABORTED, PaymentStatus.EXPIRED)))
+                    .willReturn(List.of(abortedPayment));
 
             // when
             PaymentResponse response = paymentService.repayPayment(orderId, userId);
@@ -516,9 +516,9 @@ class PaymentServiceTest {
             given(paymentRepository.findAllByOrderIdAndPaymentTypeAndStatus(
                     orderId, PaymentType.WINNING_REPAY, PaymentStatus.READY))
                     .willReturn(List.of());
-            given(paymentRepository.findByOrderIdAndPaymentTypeAndStatus(
-                    orderId, PaymentType.NORMAL, PaymentStatus.ABORTED))
-                    .willReturn(Optional.of(abortedPayment));
+            given(paymentRepository.findByOrderIdAndPaymentTypeAndStatusIn(
+                    orderId, PaymentType.NORMAL, List.of(PaymentStatus.ABORTED, PaymentStatus.EXPIRED)))
+                    .willReturn(List.of(abortedPayment));
 
             // when & then
             assertThatThrownBy(() -> paymentService.repayPayment(orderId, UUID.randomUUID()))
@@ -536,9 +536,9 @@ class PaymentServiceTest {
             given(paymentRepository.findAllByOrderIdAndPaymentTypeAndStatus(
                     orderId, PaymentType.WINNING_REPAY, PaymentStatus.READY))
                     .willReturn(List.of());
-            given(paymentRepository.findByOrderIdAndPaymentTypeAndStatus(
-                    orderId, PaymentType.NORMAL, PaymentStatus.ABORTED))
-                    .willReturn(Optional.empty());
+            given(paymentRepository.findByOrderIdAndPaymentTypeAndStatusIn(
+                    orderId, PaymentType.NORMAL, List.of(PaymentStatus.ABORTED, PaymentStatus.EXPIRED)))
+                    .willReturn(List.of());
 
             // when & then
             assertThatThrownBy(() -> paymentService.repayPayment(orderId, UUID.randomUUID()))
