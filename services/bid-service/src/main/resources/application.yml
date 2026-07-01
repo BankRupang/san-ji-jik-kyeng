@@ -3,13 +3,11 @@ spring:
     name: bid-service
   config:
     import: "optional:configserver:"
-  cloud:
-    inetutils:
-      preferred-networks:
-        - 10.0
   kafka:
     bootstrap-servers: localhost:9092
     producer:
+      acks: all
+      retries: 3
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
     consumer:

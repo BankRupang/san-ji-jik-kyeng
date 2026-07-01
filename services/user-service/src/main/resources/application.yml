@@ -8,9 +8,6 @@ spring:
   config:
     import: "optional:configserver:"
   cloud:
-    inetutils:
-      preferred-networks:
-        - 10.0
     config:
       enabled: true
       fail-fast: true
@@ -21,9 +18,15 @@ spring:
       port: 6379
 
 
+  flyway:
+    schemas: user_schema
+    create-schemas: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
         show_sql: true

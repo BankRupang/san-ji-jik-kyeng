@@ -7,6 +7,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class ChatClientConfig {
 
+    public static final String DOCUMENT_CONTEXT_MARKER = "[참고 문서]";
+
     public static final String BASE_SYSTEM_PROMPT = """
             당신은 산지직경 경매 플랫폼의 전문 상담 챗봇입니다.
 

@@ -25,4 +25,6 @@ public interface AuctionRepository extends JpaRepository<Auction, UUID> {
     Page<Auction> findAllByStatusAndDeletedAtIsNull(AuctionStatus status, Pageable pageable);
 
     List<Auction> findAllByStatusInAndDeletedAtIsNull(Collection<AuctionStatus> statuses);
+
+    List<Auction> findAllByStatusAndEndAtBeforeAndDeletedAtIsNull(AuctionStatus status, java.time.LocalDateTime dateTime);
 }

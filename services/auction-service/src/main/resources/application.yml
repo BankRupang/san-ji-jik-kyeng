@@ -3,10 +3,6 @@
     name: auction-service
   config:
     import: "optional:configserver:"
-  cloud:
-    inetutils:
-      preferred-networks:
-        - 10.0
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
@@ -15,5 +11,7 @@
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
     producer:
+      acks: all
+      retries: 3
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer

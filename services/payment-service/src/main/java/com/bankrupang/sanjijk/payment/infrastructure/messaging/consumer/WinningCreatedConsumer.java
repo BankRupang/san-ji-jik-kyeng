@@ -16,6 +16,11 @@ public class WinningCreatedConsumer {
 
     @KafkaListener(topics = "winning-created", groupId = "payment-service")
     public void consume(WinningCreatedEvent event) {
+
+        if(event == null){
+            log.info("[Consumer] WINNING_CREATED 역직렬화 실패");
+            return;
+        }
         log.info("[CONSUMER] WINNING_CREATED 수신 - orderId: {}, userId: {}, auctionId: {}",
                 event.orderId(), event.userId(), event.auctionId());
         winningCreatedHandler.handle(event);
