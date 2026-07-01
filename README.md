@@ -1,5 +1,38 @@
 # 산지직경
 
+> 생산자와 구매자를 실시간으로 연결하여 유통 마진을 줄이고 신선한 농수산물을 공정한 가격에 거래할 수 있는 B2B 경매 플랫폼입니다.
+
+## 핵심 기능
+
+**🔨 실시간 경매**
+- WebSocket/STOMP 기반 실시간 입찰
+- Redisson 분산 락으로 동시성 제어
+- Anti-Sniping (마감 30초 내 입찰 시 1분 연장)
+
+**💳 보증금 기반 결제**
+- 방 입장 시 보증금 선결제
+- 토스페이먼츠 연동
+- 낙찰 실패 시 전액 환불
+
+**🔔 실시간 알림**
+- Kafka 이벤트 기반 Slack 알림
+- 낙찰 / 결제 / 추월 알림
+
+**🤖 AI 챗봇**
+- RAG 기반 경매 규정 안내
+- Spring AI + Gemini
+- 멀티턴 대화 지원
+
+## 아키텍처 다이어그램
+
+<details>
+<summary>접기/펼치기</summary>
+<img width="1560" height="1498" alt="image" src="https://github.com/user-attachments/assets/4bbb98a6-bd64-48db-84c0-d919d7c0e6e3" />
+
+</details>
+
+---
+
 ## 접속 주소
 
 | 서비스 | 주소 | 계정 |
@@ -8,6 +41,7 @@
 | Prometheus | http://localhost:9090| - |
 | Grafana | http://localhost:3000 | admin / admin |
 | Langfuse | http://localhost:3001 | 최초 접속 시 회원가입 |
+| Keycloak | http://localhost:18080/ |  |
 
 ---
 
