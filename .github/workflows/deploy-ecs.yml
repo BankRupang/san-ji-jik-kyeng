@@ -158,7 +158,7 @@ jobs:
   wave-1:
     name: "Wave 1: config / discovery / gateway"
     needs: [build, plan]
-    if: success() && needs.plan.outputs.wave1 != ''
+    if: ${{ !failure() && !cancelled() && needs.plan.outputs.wave1 != '' }}
     uses: ./.github/workflows/_deploy-wave.yml
     with:
       services: ${{ needs.plan.outputs.wave1 }}
@@ -171,7 +171,7 @@ jobs:
   wave-2:
     name: "Wave 2: user / auction / order / payment"
     needs: [wave-1, plan]
-    if: success() && needs.plan.outputs.wave2 != ''
+    if: ${{ !failure() && !cancelled() && needs.plan.outputs.wave2 != '' }}
     uses: ./.github/workflows/_deploy-wave.yml
     with:
       services: ${{ needs.plan.outputs.wave2 }}
@@ -184,7 +184,7 @@ jobs:
   wave-3:
     name: "Wave 3: bid / notification"
     needs: [wave-2, plan]
-    if: success() && needs.plan.outputs.wave3 != ''
+    if: ${{ !failure() && !cancelled() && needs.plan.outputs.wave3 != '' }}
     uses: ./.github/workflows/_deploy-wave.yml
     with:
       services: ${{ needs.plan.outputs.wave3 }}
@@ -198,7 +198,7 @@ jobs:
   wave-4:
     name: "Wave 4: ai-service"
     needs: [wave-3, plan]
-    if: success() && needs.plan.outputs.wave4 != ''
+    if: ${{ !failure() && !cancelled() && needs.plan.outputs.wave4 != '' }}
     uses: ./.github/workflows/_deploy-wave.yml
     with:
       services: ${{ needs.plan.outputs.wave4 }}
