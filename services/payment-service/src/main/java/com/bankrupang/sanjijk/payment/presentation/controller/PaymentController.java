@@ -54,4 +54,13 @@ public class PaymentController {
         log.info("[API] POST /repay/{} - userId: {}", orderId, userId);
         return ResponseEntity.ok(paymentService.repayPayment(orderId, userId));
     }
+
+    @Operation(summary = "주문 ID로 결제 조회", description = "orderId로 결제 정보를 조회합니다.")
+    @GetMapping("/order/{orderId}")
+    public ResponseEntity<PaymentResponse> getPaymentByOrderId(
+            @PathVariable UUID orderId,
+            @RequestHeader("X-User-Id") UUID userId
+    ) {
+        return ResponseEntity.ok(paymentService.getPaymentByOrderId(orderId, userId));
+    }
 }

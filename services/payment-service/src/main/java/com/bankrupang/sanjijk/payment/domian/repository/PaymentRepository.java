@@ -10,7 +10,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import jakarta.persistence.LockModeType;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -33,6 +32,10 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     Optional<Payment> findByOrderIdAndPaymentTypeAndStatus(
             UUID orderId, PaymentType paymentType, PaymentStatus status);
 
+    // 재결제 멱등성 체크용 - 이미 생성된 WINNING_REPAY READY Payment가 있는지 확인
+    List<Payment> findAllByOrderIdAndPaymentTypeAndStatus(
+            UUID orderId, PaymentType paymentType, PaymentStatus status);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Payment p WHERE p.id = :id")
     Optional<Payment> findByIdWithLock(@Param("id") UUID id);
@@ -43,4 +46,9 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
             @Param("status") PaymentStatus status,
             @Param("expiredBefore") LocalDateTime expiredBefore,
             Pageable pageable);
+
+    // 프론트로 넘길 낙찰금-보증금 (READY 상태만 - 같은 orderId라도 가장 최근 생성된 1건만 반환)
+    @Query("SELECT p FROM Payment p WHERE p.orderId = :orderId AND p.status = :status ORDER BY p.createdAt DESC")
+    List<Payment> findAllByOrderIdAndStatusOrderByCreatedAtDesc(
+            @Param("orderId") UUID orderId, @Param("status") PaymentStatus status, Pageable pageable);
 }
