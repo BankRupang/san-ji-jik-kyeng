@@ -44,6 +44,7 @@ public class OrderSchedulerTransaction {
                         return;
                     }
                     depositOrder.markForfeited();
+                    orderRepository.save(depositOrder);
                     log.warn("[SCHEDULER] 예치금 몰수 처리 - orderId: {}, userId: {}, orderType: {}, PAYMENT_SUCCESS → FORFEITED",
                             depositOrder.getId(), depositOrder.getUserId(), depositOrder.getOrderType());
                     orderEventPublisher.publishDepositForfeited(order, depositOrder);
