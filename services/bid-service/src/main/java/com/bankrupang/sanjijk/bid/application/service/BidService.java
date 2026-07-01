@@ -97,7 +97,7 @@ public class BidService {
 
 
             LocalDateTime newEndAt = LocalDateTime.now().plusMinutes(1);
-            long newTtl = Duration.between(LocalDateTime.now(), newEndAt).getSeconds() + END_CHECK_TTL_BUFFER_SECONDS;
+            long newTtl = Duration.ofMinutes(1).getSeconds() + END_CHECK_TTL_BUFFER_SECONDS;
             redisTemplate.opsForHash().put(hashKey, "endAt", newEndAt.toString());
             DefaultRedisScript<Long> expireScript = new DefaultRedisScript<>(
                     "return redis.call('EXPIRE', KEYS[1], ARGV[1])", Long.class);
