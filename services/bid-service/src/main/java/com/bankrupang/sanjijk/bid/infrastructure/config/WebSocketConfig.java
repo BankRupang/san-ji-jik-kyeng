@@ -65,7 +65,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                         throw new MessagingException("정지된 사용자는 입찰에 참여할 수 없습니다.");
                     }
 
-                    accessor.setUser(new UserPrincipal(userId));
+                    String role = accessor.getFirstNativeHeader("X-User-Role");
+                    accessor.setUser(new UserPrincipal(userId, role));
                     log.info("Principal 설정 완료 - userId: {}", userId);
                 }
                 return message;

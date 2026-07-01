@@ -192,34 +192,7 @@ public class AuctionService {
         });
     }
 
-    @Transactional
-    public void extendAuctionByExtendedEvent(UUID auctionId, LocalDateTime newEndAt) {
-        AuctionLogContext.runWithAuctionId(auctionId, () -> {
-            Auction auction = getExistingAuction(auctionId);
 
-            if (auction.getStatus() != AuctionStatus.PROGRESS) {
-                log.info("경매 연장 이벤트 처리 생략 - PROGRESS 상태가 아닙니다. auctionId: {}, status: {}",
-                        auctionId, auction.getStatus());
-                return;
-            }
-
-            if (newEndAt == null) {
-                throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_PERIOD);
-            }
-
-            if (!newEndAt.isAfter(auction.getEndAt())) {
-                log.info("경매 연장 이벤트 처리 생략 - 기존 종료 시각 이후가 아닙니다. auctionId: {}, currentEndAt: {}, newEndAt: {}",
-                        auctionId, auction.getEndAt(), newEndAt);
-                return;
-            }
-
-            LocalDateTime previousEndAt = auction.getEndAt();
-            auction.extendEndAt(newEndAt);
-            log.info("경매 종료 시각 연장 - auctionId: {}, trigger: AUCTION_EXTENDED, previousEndAt: {}, newEndAt: {}, extensionCount: {}",
-                    auctionId, previousEndAt, auction.getEndAt(), auction.getExtensionCount());
-            scheduleEndCheckJobAfterCommit(auction);
-        });
-    }
 
     @Transactional
     public void completeAuctionPayment(UUID auctionId) {
@@ -380,13 +353,7 @@ public class AuctionService {
         transactionAfterCommitExecutor.execute(() -> auctionScheduleManager.cancelEndCheckJob(auction.getId()));
     }
 
-    private void scheduleEndCheckJobAfterCommit(Auction auction) {
-        transactionAfterCommitExecutor.execute(() -> auctionScheduleManager.scheduleEndCheckJob(
-                auction.getId(),
-                auction.getEndAt(),
-                () -> auctionSchedulerJobService.checkAuctionEnd(auction.getId())
-        ));
-    }
+
 
 
 

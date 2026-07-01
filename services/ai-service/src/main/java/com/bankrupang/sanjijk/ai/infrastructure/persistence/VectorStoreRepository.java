@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Repository
@@ -34,14 +35,19 @@ public class VectorStoreRepository {
         return total == null ? 0L : total;
     }
 
-    public List<String> hybridSearch(String vectorStr, String query, double similarityThreshold, int searchLimit, int topK) {
-        return jdbcTemplate.queryForList("""
-                WITH vector_results AS (
-                    SELECT id, content,
-                           ROW_NUMBER() OVER (ORDER BY embedding <=> CAST(? AS vector)) AS rank
+    public SearchResult hybridSearchWithStats(String vectorStr, String query, double similarityThreshold, int searchLimit, int topK) {
+        return jdbcTemplate.query("""
+                WITH pre_filter AS (
+                    SELECT id, content, 1 - (embedding <=> CAST(? AS vector)) AS similarity
                     FROM ai_schema.vector_store
-                    WHERE 1 - (embedding <=> CAST(? AS vector)) >= ?
+                    ORDER BY embedding <=> CAST(? AS vector)
                     LIMIT ?
+                ),
+                vector_results AS (
+                    SELECT id, content,
+                           ROW_NUMBER() OVER (ORDER BY similarity DESC) AS rank
+                    FROM pre_filter
+                    WHERE similarity >= ?
                 ),
                 text_results AS (
                     SELECT id, content,
@@ -60,9 +66,23 @@ public class VectorStoreRepository {
                     FROM vector_results v
                     FULL OUTER JOIN text_results t ON v.id = t.id
                 )
-                SELECT content FROM rrf_scores ORDER BY rrf_score DESC LIMIT ?
-                """, String.class,
-                vectorStr, vectorStr, similarityThreshold, searchLimit,
+                SELECT content, (SELECT COALESCE(MAX(similarity), 0.0) FROM pre_filter) AS max_similarity
+                FROM rrf_scores ORDER BY rrf_score DESC LIMIT ?
+                """,
+                rs -> {
+                    List<String> contents = new ArrayList<>();
+                    double maxSimilarity = 0.0;
+                    if (rs.next()) {
+                        maxSimilarity = rs.getDouble("max_similarity");
+                        contents.add(rs.getString("content"));
+                        while (rs.next()) {
+                            contents.add(rs.getString("content"));
+                        }
+                    }
+                    return new SearchResult(contents, maxSimilarity);
+                },
+                vectorStr, vectorStr, searchLimit,
+                similarityThreshold,
                 query, query, searchLimit,
                 topK);
     }

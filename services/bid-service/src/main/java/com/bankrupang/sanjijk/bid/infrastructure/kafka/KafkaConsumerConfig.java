@@ -4,8 +4,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.util.backoff.FixedBackOff;
 
@@ -14,22 +12,19 @@ import org.springframework.util.backoff.FixedBackOff;
 @Configuration
 public class KafkaConsumerConfig {
 
-    // 최대 3회 재시도, 재시도 간격 1초
     private static final long RETRY_INTERVAL_MS = 1000L;
     private static final long MAX_RETRY_COUNT = 3L;
 
     @Bean
-    public DefaultErrorHandler errorHandler(KafkaTemplate<String, Object> kafkaTemplate) {
-        // 처리 실패 시 {topic}.DLT 토픽으로 발행 후 컨슈머 스레드 유지
-        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate);
-
+    public DefaultErrorHandler errorHandler() {
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(
-                recoverer,
+                (record, ex) -> log.error("[BID-KAFKA] 처리 실패 메시지 스킵 - topic: {}, partition: {}, offset: {}, error: {}",
+                        record.topic(), record.partition(), record.offset(), ex.getMessage()),
                 new FixedBackOff(RETRY_INTERVAL_MS, MAX_RETRY_COUNT)
         );
 
         errorHandler.setRetryListeners((record, ex, deliveryAttempt) ->
-                log.warn("[BID-KAFKA] 메시지 처리 재시도 - topic: {}, attempt: {}, error: {}",
+                log.warn("[BID-KAFKA] 재시도 - topic: {}, attempt: {}, error: {}",
                         record.topic(), deliveryAttempt, ex.getMessage())
         );
 

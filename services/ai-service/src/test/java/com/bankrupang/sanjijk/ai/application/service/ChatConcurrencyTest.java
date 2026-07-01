@@ -5,6 +5,7 @@ import com.bankrupang.sanjijk.ai.domain.repository.ChatMessageRepository;
 import com.bankrupang.sanjijk.ai.domain.repository.ChatSessionRepository;
 import com.bankrupang.sanjijk.ai.exception.AiErrorCode;
 import com.bankrupang.sanjijk.ai.infrastructure.ai.HybridSearchService;
+import com.bankrupang.sanjijk.ai.infrastructure.langfuse.LangfuseTraceContext;
 import com.bankrupang.sanjijk.common.exception.BaseException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
@@ -42,6 +43,7 @@ class ChatConcurrencyTest {
     @Mock private ChatMessageRepository messageRepository;
     @Mock private HybridSearchService hybridSearchService;
     @Mock private TransactionTemplate transactionTemplate;
+    @Mock private LangfuseTraceContext traceContext;
 
     private ChatService chatService;
 
@@ -50,7 +52,7 @@ class ChatConcurrencyTest {
     void setUp() {
         chatService = new ChatService(chatClient, sessionRepository, messageRepository,
                 hybridSearchService, transactionTemplate,
-                ObservationRegistry.NOOP, new SimpleMeterRegistry());
+                ObservationRegistry.NOOP, new SimpleMeterRegistry(), traceContext);
         ReflectionTestUtils.setField(chatService, "sessionExpireHours", 24);
         ReflectionTestUtils.setField(chatService, "maxHistory", 10);
 

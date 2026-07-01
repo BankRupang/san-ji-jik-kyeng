@@ -49,7 +49,6 @@ class BidConcurrencyTest {
     void setUp() {
         BidEventProducer bidEventProducer = mock(BidEventProducer.class);
         doNothing().when(bidEventProducer).sendBidOvertaken(any());
-        doNothing().when(bidEventProducer).sendAuctionExtended(any());
 
         Config config = new Config();
         config.useSingleServer().setAddress("redis://localhost:6379");

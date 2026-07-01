@@ -172,3 +172,7 @@ jobs:
           if [ "${TARGET}" = "monitoring" ] || [ "${TARGET}" = "both" ]; then
             send_and_wait "monitoring" "${MONITORING_SCRIPT}"
           fi
+
+      - name: Setup Keycloak realm and client secret
+        if: ${{ inputs.target != 'kafka' }}
+        run: bash scripts/keycloak-setup.sh
