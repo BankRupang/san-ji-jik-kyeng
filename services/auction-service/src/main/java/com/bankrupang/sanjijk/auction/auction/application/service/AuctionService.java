@@ -176,7 +176,16 @@ public class AuctionService {
         return AuctionLogContext.callWithAuctionId(auctionId, () -> {
             Auction auction = getExistingAuction(auctionId);
 
-            return closeAuction(auction, request, "MANUAL");
+            if (request != null && Boolean.TRUE.equals(request.forceFail())) {
+                return closeAuction(auction, null, null, "MANUAL_FORCE_FAIL");
+            }
+
+            HighestBidResponse response = bidClient.getHighestBid(auctionId);
+            boolean hasBid = response != null && response.winnerId() != null && response.finalPrice() != null;
+            UUID winnerId = hasBid ? response.winnerId() : null;
+            Integer finalPrice = hasBid ? response.finalPrice() : null;
+
+            return closeAuction(auction, winnerId, finalPrice, "MANUAL_CLOSE");
         });
     }
 
@@ -184,11 +193,10 @@ public class AuctionService {
     public AuctionCloseResponse closeAuctionByEndedEvent(UUID auctionId, boolean hasBid, UUID winnerId, Integer finalPrice) {
         return AuctionLogContext.callWithAuctionId(auctionId, () -> {
             Auction auction = getExistingAuction(auctionId);
-            AuctionCloseRequest request = hasBid
-                    ? new AuctionCloseRequest(winnerId, finalPrice)
-                    : null;
+            UUID finalWinnerId = hasBid ? winnerId : null;
+            Integer finalWinningPrice = hasBid ? finalPrice : null;
 
-            return closeAuction(auction, request, "AUCTION_ENDED");
+            return closeAuction(auction, finalWinnerId, finalWinningPrice, "AUCTION_ENDED");
         });
     }
 
@@ -230,14 +238,14 @@ public class AuctionService {
         });
     }
 
-    private AuctionCloseResponse closeAuction(Auction auction, AuctionCloseRequest request, String trigger) {
+    private AuctionCloseResponse closeAuction(Auction auction, UUID winnerId, Integer finalPrice, String trigger) {
         if (isAlreadyClosed(auction)) {
             log.info("경매 마감 처리 생략 - 이미 종료된 상태입니다. auctionId: {}, trigger: {}, status: {}",
                     auction.getId(), trigger, auction.getStatus());
             return AuctionCloseResponse.from(auction);
         }
 
-        validateCloseRequest(auction, request);
+        validateCloseRequest(auction, winnerId, finalPrice);
 
         AuctionStatus previousStatus = auction.getStatus();
         auction.markResultPending();
@@ -245,9 +253,9 @@ public class AuctionService {
                 auction.getId(), trigger, previousStatus, auction.getStatus());
         Product product = getExistingProduct(auction.getProductId());
 
-        if (hasWinningResult(request)) {
+        if (winnerId != null && finalPrice != null) {
             previousStatus = auction.getStatus();
-            auction.markWon(request.winnerId(), request.finalPrice());
+            auction.markWon(winnerId, finalPrice);
             log.info("경매 상태 전이 - auctionId: {}, trigger: {}, previousStatus: {}, currentStatus: {}, winnerId: {}, finalPrice: {}",
                     auction.getId(), trigger, previousStatus, auction.getStatus(), auction.getWinnerId(), auction.getFinalPrice());
             auctionOutboxService.saveAuctionWonEvent(auction, product);
@@ -361,31 +369,18 @@ public class AuctionService {
         return auction.getStatus() == AuctionStatus.WON || auction.getStatus() == AuctionStatus.FAIL;
     }
 
-    private void validateCloseRequest(Auction auction, AuctionCloseRequest request) {
-        if (request == null) {
+    private void validateCloseRequest(Auction auction, UUID winnerId, Integer finalPrice) {
+        if (winnerId == null && finalPrice == null) {
             return;
         }
 
-        if (isInvalidWinningResultPair(request)) {
+        if (winnerId == null || finalPrice == null) {
             throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_RESULT);
         }
 
-        if (!hasWinningResult(request)) {
-            return;
-        }
-
-        if (request.finalPrice() < auction.getStartPrice()) {
+        if (finalPrice < auction.getStartPrice()) {
             throw new AuctionException(AuctionErrorCode.INVALID_AUCTION_RESULT);
         }
-    }
-
-    private boolean hasWinningResult(AuctionCloseRequest request) {
-        return request != null && request.winnerId() != null && request.finalPrice() != null;
-    }
-
-    private boolean isInvalidWinningResultPair(AuctionCloseRequest request) {
-        return (request.winnerId() == null && request.finalPrice() != null)
-                || (request.winnerId() != null && request.finalPrice() == null);
     }
 
     private void validateAuctionOwnerOrMasterOrManager(Auction auction, UUID userId, String userRole) {
