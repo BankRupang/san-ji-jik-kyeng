@@ -42,6 +42,27 @@ LANGFUSE_SALT=$(aws ssm get-parameter \
   --output text \
   --region "${REGION}")
 
+LANGFUSE_INIT_PROJECT_PUBLIC_KEY=$(aws ssm get-parameter \
+  --name /sanji/prod/langfuse/public-key \
+  --with-decryption \
+  --query Parameter.Value \
+  --output text \
+  --region "${REGION}")
+
+LANGFUSE_INIT_PROJECT_SECRET_KEY=$(aws ssm get-parameter \
+  --name /sanji/prod/langfuse/secret-key \
+  --with-decryption \
+  --query Parameter.Value \
+  --output text \
+  --region "${REGION}")
+
+LANGFUSE_INIT_USER_PASSWORD=$(aws ssm get-parameter \
+  --name /sanji/prod/langfuse/init-user-password \
+  --with-decryption \
+  --query Parameter.Value \
+  --output text \
+  --region "${REGION}")
+
 DB_PASSWORD=$(aws ssm get-parameter \
   --name /sanji/prod/db/password \
   --with-decryption \
@@ -80,6 +101,9 @@ LANGFUSE_DATABASE_URL=postgresql://sanji:${DB_PASSWORD}@${RDS_HOST}:5432/sanji?s
 LANGFUSE_NEXTAUTH_SECRET=${LANGFUSE_NEXTAUTH_SECRET}
 LANGFUSE_NEXTAUTH_URL=http://${MONITORING_PUBLIC_IP}:3001
 LANGFUSE_SALT=${LANGFUSE_SALT}
+LANGFUSE_INIT_PROJECT_PUBLIC_KEY=${LANGFUSE_INIT_PROJECT_PUBLIC_KEY}
+LANGFUSE_INIT_PROJECT_SECRET_KEY=${LANGFUSE_INIT_PROJECT_SECRET_KEY}
+LANGFUSE_INIT_USER_PASSWORD=${LANGFUSE_INIT_USER_PASSWORD}
 EOF
 chmod 600 .env
 
