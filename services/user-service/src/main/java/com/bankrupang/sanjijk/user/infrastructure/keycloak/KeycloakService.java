@@ -5,7 +5,6 @@ import com.bankrupang.sanjijk.user.domain.exception.KeycloakLoginFailedException
 import com.bankrupang.sanjijk.user.domain.exception.UserKeycloakCreationFailedException;
 import com.bankrupang.sanjijk.user.presentation.dto.response.KeycloakTokenResponse;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import io.github.resilience4j.timelimiter.annotation.TimeLimiter;
 import jakarta.ws.rs.NotAuthorizedException;
 import jakarta.ws.rs.core.Response;
 import lombok.RequiredArgsConstructor;
@@ -78,10 +77,9 @@ public class KeycloakService {
         }
     }
 
-    // 로그인 — Circuit Breaker + TimeLimiter 적용
+    // 로그인 — Circuit Breaker 적용
     // Keycloak 응답 3초 초과 또는 실패율 50% 초과 시 loginFallback 호출
     @CircuitBreaker(name = "keycloak", fallbackMethod = "loginFallback")
-    @TimeLimiter(name = "keycloak")
     public KeycloakTokenResponse login(String username, String password) {
         try {
             Keycloak keycloakLogin = KeycloakBuilder.builder()
@@ -137,7 +135,6 @@ public class KeycloakService {
 
     // Refresh Token으로 새 Access Token 발급 — Circuit Breaker 적용
     @CircuitBreaker(name = "keycloak", fallbackMethod = "refreshTokenFallback")
-    @TimeLimiter(name = "keycloak")
     public KeycloakTokenResponse refreshToken(String refreshToken) {
         try {
             MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
