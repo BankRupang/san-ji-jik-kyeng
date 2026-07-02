@@ -181,7 +181,7 @@ class UserControllerTest {
         @DisplayName("MASTER 권한으로 조회 성공 - 200 OK")
         void getUser_asMaster_success() throws Exception {
             var response = new AdminUserDetailResponse(USER_ID, "testuser", "테스트유저",
-                    "test@test.com", "010-1234-5678", UserRole.BUYER, UserStatus.ACTIVE);
+                    "test@test.com", "010-1234-5678", "U122DSDFW",UserRole.BUYER, UserStatus.ACTIVE);
             given(userService.getAdminUserDetail(any())).willReturn(response);
 
             mockMvc.perform(get("/api/v1/users/one")
