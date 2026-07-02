@@ -174,17 +174,17 @@ class UserControllerTest {
     // 유저 단건 조회 (MASTER/MANAGER 전용)
     // ──────────────────────────────────────────────────
     @Nested
-    @DisplayName("GET /api/v1/user/one")
+    @DisplayName("GET /api/v1/users/one")
     class GetUserApi {
 
         @Test
         @DisplayName("MASTER 권한으로 조회 성공 - 200 OK")
         void getUser_asMaster_success() throws Exception {
             var response = new AdminUserDetailResponse(USER_ID, "testuser", "테스트유저",
-                    "test@test.com", "010-1234-5678", UserRole.BUYER, UserStatus.ACTIVE);
+                    "test@test.com", "010-1234-5678", "U122DSDFW",UserRole.BUYER, UserStatus.ACTIVE);
             given(userService.getAdminUserDetail(any())).willReturn(response);
 
-            mockMvc.perform(get("/api/v1/user/one")
+            mockMvc.perform(get("/api/v1/users/one")
                             .param("userId", USER_ID.toString())
                             .header("X-User-Id", USER_ID.toString())
                             .header("X-User-Role", "MASTER"))
@@ -195,7 +195,7 @@ class UserControllerTest {
         @Test
         @DisplayName("인증 없이 접근 → 403 Forbidden")
         void getUser_noAuth_403() throws Exception {
-            mockMvc.perform(get("/api/v1/user/one")
+            mockMvc.perform(get("/api/v1/users/one")
                             .param("userId", USER_ID.toString()))
                     .andExpect(status().isForbidden());
         }
@@ -203,7 +203,7 @@ class UserControllerTest {
         @Test
         @DisplayName("BUYER 권한으로 접근 → 403 Forbidden")
         void getUser_buyerRole_403() throws Exception {
-            mockMvc.perform(get("/api/v1/user/one")
+            mockMvc.perform(get("/api/v1/users/one")
                             .param("userId", USER_ID.toString())
                             .header("X-User-Id", USER_ID.toString())
                             .header("X-User-Role", "BUYER"))
@@ -215,7 +215,7 @@ class UserControllerTest {
         void getUser_notFound_404() throws Exception {
             given(userService.getAdminUserDetail(any())).willThrow(new UserNotFoundException());
 
-            mockMvc.perform(get("/api/v1/user/one")
+            mockMvc.perform(get("/api/v1/users/one")
                             .param("userId", USER_ID.toString())
                             .header("X-User-Id", USER_ID.toString())
                             .header("X-User-Role", "MASTER"))
