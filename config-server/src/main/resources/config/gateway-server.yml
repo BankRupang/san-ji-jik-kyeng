@@ -60,7 +60,7 @@ spring:
             - id: ai-service
               uri: lb://ai-service
               predicates:
-                - Path=/api/v1/ai/**
+                - Path=/api/v1/ai/**, /api/v1/admin/ai/**
 
 logging:
   level:

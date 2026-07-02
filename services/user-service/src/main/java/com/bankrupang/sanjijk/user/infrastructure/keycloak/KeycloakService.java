@@ -2,6 +2,7 @@ package com.bankrupang.sanjijk.user.infrastructure.keycloak;
 
 import com.bankrupang.sanjijk.user.domain.UserRole;
 import com.bankrupang.sanjijk.user.domain.exception.KeycloakLoginFailedException;
+import com.bankrupang.sanjijk.user.domain.exception.KeycloakUnavailableException;
 import com.bankrupang.sanjijk.user.domain.exception.UserKeycloakCreationFailedException;
 import com.bankrupang.sanjijk.user.presentation.dto.response.KeycloakTokenResponse;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -106,8 +107,11 @@ public class KeycloakService {
     }
 
     // login() fallback — Circuit OPEN 또는 타임아웃 시 호출
-    public KeycloakTokenResponse loginFallback(String username, String password, Exception e) {
+    private KeycloakTokenResponse loginFallback(String username, String password, Exception e) {
         log.error("[Circuit Breaker] Keycloak 로그인 불가 - username: {}, error: {}", username, e.getMessage());
+        if (e instanceof io.github.resilience4j.circuitbreaker.CallNotPermittedException) {
+            throw new KeycloakUnavailableException();
+        }
         throw new KeycloakLoginFailedException();
     }
 
@@ -128,7 +132,7 @@ public class KeycloakService {
     }
 
     // revokeUserSessions() fallback — 세션 폐기 실패는 로그인을 막지 않음
-    public void revokeSessionsFallback(UUID keycloakUserId, Exception e) {
+    private void revokeSessionsFallback(UUID keycloakUserId, Exception e) {
         log.warn("[Circuit Breaker] 세션 폐기 불가 - userId: {}, 로그인 계속 진행. error: {}",
                 keycloakUserId, e.getMessage());
     }
@@ -167,8 +171,11 @@ public class KeycloakService {
     }
 
     // refreshToken() fallback
-    public KeycloakTokenResponse refreshTokenFallback(String refreshToken, Exception e) {
+    private KeycloakTokenResponse refreshTokenFallback(String refreshToken, Exception e) {
         log.error("[Circuit Breaker] Keycloak 토큰 갱신 불가 - error: {}", e.getMessage());
+        if (e instanceof io.github.resilience4j.circuitbreaker.CallNotPermittedException) {
+            throw new KeycloakUnavailableException();
+        }
         throw new KeycloakLoginFailedException();
     }
 }
