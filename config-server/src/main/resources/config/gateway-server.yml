@@ -49,6 +49,61 @@ spring:
               uri: lb://ai-service
               predicates:
                 - Path=/api/v1/ai/**, /api/v1/admin/ai/**
+            - id: auction-service-api-docs
+              uri: lb://auction-service
+              predicates:
+                - Path=/v3/api-docs/auction-service
+              filters:
+                - SetPath=/v3/api-docs
+            - id: bid-service-api-docs
+              uri: lb://bid-service
+              predicates:
+                - Path=/v3/api-docs/bid-service
+              filters:
+                - SetPath=/v3/api-docs
+            - id: order-service-api-docs
+              uri: lb://order-service
+              predicates:
+                - Path=/v3/api-docs/order-service
+              filters:
+                - SetPath=/v3/api-docs
+            - id: payment-service-api-docs
+              uri: lb://payment-service
+              predicates:
+                - Path=/v3/api-docs/payment-service
+              filters:
+                - SetPath=/v3/api-docs
+            - id: notification-service-api-docs
+              uri: lb://notification-service
+              predicates:
+                - Path=/v3/api-docs/notification-service
+              filters:
+                - SetPath=/v3/api-docs
+            - id: ai-service-api-docs
+              uri: lb://ai-service
+              predicates:
+                - Path=/v3/api-docs/ai-service
+              filters:
+                - SetPath=/v3/api-docs
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    urls-primary-name: auction-service
+    urls:
+      - name: auction-service
+        url: /v3/api-docs/auction-service
+      - name: bid-service
+        url: /v3/api-docs/bid-service
+      - name: order-service
+        url: /v3/api-docs/order-service
+      - name: payment-service
+        url: /v3/api-docs/payment-service
+      - name: notification-service
+        url: /v3/api-docs/notification-service
+      - name: ai-service
+        url: /v3/api-docs/ai-service
 
 logging:
   level:
