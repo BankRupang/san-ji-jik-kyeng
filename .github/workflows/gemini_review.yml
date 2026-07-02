@@ -54,6 +54,7 @@ jobs:
         uses: actions/github-script@v9
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
         with:
           script: |
             const fs = require("fs");
@@ -106,7 +107,7 @@ jobs:
                 "Content-Type": "application/json"
               },
               body: JSON.stringify({
-                model: "google/gemini-3.1-pro-preview",
+                model: process.env.GEMINI_MODEL,
                 messages: [{ role: "user", content: prompt }]
               })
             });
