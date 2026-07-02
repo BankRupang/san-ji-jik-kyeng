@@ -181,9 +181,8 @@ public class AuctionService {
             }
 
             HighestBidResponse response = bidClient.getHighestBid(auctionId);
-            boolean hasBid = response != null && response.winnerId() != null && response.finalPrice() != null;
-            UUID winnerId = hasBid ? response.winnerId() : null;
-            Integer finalPrice = hasBid ? response.finalPrice() : null;
+            UUID winnerId = response != null ? response.winnerId() : null;
+            Integer finalPrice = response != null ? response.finalPrice() : null;
 
             return closeAuction(auction, winnerId, finalPrice, "MANUAL_CLOSE");
         });
