@@ -13,6 +13,7 @@ import com.bankrupang.sanjijk.auction.auction.presentation.dto.response.AuctionS
 import com.bankrupang.sanjijk.auction.outbox.domain.entity.AuctionOutbox;
 import com.bankrupang.sanjijk.auction.outbox.domain.repository.AuctionOutboxRepository;
 import com.bankrupang.sanjijk.auction.outbox.domain.type.AuctionEventType;
+import com.bankrupang.sanjijk.auction.auction.infrastructure.client.BidClient;
 import com.bankrupang.sanjijk.auction.product.domain.entity.Product;
 import com.bankrupang.sanjijk.auction.product.domain.repository.ProductRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,6 +47,9 @@ class AuctionServiceIntegrationTest {
 
     @Autowired
     private AuctionOutboxRepository auctionOutboxRepository;
+
+    @org.springframework.boot.test.mock.mockito.MockBean
+    private BidClient bidClient;
 
     private UUID sellerId;
     private Product product;
@@ -140,7 +144,9 @@ class AuctionServiceIntegrationTest {
         auctionRepository.save(auction);
 
         UUID winnerId = UUID.randomUUID();
-        AuctionCloseRequest request = new AuctionCloseRequest(winnerId, 20000);
+        AuctionCloseRequest request = new AuctionCloseRequest(false);
+        org.mockito.BDDMockito.given(bidClient.getHighestBid(auction.getId()))
+                .willReturn(new com.bankrupang.sanjijk.auction.auction.infrastructure.client.dto.HighestBidResponse(winnerId, 20000));
 
         // when
         AuctionCloseResponse response = auctionService.closeAuctionManually(auction.getId(), request);

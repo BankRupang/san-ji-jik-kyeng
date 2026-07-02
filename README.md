@@ -69,9 +69,9 @@
 |---|---|
 | [API 명세](./docs/API.md) | 전체 API 엔드포인트 및 요청/응답 형식 |
 | [테이블 명세](./docs/TABLES.md) | DB 테이블 구조 |
-| [인프라 구조](./docs/INFRASTRUCTURE.md) | AWS 인프라 설계 및 네트워크 구성 |
+| [인프라 구조](./docs/INFRASTRUCTURE.md) | AWS 인프라 설계 및 의사결정 |
 | [CI 파이프라인](./docs/CI.md) | PR 생성 시 자동 빌드 및 테스트 |
-| [CD 배포 가이드](./docs/CD.md) | ECS 롤링 배포 + EC2 compose 배포 흐름 |
+| [CD 파이프라인](./docs/CD.md) | ECS 롤링 배포 + EC2 compose 배포 흐름 |
 
 ---
 

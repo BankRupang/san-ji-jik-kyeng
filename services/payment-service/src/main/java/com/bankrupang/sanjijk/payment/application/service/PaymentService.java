@@ -194,8 +194,8 @@ public class PaymentService {
     // ================================
     @Transactional(readOnly = true)
     public PaymentResponse getPaymentByOrderId(UUID orderId, UUID userId) {
-        List<Payment> payments = paymentRepository.findAllByOrderIdAndStatusOrderByCreatedAtDesc(
-                orderId, PaymentStatus.READY, PageRequest.of(0, 1));
+        List<Payment> payments = paymentRepository.findAllByOrderIdOrderByCreatedAtDesc(
+                orderId, PageRequest.of(0, 1));
 
         Payment payment = payments.stream().findFirst()
                 .orElseThrow(PaymentNotFoundException::new);
@@ -255,23 +255,26 @@ public class PaymentService {
                 return PaymentResponse.from(existing);
             }
 
-            Payment abortedPayment = paymentRepository
-                    .findByOrderIdAndPaymentTypeAndStatus(orderId, PaymentType.NORMAL, PaymentStatus.ABORTED)
+            // 시도했다가 실패(ABORTED)했든, 시도 자체를 안 해서 만료(EXPIRED)됐든 재결제 기준으로 인정
+            Payment failedPayment = paymentRepository
+                    .findByOrderIdAndPaymentTypeAndStatusIn(
+                            orderId, PaymentType.NORMAL, List.of(PaymentStatus.ABORTED, PaymentStatus.EXPIRED))
+                    .stream().findFirst()
                     .orElseThrow(PaymentNotFoundException::new);
 
             // 15분 제한 체크 - updatedAt 기준
-            if (abortedPayment.getUpdatedAt() != null &&
-                    abortedPayment.getUpdatedAt().isBefore(LocalDateTime.now().minusMinutes(15))) {
-                log.warn("[REPAY] 재결제 15분 초과 - orderId: {}, abortedAt: {}",
-                        orderId, abortedPayment.getUpdatedAt());
+            if (failedPayment.getUpdatedAt() != null &&
+                    failedPayment.getUpdatedAt().isBefore(LocalDateTime.now().minusMinutes(15))) {
+                log.warn("[REPAY] 재결제 15분 초과 - orderId: {}, failedAt: {}",
+                        orderId, failedPayment.getUpdatedAt());
                 throw new PaymentNotFoundException(); // TODO: RepayExpiredException 추가
             }
 
             String newTossOrderId = UUID.randomUUID().toString();
             Payment newPayment = Payment.create(
-                    abortedPayment.getOrderId(), abortedPayment.getUserId(), abortedPayment.getSellerId(),
-                    abortedPayment.getAuctionId(), abortedPayment.getAuctionTitle(), newTossOrderId,
-                    PaymentType.WINNING_REPAY, abortedPayment.getAmount(), abortedPayment.getOriginalAmount(), null
+                    failedPayment.getOrderId(), failedPayment.getUserId(), failedPayment.getSellerId(),
+                    failedPayment.getAuctionId(), failedPayment.getAuctionTitle(), newTossOrderId,
+                    PaymentType.WINNING_REPAY, failedPayment.getAmount(), failedPayment.getOriginalAmount(), null
             );
             paymentRepository.save(newPayment);
 

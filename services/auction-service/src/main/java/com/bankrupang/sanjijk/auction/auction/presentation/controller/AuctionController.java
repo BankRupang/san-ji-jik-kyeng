@@ -126,7 +126,7 @@ public class AuctionController {
 
     @PostMapping("/{auctionId}/close")
     @PreAuthorize("hasAnyRole('MASTER', 'MANAGER')")
-    @Operation(summary = "경매 수동 마감", description = "관리자가 경매를 강제로 WON(낙찰) 또는 FAIL(유찰) 처리하여 마감합니다.")
+    @Operation(summary = "경매 수동 마감", description = "관리자가 경매를 조기 마감합니다. forceFail 플래그에 따라 강제 유찰 또는 최고가 입찰자로 자동 낙찰 처리됩니다.")
     public ResponseEntity<ApiResponse<AuctionCloseResponse>> closeAuctionManually(
             @PathVariable @Parameter(description = "경매 ID") UUID auctionId,
             @Valid @RequestBody(required = false) AuctionCloseRequest request

@@ -71,8 +71,44 @@ LANGFUSE_SALT=${LANGFUSE_SALT}
 EOF
 chmod 600 .env
 
-# Prometheus 설정 파일 치환
-envsubst '$KAFKA_PRIVATE_IP $MONITORING_PRIVATE_IP' < monitoring/prometheus/prometheus.prod.yml.template > monitoring/prometheus/prometheus.prod.yml
+# Prometheus 설정 파일 생성
+# envsubst 대신 직접 생성: KAFKA_PRIVATE_IP가 쉼표로 구분된 여러 IP이므로
+# targets 블록을 루프로 확장해야 합니다.
+IFS=',' read -ra KAFKA_IPS <<< "${KAFKA_PRIVATE_IP}"
+
+cat > monitoring/prometheus/prometheus.prod.yml <<'YAML_HEADER'
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Kafka EC2: JMX Exporter(7071) + Node Exporter(9100)
+  - job_name: "kafka"
+    static_configs:
+      - targets:
+YAML_HEADER
+
+for addr in "${KAFKA_IPS[@]}"; do
+  ip="${addr%%:*}"   # 포트가 붙어 있어도 제거 (IP:9092 → IP)
+  printf '          - "%s:7071"\n          - "%s:9100"\n' "${ip}" "${ip}" >> monitoring/prometheus/prometheus.prod.yml
+done
+
+cat >> monitoring/prometheus/prometheus.prod.yml <<YAML_FOOTER
+
+  # ECS Fargate 앱: ecs-discovery.sh(cron 5분)가 주기적으로 태스크 IP를 JSON 파일에 기록
+  - job_name: "ecs-apps"
+    metrics_path: "/actuator/prometheus"
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/ecs-targets.json
+        refresh_interval: 5m
+
+  # 모니터링 EC2: Node Exporter(9100)
+  - job_name: "monitoring"
+    static_configs:
+      - targets:
+          - "${MONITORING_PRIVATE_IP}:9100"
+YAML_FOOTER
 
 # ecs-targets.json 초기화 (없을 때만)
 [ -f monitoring/prometheus/ecs-targets.json ] || echo "[]" > monitoring/prometheus/ecs-targets.json

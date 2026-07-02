@@ -32,7 +32,8 @@ public class AuctionEventConsumer {
             log.info("경매 시작 이벤트 수신 - auctionId: {}", event.getAuctionId());
 
             String auctionId = event.getAuctionId().toString();
-            LocalDateTime endAt = event.getStartAt().plusMinutes(10);
+            // auction-service의 경매 기간 정책(시작 + 1시간)과 반드시 일치해야 함
+            LocalDateTime endAt = event.getStartAt().plusHours(1);
             long ttlSeconds = Duration.between(LocalDateTime.now(), endAt).getSeconds();
 
             if (ttlSeconds <= 0) {

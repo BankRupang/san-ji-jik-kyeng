@@ -43,19 +43,15 @@ jobs:
           IMAGE_TAG="${GITHUB_SHA::7}"
 
           # 서비스 하나를 SHA 태그 기반 새 Task Definition 리비전으로 배포합니다.
-          # 흐름: 현재 태스크 정의 조회 → 이미지 태그를 SHA로 교체 → 새 리비전 등록 → 서비스 교체
+          # 흐름: Terraform이 등록한 최신 태스크 정의(family) 조회 → 이미지 태그를 SHA로 교체 → 새 리비전 등록 → 서비스 교체
+          # 서비스에 "현재 붙어있는" 정의를 베이스로 삼으면 Terraform이 바꾼 환경변수 등이
+          # 영원히 반영되지 않으므로, family 이름으로 조회해 Terraform의 최신 리비전을 베이스로 삼습니다.
           deploy_one() {
             local SERVICE="$1"
-
-            TASK_DEF_ARN=$(aws ecs describe-services \
-              --cluster "${ECS_CLUSTER}" \
-              --services "${SERVICE}" \
-              --region "${AWS_REGION}" \
-              --query 'services[0].taskDefinition' \
-              --output text)
+            local FAMILY="${ECS_CLUSTER%-cluster}-${SERVICE}"
 
             TASK_DEF=$(aws ecs describe-task-definition \
-              --task-definition "${TASK_DEF_ARN}" \
+              --task-definition "${FAMILY}" \
               --region "${AWS_REGION}" \
               --query 'taskDefinition')
 

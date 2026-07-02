@@ -13,6 +13,7 @@ services:
     restart: unless-stopped
     ports:
       - "9092:9092"
+      - "9093:9093"  # KRaft 컨트롤러(Raft quorum) 포트, 브로커 간 통신
       - "7071:7071"  # JMX Exporter 메트릭 (Prometheus scrape 대상)
     environment:
       KAFKA_NODE_ID: ${KAFKA_NODE_ID}

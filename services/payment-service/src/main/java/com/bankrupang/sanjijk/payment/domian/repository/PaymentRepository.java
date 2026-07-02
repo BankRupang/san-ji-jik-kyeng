@@ -32,6 +32,10 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     Optional<Payment> findByOrderIdAndPaymentTypeAndStatus(
             UUID orderId, PaymentType paymentType, PaymentStatus status);
 
+    // 잔금 재결제용 - ABORTED(시도 후 실패) 또는 EXPIRED(방치 후 만료) 상태 NORMAL Payment 조회
+    List<Payment> findByOrderIdAndPaymentTypeAndStatusIn(
+            UUID orderId, PaymentType paymentType, List<PaymentStatus> statuses);
+
     // 재결제 멱등성 체크용 - 이미 생성된 WINNING_REPAY READY Payment가 있는지 확인
     List<Payment> findAllByOrderIdAndPaymentTypeAndStatus(
             UUID orderId, PaymentType paymentType, PaymentStatus status);
@@ -51,4 +55,10 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     @Query("SELECT p FROM Payment p WHERE p.orderId = :orderId AND p.status = :status ORDER BY p.createdAt DESC")
     List<Payment> findAllByOrderIdAndStatusOrderByCreatedAtDesc(
             @Param("orderId") UUID orderId, @Param("status") PaymentStatus status, Pageable pageable);
+
+    // 프론트 상태 조회용 - 상태 무관하게 해당 주문의 가장 최근 Payment 1건 반환
+    // (원 결제가 ABORTED/EXPIRED로 죽어있어도 프론트가 현재 상태를 알 수 있어야 함)
+    @Query("SELECT p FROM Payment p WHERE p.orderId = :orderId ORDER BY p.createdAt DESC")
+    List<Payment> findAllByOrderIdOrderByCreatedAtDesc(
+            @Param("orderId") UUID orderId, Pageable pageable);
 }

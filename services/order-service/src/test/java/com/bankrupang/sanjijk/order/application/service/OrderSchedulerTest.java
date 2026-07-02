@@ -1,5 +1,6 @@
 package com.bankrupang.sanjijk.order.application.service;
 
+import com.bankrupang.sanjijk.order.application.port.OrderEventPublisher;
 import com.bankrupang.sanjijk.order.domain.entity.Order;
 import com.bankrupang.sanjijk.order.domain.enums.OrderStatus;
 import com.bankrupang.sanjijk.order.domain.enums.OrderType;
@@ -18,7 +19,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 @DisplayName("OrderScheduler 테스트")
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +39,9 @@ class OrderSchedulerTest {
 
     @Mock
     private ObjectMapper objectMapper;
+
+    @Mock
+    private OrderEventPublisher orderEventPublisher;
 
     @Nested
     @DisplayName("expireUnpaidOne()")
@@ -92,6 +99,7 @@ class OrderSchedulerTest {
             // then
             assertThat(winningOrder.getStatus()).isEqualTo(OrderStatus.EXPIRED);
             assertThat(depositOrder.getStatus()).isEqualTo(OrderStatus.FORFEITED);
+            verify(orderEventPublisher).publishDepositForfeited(winningOrder, depositOrder);
         }
 
         @Test
@@ -118,6 +126,7 @@ class OrderSchedulerTest {
 
             // then
             assertThat(winningOrder.getStatus()).isEqualTo(OrderStatus.EXPIRED);
+            verify(orderEventPublisher, never()).publishDepositForfeited(any(), any());
         }
     }
 }

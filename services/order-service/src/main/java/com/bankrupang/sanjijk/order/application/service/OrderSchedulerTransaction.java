@@ -1,5 +1,6 @@
 package com.bankrupang.sanjijk.order.application.service;
 
+import com.bankrupang.sanjijk.order.application.port.OrderEventPublisher;
 import com.bankrupang.sanjijk.order.domain.entity.Order;
 import com.bankrupang.sanjijk.order.domain.enums.OrderStatus;
 import com.bankrupang.sanjijk.order.domain.enums.OrderType;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrderSchedulerTransaction {
 
     private final OrderRepository orderRepository;
+    private final OrderEventPublisher orderEventPublisher;
 
     @Transactional
     public void expireUnpaidOne(Order order) {
@@ -42,8 +44,10 @@ public class OrderSchedulerTransaction {
                         return;
                     }
                     depositOrder.markForfeited();
+                    orderRepository.save(depositOrder);
                     log.warn("[SCHEDULER] 예치금 몰수 처리 - orderId: {}, userId: {}, orderType: {}, PAYMENT_SUCCESS → FORFEITED",
                             depositOrder.getId(), depositOrder.getUserId(), depositOrder.getOrderType());
+                    orderEventPublisher.publishDepositForfeited(order, depositOrder);
                 });
     }
 

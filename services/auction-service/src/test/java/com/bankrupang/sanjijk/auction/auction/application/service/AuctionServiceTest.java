@@ -631,10 +631,11 @@ class AuctionServiceTest {
             Auction auction = createAuction(sellerId, productId, auctionId);
             Product product = createProduct(sellerId, productId);
             auction.start();
-            AuctionCloseRequest request = new AuctionCloseRequest(winnerId, 15000);
+            AuctionCloseRequest request = new AuctionCloseRequest(false);
 
             given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            given(bidClient.getHighestBid(auctionId)).willReturn(new HighestBidResponse(winnerId, 15000));
 
             // when
             AuctionCloseResponse result = auctionService.closeAuctionManually(auctionId, request);
@@ -659,12 +660,14 @@ class AuctionServiceTest {
             Auction auction = createAuction(sellerId, productId, auctionId);
             Product product = createProduct(sellerId, productId);
             auction.start();
+            AuctionCloseRequest request = new AuctionCloseRequest(false);
 
             given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
             given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+            given(bidClient.getHighestBid(auctionId)).willReturn(null);
 
             // when
-            AuctionCloseResponse result = auctionService.closeAuctionManually(auctionId, null);
+            AuctionCloseResponse result = auctionService.closeAuctionManually(auctionId, request);
 
             // then
             assertThat(result.auctionId()).isEqualTo(auctionId);
@@ -674,6 +677,35 @@ class AuctionServiceTest {
             assertThat(auction.getStatus()).isEqualTo(AuctionStatus.FAIL);
             verify(auctionOutboxService).saveAuctionFailedEvent(auction, product);
             verify(auctionOutboxService, never()).saveAuctionWonEvent(any(Auction.class), any(Product.class));
+        }
+
+        @Test
+        @DisplayName("성공 - forceFail 플래그가 true이면 즉시 강제 유찰 처리한다")
+        void success_forced_fail() {
+            // given
+            UUID sellerId = UUID.randomUUID();
+            UUID productId = UUID.randomUUID();
+            UUID auctionId = UUID.randomUUID();
+            Auction auction = createAuction(sellerId, productId, auctionId);
+            Product product = createProduct(sellerId, productId);
+            auction.start();
+            AuctionCloseRequest request = new AuctionCloseRequest(true);
+
+            given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            given(productRepository.findByIdAndDeletedAtIsNull(productId)).willReturn(Optional.of(product));
+
+            // when
+            AuctionCloseResponse result = auctionService.closeAuctionManually(auctionId, request);
+
+            // then
+            assertThat(result.auctionId()).isEqualTo(auctionId);
+            assertThat(result.status()).isEqualTo(AuctionStatus.FAIL);
+            assertThat(result.winnerId()).isNull();
+            assertThat(result.finalPrice()).isNull();
+            assertThat(auction.getStatus()).isEqualTo(AuctionStatus.FAIL);
+            verify(auctionOutboxService).saveAuctionFailedEvent(auction, product);
+            verify(auctionOutboxService, never()).saveAuctionWonEvent(any(Auction.class), any(Product.class));
+            verify(bidClient, never()).getHighestBid(any(UUID.class));
         }
 
         @Test
@@ -688,14 +720,12 @@ class AuctionServiceTest {
             auction.start();
             auction.markResultPending();
             auction.markWon(winnerId, 15000);
+            AuctionCloseRequest request = new AuctionCloseRequest(false);
 
             given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
 
             // when
-            AuctionCloseResponse result = auctionService.closeAuctionManually(
-                    auctionId,
-                    new AuctionCloseRequest(winnerId, 15000)
-            );
+            AuctionCloseResponse result = auctionService.closeAuctionManually(auctionId, request);
 
             // then
             assertThat(result.auctionId()).isEqualTo(auctionId);
@@ -717,11 +747,12 @@ class AuctionServiceTest {
             auction.start();
             auction.markResultPending();
             auction.markFailed();
+            AuctionCloseRequest request = new AuctionCloseRequest(true);
 
             given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
 
             // when
-            AuctionCloseResponse result = auctionService.closeAuctionManually(auctionId, null);
+            AuctionCloseResponse result = auctionService.closeAuctionManually(auctionId, request);
 
             // then
             assertThat(result.auctionId()).isEqualTo(auctionId);
@@ -740,11 +771,12 @@ class AuctionServiceTest {
             UUID productId = UUID.randomUUID();
             UUID auctionId = UUID.randomUUID();
             Auction auction = createAuction(sellerId, productId, auctionId);
+            AuctionCloseRequest request = new AuctionCloseRequest(false);
 
             given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
 
             // when & then
-            assertThatThrownBy(() -> auctionService.closeAuctionManually(auctionId, null))
+            assertThatThrownBy(() -> auctionService.closeAuctionManually(auctionId, request))
                     .isInstanceOf(AuctionException.class)
                     .hasMessage(AuctionErrorCode.INVALID_STATE_TRANSITION.getMessage());
             verify(auctionOutboxService, never()).saveAuctionWonEvent(any(Auction.class), any(Product.class));
@@ -761,9 +793,10 @@ class AuctionServiceTest {
             UUID winnerId = UUID.randomUUID();
             Auction auction = createAuction(sellerId, productId, auctionId);
             auction.start();
-            AuctionCloseRequest request = new AuctionCloseRequest(winnerId, null);
+            AuctionCloseRequest request = new AuctionCloseRequest(false);
 
             given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            given(bidClient.getHighestBid(auctionId)).willReturn(new HighestBidResponse(winnerId, null));
 
             // when & then
             assertThatThrownBy(() -> auctionService.closeAuctionManually(auctionId, request))
@@ -784,9 +817,10 @@ class AuctionServiceTest {
             UUID winnerId = UUID.randomUUID();
             Auction auction = createAuction(sellerId, productId, auctionId);
             auction.start();
-            AuctionCloseRequest request = new AuctionCloseRequest(winnerId, 9000);
+            AuctionCloseRequest request = new AuctionCloseRequest(false);
 
             given(auctionRepository.findByIdAndDeletedAtIsNull(auctionId)).willReturn(Optional.of(auction));
+            given(bidClient.getHighestBid(auctionId)).willReturn(new HighestBidResponse(winnerId, 9000));
 
             // when & then
             assertThatThrownBy(() -> auctionService.closeAuctionManually(auctionId, request))

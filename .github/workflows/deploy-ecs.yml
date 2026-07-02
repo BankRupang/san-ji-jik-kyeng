@@ -7,6 +7,11 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:   # 필요할 때 수동으로 다시 배포하는 버튼
+    inputs:
+      services:
+        description: "재배포할 서비스 목록 (공백 구분, 비워두면 10개 전체). 예: bid-service notification-service"
+        required: false
+        type: string
 
 # OIDC로 AWS에 키 없이 로그인하려면 id-token 쓰기 권한이 반드시 필요합니다.
 permissions:
@@ -19,10 +24,48 @@ env:
 
 jobs:
   # -------------------------------------------------------------------------
+  # 0) 이번 실행에서 어떤 서비스를 빌드/배포할지 결정 (services 입력이 비어있으면 전체)
+  # -------------------------------------------------------------------------
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      all: ${{ steps.plan.outputs.all }}
+      wave1: ${{ steps.plan.outputs.wave1 }}
+      wave2: ${{ steps.plan.outputs.wave2 }}
+      wave3: ${{ steps.plan.outputs.wave3 }}
+      wave4: ${{ steps.plan.outputs.wave4 }}
+    steps:
+      - id: plan
+        env:
+          INPUT_SERVICES: ${{ github.event.inputs.services }}
+        run: |
+          set -euo pipefail
+          ALL="config-server discovery-server gateway-server user-service auction-service order-service payment-service notification-service ai-service bid-service"
+          SELECTED="${INPUT_SERVICES:-$ALL}"
+
+          filter() {
+            local wave_services="$1"
+            local result=""
+            for s in $wave_services; do
+              for sel in $SELECTED; do
+                [ "$s" = "$sel" ] && result="$result $s"
+              done
+            done
+            echo "$result" | xargs echo -n
+          }
+
+          echo "all=$(echo "$SELECTED" | xargs echo -n)" >> "$GITHUB_OUTPUT"
+          echo "wave1=$(filter 'config-server discovery-server gateway-server')" >> "$GITHUB_OUTPUT"
+          echo "wave2=$(filter 'user-service auction-service order-service payment-service')" >> "$GITHUB_OUTPUT"
+          echo "wave3=$(filter 'bid-service notification-service')" >> "$GITHUB_OUTPUT"
+          echo "wave4=$(filter 'ai-service')" >> "$GITHUB_OUTPUT"
+
+  # -------------------------------------------------------------------------
   # 1) 빌드 + 이미지 push
   # -------------------------------------------------------------------------
   build:
     runs-on: ubuntu-latest
+    needs: plan
 
     steps:
       - uses: actions/checkout@v4
@@ -64,6 +107,7 @@ jobs:
       - name: Build and push images
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          SELECTED_SERVICES: ${{ needs.plan.outputs.all }}
         run: |
           set -euo pipefail
           IMAGE_TAG="${GITHUB_SHA::7}"
@@ -85,6 +129,12 @@ jobs:
           for entry in "${SERVICES[@]}"; do
             SERVICE="${entry%%:*}"
             DOCKERFILE="${entry#*:}"
+
+            case " ${SELECTED_SERVICES} " in
+              *" ${SERVICE} "*) ;;
+              *) continue ;;
+            esac
+
             IMAGE="${ECR_REGISTRY}/sanji/${SERVICE}"
             echo "::group::build ${SERVICE}"
             docker build -f "${DOCKERFILE}" \
@@ -107,10 +157,11 @@ jobs:
   # -------------------------------------------------------------------------
   wave-1:
     name: "Wave 1: config / discovery / gateway"
-    needs: build
+    needs: [build, plan]
+    if: ${{ !failure() && !cancelled() && needs.plan.outputs.wave1 != '' }}
     uses: ./.github/workflows/_deploy-wave.yml
     with:
-      services: 'config-server discovery-server gateway-server'
+      services: ${{ needs.plan.outputs.wave1 }}
 
   # -------------------------------------------------------------------------
   # 3) Wave 2: 앱 서비스 (1)
@@ -119,10 +170,11 @@ jobs:
   # -------------------------------------------------------------------------
   wave-2:
     name: "Wave 2: user / auction / order / payment"
-    needs: wave-1
+    needs: [wave-1, plan]
+    if: ${{ !failure() && !cancelled() && needs.plan.outputs.wave2 != '' }}
     uses: ./.github/workflows/_deploy-wave.yml
     with:
-      services: 'user-service auction-service order-service payment-service'
+      services: ${{ needs.plan.outputs.wave2 }}
 
   # -------------------------------------------------------------------------
   # 4) Wave 3: 앱 서비스 (2)
@@ -131,10 +183,11 @@ jobs:
   # -------------------------------------------------------------------------
   wave-3:
     name: "Wave 3: bid / notification"
-    needs: wave-2
+    needs: [wave-2, plan]
+    if: ${{ !failure() && !cancelled() && needs.plan.outputs.wave3 != '' }}
     uses: ./.github/workflows/_deploy-wave.yml
     with:
-      services: 'bid-service notification-service'
+      services: ${{ needs.plan.outputs.wave3 }}
 
   # -------------------------------------------------------------------------
   # 5) Wave 4: ai-service (단독)
@@ -144,8 +197,9 @@ jobs:
   # -------------------------------------------------------------------------
   wave-4:
     name: "Wave 4: ai-service"
-    needs: wave-3
+    needs: [wave-3, plan]
+    if: ${{ !failure() && !cancelled() && needs.plan.outputs.wave4 != '' }}
     uses: ./.github/workflows/_deploy-wave.yml
     with:
-      services: 'ai-service'
+      services: ${{ needs.plan.outputs.wave4 }}
       max_attempts: 120

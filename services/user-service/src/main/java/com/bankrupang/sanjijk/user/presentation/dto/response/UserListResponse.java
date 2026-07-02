@@ -4,7 +4,10 @@ import com.bankrupang.sanjijk.user.domain.UserRole;
 import com.bankrupang.sanjijk.user.domain.UserStatus;
 import com.bankrupang.sanjijk.user.domain.entity.User;
 
+import java.util.UUID;
+
 public record UserListResponse(
+        UUID userId,
         String name,
         String email,
         String phone,
@@ -15,6 +18,7 @@ public record UserListResponse(
 ) {
     public static UserListResponse from(User user) {
         return new UserListResponse(
+                user.getId(),
                 user.getName(),
                 user.getEmail(),
                 user.getPhone(),
