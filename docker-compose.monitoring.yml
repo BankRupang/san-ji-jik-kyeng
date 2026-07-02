@@ -53,6 +53,17 @@ services:
       NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET}
       NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL}
       SALT: ${LANGFUSE_SALT}
+      # Headless Initialization: 컨테이너가 뜰 때마다 같은 프로젝트/키를 자동 생성해서
+      # RDS가 destroy 후 재생성되어도 LANGFUSE_AUTH_HEADER를 재발급할 필요가 없게 함
+      LANGFUSE_INIT_ORG_ID: sanji
+      LANGFUSE_INIT_ORG_NAME: sanji
+      LANGFUSE_INIT_PROJECT_ID: sanji-ai
+      LANGFUSE_INIT_PROJECT_NAME: sanji-ai
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_INIT_PROJECT_PUBLIC_KEY}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_INIT_PROJECT_SECRET_KEY}
+      LANGFUSE_INIT_USER_EMAIL: sanji@test.com
+      LANGFUSE_INIT_USER_NAME: sanji
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD}
 
   # 모니터링 EC2 자체 지표 수집 (CPU, 디스크, 메모리)
   # Prometheus monitoring job이 9100 포트를 스크레이프
