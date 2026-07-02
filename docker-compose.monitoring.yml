@@ -77,8 +77,8 @@ services:
     restart: unless-stopped
     environment:
       KAFKA_CLUSTERS_0_NAME: prod
-      # SSM Run Command 스크립트에서 .env로 주입
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${KAFKA_PRIVATE_IP}:9092
+      # SSM Run Command 스크립트에서 .env로 주입 (브로커별로 이미 :9092가 붙은 값)
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
     ports: ["8080:8080"]
 
 volumes:
