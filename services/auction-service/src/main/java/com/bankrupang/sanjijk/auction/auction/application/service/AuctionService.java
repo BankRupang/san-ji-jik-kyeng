@@ -165,6 +165,7 @@ public class AuctionService {
         Auction auction = getExistingAuction(auctionId);
 
         auction.start();
+        scheduleEndCheckJobAfterCommit(auction);
         Product product = getExistingProduct(auction.getProductId());
         auctionOutboxService.saveAuctionStartEvent(auction, product);
 
@@ -354,6 +355,14 @@ public class AuctionService {
 
     private void cancelStartJobAfterCommit(Auction auction) {
         transactionAfterCommitExecutor.execute(() -> auctionScheduleManager.cancelStartJob(auction.getId()));
+    }
+
+    private void scheduleEndCheckJobAfterCommit(Auction auction) {
+        transactionAfterCommitExecutor.execute(() -> auctionScheduleManager.scheduleEndCheckJob(
+                auction.getId(),
+                auction.getEndAt(),
+                () -> auctionSchedulerJobService.checkAuctionEnd(auction.getId())
+        ));
     }
 
     private void cancelEndCheckJobAfterCommit(Auction auction) {
