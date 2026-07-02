@@ -110,6 +110,7 @@ jobs:
           EOS
 
           # 대상 EC2(Role 태그)와 실행할 스크립트를 짝지어 SSM으로 보내고 완료까지 기다립니다.
+          # Kafka는 3대이므로 인스턴스별로 루프를 돌아 각각 확인합니다.
           send_and_wait() {
             local role="$1" script="$2"
             echo "::group::deploy ${role}"
@@ -127,41 +128,51 @@ jobs:
               --query "Command.CommandId" --output text)
             echo "CommandId: ${command_id}"
 
-            # 대상 인스턴스 ID 조회 (Role 태그로 실행 중인 인스턴스)
-            local instance_id
-            instance_id=$(aws ec2 describe-instances \
+            # 인스턴스 ID 목록 (Role 태그로 실행 중인 인스턴스, 1대 이상)
+            local -a instance_ids
+            mapfile -t instance_ids < <(aws ec2 describe-instances \
               --filters "Name=tag:Role,Values=${role}" "Name=instance-state-name,Values=running" \
-              --query "Reservations[].Instances[].InstanceId" --output text --region "${AWS_REGION}")
-            echo "InstanceId: ${instance_id}"
+              --query "Reservations[].Instances[].InstanceId" --output json --region "${AWS_REGION}" \
+              | jq -r '.[]')
+            echo "InstanceIds: ${instance_ids[*]}"
 
-            aws ssm wait command-executed \
-              --command-id "${command_id}" \
-              --instance-id "${instance_id}" \
-              --region "${AWS_REGION}" || true
+            local overall_status="Success"
 
-            local status
-            status=$(aws ssm get-command-invocation \
-              --command-id "${command_id}" \
-              --instance-id "${instance_id}" \
-              --region "${AWS_REGION}" \
-              --query "Status" --output text)
-            echo "Status: ${status}"
+            for iid in "${instance_ids[@]}"; do
+              aws ssm wait command-executed \
+                --command-id "${command_id}" \
+                --instance-id "${iid}" \
+                --region "${AWS_REGION}" || true
 
-            # 실행 로그 출력
-            aws ssm get-command-invocation \
-              --command-id "${command_id}" \
-              --instance-id "${instance_id}" \
-              --region "${AWS_REGION}" \
-              --query "StandardOutputContent" --output text || true
-            echo "::endgroup::"
+              local status
+              status=$(aws ssm get-command-invocation \
+                --command-id "${command_id}" \
+                --instance-id "${iid}" \
+                --region "${AWS_REGION}" \
+                --query "Status" --output text)
+              echo "${iid} Status: ${status}"
 
-            if [ "${status}" != "Success" ]; then
-              echo "::error::${role} 배포 실패 (status=${status})"
+              # 실행 로그 출력
               aws ssm get-command-invocation \
                 --command-id "${command_id}" \
-                --instance-id "${instance_id}" \
+                --instance-id "${iid}" \
                 --region "${AWS_REGION}" \
-                --query "StandardErrorContent" --output text || true
+                --query "StandardOutputContent" --output text || true
+
+              if [ "${status}" != "Success" ]; then
+                echo "::error::${role} 배포 실패 (instance=${iid}, status=${status})"
+                aws ssm get-command-invocation \
+                  --command-id "${command_id}" \
+                  --instance-id "${iid}" \
+                  --region "${AWS_REGION}" \
+                  --query "StandardErrorContent" --output text || true
+                overall_status="${status}"
+              fi
+            done
+
+            echo "::endgroup::"
+
+            if [ "${overall_status}" != "Success" ]; then
               return 1
             fi
           }

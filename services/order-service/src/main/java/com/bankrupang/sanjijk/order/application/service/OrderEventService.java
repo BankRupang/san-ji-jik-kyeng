@@ -6,6 +6,7 @@ import com.bankrupang.sanjijk.order.domain.entity.OrderOutbox;
 import com.bankrupang.sanjijk.order.domain.exception.OrderEventPublishFailedException;
 import com.bankrupang.sanjijk.order.infrastructure.outbox.OrderOutboxJpaRepository;
 import com.bankrupang.sanjijk.order.infrastructure.messaging.producer.dto.DepositCreatedEvent;
+import com.bankrupang.sanjijk.order.infrastructure.messaging.producer.dto.DepositForfeitedEvent;
 import com.bankrupang.sanjijk.order.infrastructure.messaging.producer.dto.WinningCreatedEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -56,6 +57,21 @@ public class OrderEventService implements OrderEventPublisher {
                 LocalDateTime.now()
         );
         saveOutbox(order.getId(), "WINNING_CREATED", event);
+    }
+
+    @Override
+    @Transactional
+    public void publishDepositForfeited(Order winningOrder, Order depositOrder) {
+        DepositForfeitedEvent event = new DepositForfeitedEvent(
+                depositOrder.getId(),
+                winningOrder.getAuctionId(),
+                winningOrder.getAuctionTitle(),
+                winningOrder.getUserId(),
+                winningOrder.getSellerId(),
+                depositOrder.getAmount(),
+                LocalDateTime.now()
+        );
+        saveOutbox(depositOrder.getId(), "DEPOSIT_FORFEITED", event);
     }
 
     private void saveOutbox(UUID aggregateId, String eventType, Object event) {
