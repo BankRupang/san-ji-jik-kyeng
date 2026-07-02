@@ -42,6 +42,27 @@ LANGFUSE_SALT=$(aws ssm get-parameter \
   --output text \
   --region "${REGION}")
 
+LANGFUSE_INIT_PROJECT_PUBLIC_KEY=$(aws ssm get-parameter \
+  --name /sanji/prod/langfuse/public-key \
+  --with-decryption \
+  --query Parameter.Value \
+  --output text \
+  --region "${REGION}")
+
+LANGFUSE_INIT_PROJECT_SECRET_KEY=$(aws ssm get-parameter \
+  --name /sanji/prod/langfuse/secret-key \
+  --with-decryption \
+  --query Parameter.Value \
+  --output text \
+  --region "${REGION}")
+
+LANGFUSE_INIT_USER_PASSWORD=$(aws ssm get-parameter \
+  --name /sanji/prod/langfuse/init-user-password \
+  --with-decryption \
+  --query Parameter.Value \
+  --output text \
+  --region "${REGION}")
+
 DB_PASSWORD=$(aws ssm get-parameter \
   --name /sanji/prod/db/password \
   --with-decryption \
@@ -59,23 +80,36 @@ MONITORING_PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: ${IMDS_TOKEN}" http
 MONITORING_PRIVATE_IP=$(curl -s -H "X-aws-ec2-metadata-token: ${IMDS_TOKEN}" http://169.254.169.254/latest/meta-data/local-ipv4)
 export MONITORING_PRIVATE_IP
 
+# KAFKA_PRIVATE_IP는 쉼표로 구분된 여러 IP(포트 포함 여부는 무관)이므로
+# 브로커별로 IP를 뽑아 :9092를 붙인 kafka-ui용 bootstrap 문자열을 만듭니다.
+# (IP만 있는 값과 IP:PORT 값이 섞여 있어도 %%:*로 포트를 떼고 다시 붙입니다)
+IFS=',' read -ra KAFKA_IPS <<< "${KAFKA_PRIVATE_IP}"
+KAFKA_BOOTSTRAP_SERVERS=""
+for addr in "${KAFKA_IPS[@]}"; do
+  ip="${addr%%:*}"
+  KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:+${KAFKA_BOOTSTRAP_SERVERS},}${ip}:9092"
+done
+export KAFKA_BOOTSTRAP_SERVERS
+
 # .env 파일 생성
 cat > .env <<EOF
 KAFKA_PRIVATE_IP=${KAFKA_PRIVATE_IP}
+KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS}
 GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
 SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
 LANGFUSE_DATABASE_URL=postgresql://sanji:${DB_PASSWORD}@${RDS_HOST}:5432/sanji?schema=langfuse_schema
 LANGFUSE_NEXTAUTH_SECRET=${LANGFUSE_NEXTAUTH_SECRET}
 LANGFUSE_NEXTAUTH_URL=http://${MONITORING_PUBLIC_IP}:3001
 LANGFUSE_SALT=${LANGFUSE_SALT}
+LANGFUSE_INIT_PROJECT_PUBLIC_KEY=${LANGFUSE_INIT_PROJECT_PUBLIC_KEY}
+LANGFUSE_INIT_PROJECT_SECRET_KEY=${LANGFUSE_INIT_PROJECT_SECRET_KEY}
+LANGFUSE_INIT_USER_PASSWORD=${LANGFUSE_INIT_USER_PASSWORD}
 EOF
 chmod 600 .env
 
 # Prometheus 설정 파일 생성
 # envsubst 대신 직접 생성: KAFKA_PRIVATE_IP가 쉼표로 구분된 여러 IP이므로
 # targets 블록을 루프로 확장해야 합니다.
-IFS=',' read -ra KAFKA_IPS <<< "${KAFKA_PRIVATE_IP}"
-
 cat > monitoring/prometheus/prometheus.prod.yml <<'YAML_HEADER'
 global:
   scrape_interval: 15s
