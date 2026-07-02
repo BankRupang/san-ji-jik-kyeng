@@ -189,7 +189,7 @@ class UserControllerTest {
                             .header("X-User-Id", USER_ID.toString())
                             .header("X-User-Role", "MASTER"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.username").value("testuser"));
+                    .andExpect(jsonPath("$.data.name").value("testuser"));
         }
 
         @Test
