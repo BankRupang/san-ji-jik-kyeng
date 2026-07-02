@@ -113,8 +113,9 @@ class AuctionScheduleRecoveryTest {
 
     private Auction createProgressAuction(LocalDateTime startAt, LocalDateTime endAt) {
         Auction auction = createAuction(startAt);
-        ReflectionTestUtils.setField(auction, "endAt", endAt);
         auction.start();
+        ReflectionTestUtils.setField(auction, "startAt", startAt);
+        ReflectionTestUtils.setField(auction, "endAt", endAt);
         return auction;
     }
 }
