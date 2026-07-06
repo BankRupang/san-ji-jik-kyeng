@@ -18,7 +18,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -31,15 +30,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(UserController.class)
-@Import({CommonSecurityConfig.class, GlobalExceptionHandler.class, UserControllerTest.MethodSecurityConfig.class})
+@Import({CommonSecurityConfig.class, GlobalExceptionHandler.class})
 @TestPropertySource(properties = {
         "spring.cloud.config.enabled=false",
         "eureka.client.enabled=false"
 })
 class UserControllerTest {
 
-    @EnableMethodSecurity
-    static class MethodSecurityConfig {}
 
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
