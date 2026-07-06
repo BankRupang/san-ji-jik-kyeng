@@ -136,6 +136,8 @@ public class Auction extends BaseEntity {
 
         validateStatus(AuctionStatus.READY);
         this.status = AuctionStatus.PROGRESS;
+        this.startAt = LocalDateTime.now();
+        this.endAt = this.startAt.plusHours(1);
     }
 
     public void markResultPending() {
