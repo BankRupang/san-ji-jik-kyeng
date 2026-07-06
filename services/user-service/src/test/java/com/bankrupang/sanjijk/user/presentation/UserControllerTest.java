@@ -6,7 +6,7 @@ import com.bankrupang.sanjijk.user.domain.UserRole;
 import com.bankrupang.sanjijk.user.domain.UserStatus;
 import com.bankrupang.sanjijk.user.domain.exception.UserNotFoundException;
 import com.bankrupang.sanjijk.user.domain.exception.UserSuspendedException;
-import com.bankrupang.sanjijk.user.infrastructure.config.SecurityConfig;
+import com.bankrupang.sanjijk.common.config.CommonSecurityConfig;
 import com.bankrupang.sanjijk.user.presentation.controller.UserController;
 import com.bankrupang.sanjijk.user.presentation.dto.request.*;
 import com.bankrupang.sanjijk.user.presentation.dto.response.*;
@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(UserController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandler.class, UserControllerTest.MethodSecurityConfig.class})
+@Import({CommonSecurityConfig.class, GlobalExceptionHandler.class, UserControllerTest.MethodSecurityConfig.class})
 @TestPropertySource(properties = {
         "spring.cloud.config.enabled=false",
         "eureka.client.enabled=false"
