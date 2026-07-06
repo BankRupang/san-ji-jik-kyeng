@@ -52,7 +52,6 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.GET, "/api/v1/bids/auctions/*/highest").permitAll()
                         .pathMatchers("/actuator/health", "/actuator/prometheus").permitAll()
                         .pathMatchers("/ws/**").permitAll()
-                        .pathMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**").permitAll()
                         .anyExchange().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
