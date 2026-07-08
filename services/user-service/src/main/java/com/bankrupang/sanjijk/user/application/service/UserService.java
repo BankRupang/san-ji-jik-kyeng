@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.concurrent.CompletableFuture;
 import java.util.List;
 import jakarta.persistence.criteria.Predicate;
 import java.util.UUID;
@@ -111,18 +112,23 @@ public class UserService {
     }
 
     // 로그인
-    @Transactional
+    @Transactional(readOnly = true)
     public UserLoginResponse login(UserLoginRequest request) {
         // 1. DB에서 유저 상태 확인 (탈퇴 여부)
+        //    @Transactional(readOnly=true) 경계 안에서 findByUsername 실행 → 트랜잭션 종료 시 DB 커넥션 반환
+        //    open-in-view=false 이므로 이후 Keycloak 호출 중에 커넥션이 점유되지 않음
         User user = userRepository.findByUsername(request.username())
                 .orElseThrow(UserNotFoundException::new);
 
         user.validateStatusForLogin();
 
-        // 2. 기존 세션 폐기 (중복 로그인 방지 — 새 기기 로그인 시 이전 토큰 만료)
-        keycloakService.revokeUserSessions(user.getId());
+        // 2. 기존 세션 비동기 폐기 (fire-and-forget)
+        //    revokeUserSessions 결과는 로그인 응답에 필요 없으므로 비동기 처리
+        //    → 응답 시간: revoke(180ms) + login(250ms) = 430ms  →  login(250ms)만 블로킹
+        UUID userId = user.getId();
+        CompletableFuture.runAsync(() -> keycloakService.revokeUserSessions(userId));
 
-        // 3. Keycloak에 로그인 요청 → 새 토큰 발급
+        // 3. Keycloak에 로그인 요청 → 새 토큰 발급 (동기 — 토큰 발급 결과가 응답에 필요)
         KeycloakTokenResponse token = keycloakService.login(request.username(), request.password());
 
         // 4. UserLoginResponse로 변환해서 반환

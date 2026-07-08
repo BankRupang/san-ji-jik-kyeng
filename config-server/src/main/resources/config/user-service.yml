@@ -12,6 +12,7 @@ spring:
       host: ${SPRING_DATA_REDIS_HOST}
       port: 6379
   jpa:
+    open-in-view: false # DB 커넥션이 Keycloak HTTP 호출 중에도 점유되는 것을 방지
     hibernate:
       ddl-auto: validate
     properties:
