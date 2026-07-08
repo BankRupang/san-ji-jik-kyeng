@@ -77,3 +77,5 @@ resilience4j:
         permittedNumberOfCallsInHalfOpenState: 3
         slidingWindowSize: 10
         slidingWindowType: COUNT_BASED
+        slowCallRateThreshold: 50        # slow call 50% 이상 → CB open
+        slowCallDurationThreshold: 350ms # 350ms 초과 = slow call (Keycloak 정상 응답 ~250ms 기준)
