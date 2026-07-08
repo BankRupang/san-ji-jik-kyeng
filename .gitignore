@@ -54,13 +54,7 @@ MEMORY.md
 ### Generated at deploy time ###
 monitoring/prometheus/prometheus.prod.yml
 
-### Local test frontend ###
-api-test.html
-user-api-test.html
 
 .DS_Store
 ### Local Scripts ###
 make_csv.py
-
-# 개인 정리 문서 (비공개)
-.brusher/
