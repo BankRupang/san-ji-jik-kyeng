@@ -30,13 +30,15 @@ const connectErr   = new Counter('connect_error');
 const bidLatency   = new Trend('bid_latency_ms');
 
 // 성공 카운트 공유 (k6는 VU 간 공유 안 되므로 메트릭으로 판별)
+const VUS = parseInt(__ENV.VUS || '50');
+
 export const options = {
     scenarios: {
         concurrent_bids: {
             executor: 'shared-iterations',  // 전체 N번을 VU들이 나눠서 처리
-            vus: 50,                        // 동시 접속 유저 수
-            iterations: 50,                 // 총 입찰 시도 수 (vus == iterations → 한 번에 모두 동시)
-            maxDuration: '30s',
+            vus: VUS,                       // 동시 접속 유저 수 (VUS 환경변수로 조절)
+            iterations: VUS,                // 총 입찰 시도 수 (vus == iterations → 한 번에 모두 동시)
+            maxDuration: '60s',
         },
     },
     thresholds: {
@@ -132,6 +134,18 @@ export function handleSummary(data) {
         console.log(`\n⚠️  경고: 동시 낙찰 ${success}건 발생 → 분산 락 버그!`);
     } else {
         console.log(`\n✅ 정상: 동시 성공 1건 이하`);
+    }
+
+    const lat = data.metrics['bid_latency_ms']?.values;
+    const durationMs = data.state?.testRunDurationMs ?? 0;
+    const totalIters = data.metrics['iterations']?.values?.count ?? 0;
+
+    console.log('\n===== 지표 =====');
+    if (lat) {
+        console.log(`bid_latency_ms: avg=${lat.avg.toFixed(1)} min=${lat.min.toFixed(1)} p(90)=${lat['p(90)'].toFixed(1)} p(95)=${lat['p(95)'].toFixed(1)} max=${lat.max.toFixed(1)}`);
+    }
+    if (durationMs > 0) {
+        console.log(`처리시간: ${(durationMs / 1000).toFixed(2)}s, TPS(iterations/s): ${(totalIters / (durationMs / 1000)).toFixed(1)}`);
     }
 
     return {};
